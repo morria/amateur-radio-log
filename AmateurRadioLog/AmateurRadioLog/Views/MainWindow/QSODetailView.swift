@@ -61,9 +61,19 @@ struct QSODetailView: View {
 
                 // QSO Details
                 DetailSection(title: "QSO Details") {
+                    clickableDetailRow(label: "Date", value: ADIFDateFormatter.displayDate(qso.qsoDate)) {
+                        // Filter to same day
+                        appState.clearFilters()
+                        appState.searchText = qso.qsoDate.isEmpty ? "" : ADIFDateFormatter.displayDate(qso.qsoDate)
+                        appState.selectedTab = .log
+                    }
                     DetailRow(label: "Frequency", value: qso.displayFrequency)
-                    DetailRow(label: "Band", value: qso.band?.displayName)
-                    DetailRow(label: "Mode", value: qso.mode?.displayName)
+                    clickableDetailRow(label: "Band", value: qso.band?.displayName) {
+                        if let b = qso.band { appState.showLogFiltered(band: b) }
+                    }
+                    clickableDetailRow(label: "Mode", value: qso.mode?.displayName) {
+                        if let m = qso.mode { appState.showLogFiltered(mode: m) }
+                    }
                     DetailRow(label: "Submode", value: qso.submode)
                     DetailRow(label: "RST Sent", value: qso.rstSent)
                     DetailRow(label: "RST Rcvd", value: qso.rstRcvd)

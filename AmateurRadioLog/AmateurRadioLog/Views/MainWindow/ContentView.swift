@@ -28,14 +28,14 @@ struct ContentView: View {
     @State private var showingNewQSO = false
     @State private var showingImporter = false
     @State private var showingExportSheet = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
     var body: some View {
         @Bindable var appState = appState
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 #if os(macOS)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 250)
+                .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
                 #endif
         } detail: {
             switch appState.selectedTab {
@@ -44,8 +44,9 @@ struct ContentView: View {
             case .stats: StatsView(qsos: allQSOs)
             }
         }
+        .navigationSplitViewStyle(.balanced)
         #if os(macOS)
-        .frame(minWidth: 950, minHeight: 600)
+        .frame(minWidth: 900, minHeight: 600)
         #endif
         .toolbar { toolbarContent }
         .sheet(isPresented: $showingNewQSO) {
@@ -147,18 +148,32 @@ struct QSOLogView: View {
     var onDelete: (QSO) -> Void
     var onNew: () -> Void
 
+    @State private var showDetailPanel = true
+
     var body: some View {
-        @Bindable var appState = appState
         VStack(spacing: 0) {
             SearchBarView()
             Divider()
             #if os(macOS)
-            HSplitView {
+            HStack(spacing: 0) {
                 QSOListView(
                     selectedQSO: $selectedQSO,
                     onEdit: onEdit, onDelete: onDelete)
-                    .frame(minWidth: 400)
-                detailPane.frame(minWidth: 250, idealWidth: 300)
+                    .frame(minWidth: 300)
+                    .layoutPriority(1)
+                if showDetailPanel {
+                    Divider()
+                    detailPane
+                        .frame(width: 280)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { withAnimation { showDetailPanel.toggle() } }) {
+                        Label("Inspector", systemImage: "sidebar.trailing")
+                    }
+                    .help(showDetailPanel ? "Hide Detail Panel" : "Show Detail Panel")
+                }
             }
             #else
             QSOListView(
@@ -172,7 +187,20 @@ struct QSOLogView: View {
     @ViewBuilder
     private var detailPane: some View {
         if let qso = selectedQSO {
-            QSODetailView(qso: qso, onEdit: onEdit)
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button(action: { withAnimation { showDetailPanel = false } }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Close Detail Panel")
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 6)
+                QSODetailView(qso: qso, onEdit: onEdit)
+            }
         } else {
             VStack { Spacer(); Text("Select a QSO").foregroundStyle(.secondary); Spacer() }
         }

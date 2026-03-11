@@ -11,6 +11,7 @@ struct QSOMapPin: Identifiable, Hashable {
     let date: String
     let country: String
     let rstRcvd: String
+    let colorKey: String  // changes when color-by changes, forcing re-render
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -27,7 +28,6 @@ struct ContactMapView: View {
 
     private var filteredQSOs: [QSO] {
         var result = appState.filteredQSOs(from: qsos)
-        // Apply map-specific time range filter
         if let startDate = appState.mapTimeRange.startDate {
             result = result.filter { qso in
                 guard let dt = qso.dateTime else { return false }
@@ -38,17 +38,28 @@ struct ContactMapView: View {
     }
 
     private var pins: [QSOMapPin] {
-        filteredQSOs.compactMap { qso in
+        let colorBy = appState.mapColorBy
+        return filteredQSOs.compactMap { qso in
             guard let lat = qso.latitude, let lon = qso.longitude else { return nil }
+            let band = qso.band?.displayName ?? ""
+            let mode = qso.mode?.displayName ?? ""
+            let rst = qso.rstRcvd ?? ""
+            // Include colorBy in the colorKey so pin IDs change when color mode changes
+            let colorKey: String
+            switch colorBy {
+            case .band: colorKey = "b-\(band)"
+            case .mode: colorKey = "m-\(mode)"
+            case .snr: colorKey = "s-\(rst)"
+            }
             return QSOMapPin(
-                id: "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)",
+                id: "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)-\(colorKey)",
                 latitude: lat, longitude: lon,
                 callsign: qso.call,
-                band: qso.band?.displayName ?? "",
-                mode: qso.mode?.displayName ?? "",
+                band: band, mode: mode,
                 date: ADIFDateFormatter.displayDate(qso.qsoDate),
                 country: qso.country ?? "",
-                rstRcvd: qso.rstRcvd ?? ""
+                rstRcvd: rst,
+                colorKey: colorKey
             )
         }
     }
@@ -63,9 +74,14 @@ struct ContactMapView: View {
             ZStack(alignment: .topTrailing) {
                 Map(position: $cameraPosition, selection: $selectedPin) {
                     ForEach(pins) { pin in
-                        Marker(pin.callsign, coordinate: pin.coordinate)
-                            .tint(pinColor(for: pin))
-                            .tag(pin)
+                        Annotation(pin.callsign, coordinate: pin.coordinate) {
+                            Circle()
+                                .fill(pinColor(for: pin))
+                                .stroke(selectedPin == pin ? Color.white : Color.clear, lineWidth: 2)
+                                .frame(width: 10, height: 10)
+                                .shadow(radius: 1)
+                        }
+                        .tag(pin)
                     }
                 }
                 .mapStyle(.standard)
@@ -77,6 +93,20 @@ struct ContactMapView: View {
                             Text("\(pins.count) mapped").font(.caption).bold()
                             Text("\(filteredQSOs.count - pins.count) no coords")
                                 .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+
+                    // Clear filters button (visible when filters active)
+                    if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
+                        Button(action: {
+                            appState.clearFilters()
+                            appState.mapTimeRange = .allTime
+                        }) {
+                            Label("Clear Filters", systemImage: "xmark.circle")
+                                .font(.caption)
+                                .padding(8)
+                                .background(.regularMaterial)
+                                .clipShape(Capsule())
                         }
                     }
 
@@ -115,22 +145,27 @@ struct ContactMapView: View {
             }
         }
         .onChange(of: appState.mapHighlightQSOId) { _, newId in
-            if let newId, let pin = pins.first(where: { $0.id == newId }) {
-                selectedPin = pin
-                cameraPosition = .region(MKCoordinateRegion(
-                    center: pin.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
-                ))
+            if let newId {
+                // Match by prefix since pin IDs now include colorKey
+                if let pin = pins.first(where: { $0.id.hasPrefix(newId) }) {
+                    selectedPin = pin
+                    cameraPosition = .region(MKCoordinateRegion(
+                        center: pin.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
+                    ))
+                }
                 appState.mapHighlightQSOId = nil
             }
         }
         .onAppear {
-            if let id = appState.mapHighlightQSOId, let pin = pins.first(where: { $0.id == id }) {
-                selectedPin = pin
-                cameraPosition = .region(MKCoordinateRegion(
-                    center: pin.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
-                ))
+            if let id = appState.mapHighlightQSOId {
+                if let pin = pins.first(where: { $0.id.hasPrefix(id) }) {
+                    selectedPin = pin
+                    cameraPosition = .region(MKCoordinateRegion(
+                        center: pin.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
+                    ))
+                }
                 appState.mapHighlightQSOId = nil
             }
         }
@@ -242,6 +277,13 @@ struct ContactMapView: View {
                 }
             }
             .pickerStyle(.segmented)
+
+            if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
+                Button("Clear All Filters") {
+                    appState.clearFilters()
+                    appState.mapTimeRange = .allTime
+                }
+            }
         }
     }
 
