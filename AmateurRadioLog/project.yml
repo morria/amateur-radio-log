@@ -1,0 +1,63 @@
+name: AmateurRadioLog
+options:
+  bundleIdPrefix: com.amateurradiolog
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    SUPPORTS_MACCATALYST: NO
+
+targets:
+  AmateurRadioLog:
+    type: application
+    supportedDestinations: [macOS, iOS]
+    sources:
+      - AmateurRadioLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.amateurradiolog.app
+        INFOPLIST_KEY_CFBundleDisplayName: "Amateur Radio Log"
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0.0
+        SWIFT_EMIT_LOC_STRINGS: YES
+        PRODUCT_NAME: "Amateur Radio Log"
+        CODE_SIGN_ENTITLEMENTS: AmateurRadioLog/App/AmateurRadioLog.entitlements
+        SWIFT_STRICT_CONCURRENCY: minimal
+    entitlements:
+      path: AmateurRadioLog/App/AmateurRadioLog.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.network.client: true
+        com.apple.developer.icloud-container-identifiers:
+          - "iCloud.com.amateurradiolog.app"
+        com.apple.developer.icloud-services:
+          - "CloudDocuments"
+          - "CloudKit"
+        com.apple.developer.ubiquity-container-identifiers:
+          - "iCloud.com.amateurradiolog.app"
+
+  AmateurRadioLogTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - AmateurRadioLogTests
+    dependencies:
+      - target: AmateurRadioLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.amateurradiolog.tests
+        GENERATE_INFOPLIST_FILE: YES
