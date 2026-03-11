@@ -9,6 +9,7 @@ struct QSOEditorView: View {
     @State private var isLookingUp = false
     @State private var dateValue: Date
     @State private var timeValue: Date
+    @State private var lookupTask: Task<Void, Never>?
 
     let onSave: (QSOEditData) -> Void
 
@@ -22,17 +23,22 @@ struct QSOEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                contactSection
-                frequencySection
-                signalSection
-                stationSection
-                notesSection
-                lookupSection
+            ScrollView {
+                Form {
+                    contactSection
+                    frequencySection
+                    signalSection
+                    stationSection
+                    notesSection
+                    lookupSection
+                }
+                #if os(macOS)
+                .formStyle(.grouped)
+                #endif
             }
             .navigationTitle(data.isNew ? "New QSO" : "Edit QSO")
             #if os(macOS)
-            .frame(width: 550, height: 600)
+            .frame(width: 550, height: 650)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -62,12 +68,10 @@ struct QSOEditorView: View {
                     #if os(iOS)
                     .textInputAutocapitalization(.characters)
                     #endif
-                    .onChange(of: data.call) { _, v in data.call = v.uppercased() }
-
-                Button("Lookup") {
-                    Task { await performLookup() }
-                }
-                .disabled(data.call.count < 3 || isLookingUp)
+                    .onChange(of: data.call) { _, v in
+                        data.call = v.uppercased()
+                        scheduleLookup()
+                    }
 
                 if isLookingUp { ProgressView().controlSize(.small) }
             }
@@ -181,10 +185,47 @@ struct QSOEditorView: View {
         }
     }
 
-    private func performLookup() async {
+    private func scheduleLookup() {
+        lookupTask?.cancel()
+        let callsign = data.call
+        guard callsign.count >= 3 else {
+            lookupResult = nil
+            return
+        }
+        lookupTask = Task {
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled else { return }
+            await performLookup(callsign)
+        }
+    }
+
+    private func performLookup(_ callsign: String) async {
         isLookingUp = true
-        lookupResult = await appState.lookupCallsign(data.call)
+        let result = await appState.lookupCallsign(callsign)
+        guard !Task.isCancelled else {
+            isLookingUp = false
+            return
+        }
+        lookupResult = result
         isLookingUp = false
+        // Auto-fill empty fields
+        if let result {
+            autoFillFromLookup(result)
+        }
+    }
+
+    private func autoFillFromLookup(_ r: CallsignLookupResult) {
+        if data.name == nil || data.name?.isEmpty == true, let v = r.fullName { data.name = v }
+        if data.qth == nil || data.qth?.isEmpty == true, let v = r.city { data.qth = v }
+        if data.state == nil || data.state?.isEmpty == true, let v = r.state { data.state = v }
+        if data.country == nil || data.country?.isEmpty == true, let v = r.country { data.country = v }
+        if data.gridsquare == nil || data.gridsquare?.isEmpty == true, let v = r.grid { data.gridsquare = v }
+        if data.latitude == nil, let v = r.latitude { data.latitude = v }
+        if data.longitude == nil, let v = r.longitude { data.longitude = v }
+        if data.cqZone == nil, let v = r.cqZone { data.cqZone = v }
+        if data.ituZone == nil, let v = r.ituZone { data.ituZone = v }
+        if data.dxcc == nil, let v = r.dxcc { data.dxcc = v }
+        if data.continent == nil, let v = r.continent { data.continent = v }
     }
 
     private func applyLookup(_ r: CallsignLookupResult) {

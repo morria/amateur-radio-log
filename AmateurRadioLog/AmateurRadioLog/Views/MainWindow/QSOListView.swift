@@ -2,32 +2,18 @@ import SwiftUI
 import SwiftData
 
 struct QSOListView: View {
-    var searchText: String
-    var filterBand: Band?
-    var filterMode: Mode?
+    @Environment(AppState.self) private var appState
     @Binding var selectedQSO: QSO?
     var onEdit: (QSO) -> Void
     var onDelete: (QSO) -> Void
 
     @Query(sort: \QSO.qsoDate, order: .reverse) private var allQSOs: [QSO]
+    #if os(macOS)
+    @State private var sortOrder = [KeyPathComparator(\QSO.qsoDate, order: .reverse)]
+    #endif
 
     private var filteredQSOs: [QSO] {
-        allQSOs.filter { qso in
-            if !searchText.isEmpty {
-                let s = searchText.uppercased()
-                let matches = qso.call.uppercased().contains(s)
-                    || (qso.name?.uppercased().contains(s) ?? false)
-                    || (qso.country?.uppercased().contains(s) ?? false)
-                    || (qso.qth?.uppercased().contains(s) ?? false)
-                    || (qso.gridsquare?.uppercased().contains(s) ?? false)
-                    || (qso.state?.uppercased().contains(s) ?? false)
-                    || (qso.comment?.uppercased().contains(s) ?? false)
-                if !matches { return false }
-            }
-            if let band = filterBand, qso.bandRaw != band.rawValue { return false }
-            if let mode = filterMode, qso.modeRaw != mode.rawValue { return false }
-            return true
-        }
+        appState.filteredQSOs(from: allQSOs)
     }
 
     var body: some View {
@@ -39,60 +25,85 @@ struct QSOListView: View {
     }
 
     #if os(macOS)
+    private var sortedFilteredQSOs: [QSO] {
+        filteredQSOs.sorted(using: sortOrder)
+    }
+
     private var macOSList: some View {
-        Table(filteredQSOs, selection: Binding(
+        Table(sortedFilteredQSOs, selection: Binding(
             get: { selectedQSO?.persistentModelID },
-            set: { id in selectedQSO = id.flatMap { pid in filteredQSOs.first { $0.persistentModelID == pid } } }
-        )) {
-            TableColumn("Date") { qso in
+            set: { id in selectedQSO = id.flatMap { pid in sortedFilteredQSOs.first { $0.persistentModelID == pid } } }
+        ), sortOrder: $sortOrder) {
+            TableColumn("Date", value: \.qsoDate) { qso in
                 Text(ADIFDateFormatter.displayDate(qso.qsoDate))
                     .font(.system(.body, design: .monospaced))
             }
             .width(min: 80, ideal: 100)
 
-            TableColumn("Time") { qso in
+            TableColumn("Time", value: \.timeOn) { qso in
                 Text(ADIFDateFormatter.displayTime(qso.timeOn))
                     .font(.system(.body, design: .monospaced))
             }
             .width(min: 60, ideal: 75)
 
-            TableColumn("Callsign") { qso in
-                Text(qso.call).font(.system(.body, design: .monospaced)).bold()
+            TableColumn("Callsign", value: \.call) { qso in
+                Text(qso.call)
+                    .font(.system(.body, design: .monospaced)).bold()
+                    .foregroundStyle(.blue)
+                    .onTapGesture { appState.showLogFiltered(callsign: qso.call) }
             }
             .width(min: 80, ideal: 100)
 
-            TableColumn("Band") { qso in Text(qso.band?.displayName ?? "—") }
+            TableColumn("Band", value: \.bandSort) { qso in Text(qso.band?.displayName ?? "—") }
                 .width(min: 40, ideal: 50)
 
-            TableColumn("Mode") { qso in Text(qso.mode?.displayName ?? "—") }
+            TableColumn("Mode", value: \.modeSort) { qso in Text(qso.mode?.displayName ?? "—") }
                 .width(min: 40, ideal: 55)
 
-            TableColumn("RST S") { qso in Text(qso.rstSent ?? "—") }
+            TableColumn("RST S", value: \.rstSentSort) { qso in Text(qso.rstSent ?? "—") }
                 .width(min: 35, ideal: 45)
 
-            TableColumn("RST R") { qso in Text(qso.rstRcvd ?? "—") }
+            TableColumn("RST R", value: \.rstRcvdSort) { qso in Text(qso.rstRcvd ?? "—") }
                 .width(min: 35, ideal: 45)
 
-            TableColumn("Name") { qso in Text(qso.name ?? "—") }
+            TableColumn("Name", value: \.nameSort) { qso in Text(qso.name ?? "—") }
                 .width(min: 60, ideal: 100)
 
-            TableColumn("Country") { qso in Text(qso.country ?? "—") }
-                .width(min: 60, ideal: 100)
+            TableColumn("Country", value: \.countrySort) { qso in
+                Text(qso.country ?? "—")
+                    .foregroundStyle(qso.country != nil ? .blue : .primary)
+                    .onTapGesture {
+                        if let c = qso.country { appState.showLogFiltered(country: c) }
+                    }
+            }
+            .width(min: 60, ideal: 100)
 
-            TableColumn("Grid") { qso in
-                Text(qso.gridsquare ?? "—").font(.system(.body, design: .monospaced))
+            TableColumn("Grid", value: \.gridSort) { qso in
+                Text(qso.gridsquare ?? "—")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(qso.gridsquare != nil ? .blue : .primary)
+                    .onTapGesture {
+                        if let g = qso.gridsquare { appState.showLogFiltered(grid: g) }
+                    }
             }
             .width(min: 50, ideal: 60)
         }
         .contextMenu(forSelectionType: PersistentIdentifier.self) { ids in
-            if let id = ids.first, let qso = filteredQSOs.first(where: { $0.persistentModelID == id }) {
+            if let id = ids.first, let qso = sortedFilteredQSOs.first(where: { $0.persistentModelID == id }) {
                 Button("Edit QSO") { onEdit(qso) }
+                Button("Show on Map") { appState.showOnMap(qso: qso) }
+                if let country = qso.country {
+                    Button("Filter by Country: \(country)") { appState.showLogFiltered(country: country) }
+                }
+                if let state = qso.state {
+                    Button("Filter by State: \(state)") { appState.showLogFiltered(state: state) }
+                }
                 Divider()
                 Button("Delete QSO", role: .destructive) { onDelete(qso) }
             }
         } primaryAction: { ids in
-            if let id = ids.first, let qso = filteredQSOs.first(where: { $0.persistentModelID == id }) {
-                onEdit(qso)
+            if let id = ids.first, let qso = sortedFilteredQSOs.first(where: { $0.persistentModelID == id }) {
+                appState.showOnMap(qso: qso)
             }
         }
     }
@@ -143,6 +154,10 @@ struct QSOListView: View {
                 Button(role: .destructive) { onDelete(qso) } label: { Label("Delete", systemImage: "trash") }
                 Button { onEdit(qso) } label: { Label("Edit", systemImage: "pencil") }
                     .tint(.blue)
+            }
+            .swipeActions(edge: .leading) {
+                Button { appState.showOnMap(qso: qso) } label: { Label("Map", systemImage: "map") }
+                    .tint(.green)
             }
         }
         .navigationDestination(for: PersistentIdentifier.self) { id in

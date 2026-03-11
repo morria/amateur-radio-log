@@ -10,6 +10,7 @@ struct QSOMapPin: Identifiable, Hashable {
     let mode: String
     let date: String
     let country: String
+    let rstRcvd: String
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -17,12 +18,27 @@ struct QSOMapPin: Identifiable, Hashable {
 }
 
 struct ContactMapView: View {
+    @Environment(AppState.self) private var appState
     let qsos: [QSO]
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPin: QSOMapPin?
+    @State private var showFilters = false
+    @State private var showLegend = false
+
+    private var filteredQSOs: [QSO] {
+        var result = appState.filteredQSOs(from: qsos)
+        // Apply map-specific time range filter
+        if let startDate = appState.mapTimeRange.startDate {
+            result = result.filter { qso in
+                guard let dt = qso.dateTime else { return false }
+                return dt >= startDate
+            }
+        }
+        return result
+    }
 
     private var pins: [QSOMapPin] {
-        qsos.compactMap { qso in
+        filteredQSOs.compactMap { qso in
             guard let lat = qso.latitude, let lon = qso.longitude else { return nil }
             return QSOMapPin(
                 id: "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)",
@@ -31,46 +47,264 @@ struct ContactMapView: View {
                 band: qso.band?.displayName ?? "",
                 mode: qso.mode?.displayName ?? "",
                 date: ADIFDateFormatter.displayDate(qso.qsoDate),
-                country: qso.country ?? ""
+                country: qso.country ?? "",
+                rstRcvd: qso.rstRcvd ?? ""
             )
         }
     }
 
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Map(position: $cameraPosition, selection: $selectedPin) {
-                ForEach(pins) { pin in
-                    Marker(pin.callsign, coordinate: pin.coordinate)
-                        .tint(pinColor(pin.band))
-                        .tag(pin)
-                }
-            }
-            .mapStyle(.standard)
+    private var selectedCallsignQSOs: [QSO] {
+        guard let pin = selectedPin else { return [] }
+        return filteredQSOs.filter { $0.call == pin.callsign }
+    }
 
-            VStack(alignment: .trailing, spacing: 8) {
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(pins.count) mapped").font(.caption).bold()
-                        Text("\(qsos.count - pins.count) no coords").font(.caption2).foregroundStyle(.secondary)
+    var body: some View {
+        HStack(spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                Map(position: $cameraPosition, selection: $selectedPin) {
+                    ForEach(pins) { pin in
+                        Marker(pin.callsign, coordinate: pin.coordinate)
+                            .tint(pinColor(for: pin))
+                            .tag(pin)
                     }
                 }
+                .mapStyle(.standard)
 
-                if let pin = selectedPin {
+                VStack(alignment: .trailing, spacing: 8) {
+                    // Stats overlay
                     GroupBox {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(pin.callsign).font(.headline).fontDesign(.monospaced)
-                            Text("\(pin.band) \(pin.mode)").font(.caption)
-                            Text(pin.date).font(.caption)
-                            if !pin.country.isEmpty { Text(pin.country).font(.caption).foregroundStyle(.secondary) }
+                            Text("\(pins.count) mapped").font(.caption).bold()
+                            Text("\(filteredQSOs.count - pins.count) no coords")
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
+
+                    // Filter button
+                    Button(action: { showFilters.toggle() }) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.title3)
+                            .padding(8)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    .popover(isPresented: $showFilters) {
+                        mapFiltersView.padding().frame(width: 280)
+                    }
+
+                    // Legend button
+                    Button(action: { showLegend.toggle() }) {
+                        Image(systemName: "paintpalette")
+                            .font(.title3)
+                            .padding(8)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    .popover(isPresented: $showLegend) {
+                        legendView.padding().frame(width: 220)
+                    }
                 }
+                .padding()
             }
-            .padding()
+
+            // Right panel: QSO list for selected callsign
+            if selectedPin != nil && !selectedCallsignQSOs.isEmpty {
+                Divider()
+                callsignDetailPanel
+                    .frame(width: 300)
+            }
+        }
+        .onChange(of: appState.mapHighlightQSOId) { _, newId in
+            if let newId, let pin = pins.first(where: { $0.id == newId }) {
+                selectedPin = pin
+                cameraPosition = .region(MKCoordinateRegion(
+                    center: pin.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
+                ))
+                appState.mapHighlightQSOId = nil
+            }
+        }
+        .onAppear {
+            if let id = appState.mapHighlightQSOId, let pin = pins.first(where: { $0.id == id }) {
+                selectedPin = pin
+                cameraPosition = .region(MKCoordinateRegion(
+                    center: pin.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
+                ))
+                appState.mapHighlightQSOId = nil
+            }
         }
     }
 
-    private func pinColor(_ band: String) -> Color {
+    // MARK: - Callsign Detail Panel
+
+    private var callsignDetailPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let pin = selectedPin {
+                HStack {
+                    Text(pin.callsign)
+                        .font(.headline.monospaced())
+                    Spacer()
+                    Button(action: { selectedPin = nil }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding()
+
+                Divider()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(selectedCallsignQSOs, id: \.persistentModelID) { qso in
+                            qsoCard(qso)
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+        .background(.background)
+    }
+
+    private func qsoCard(_ qso: QSO) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(qso.displayDate).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if let band = qso.band {
+                    Text(band.displayName)
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.blue.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+                if let mode = qso.mode {
+                    Text(mode.displayName)
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.green.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            if let freq = qso.freq {
+                Text(String(format: "%.4f MHz", freq)).font(.caption)
+            }
+            HStack {
+                if let rst = qso.rstSent { Text("S: \(rst)").font(.caption) }
+                if let rst = qso.rstRcvd { Text("R: \(rst)").font(.caption) }
+            }
+            if let name = qso.name { Text(name).font(.caption) }
+            if let country = qso.country { Text(country).font(.caption).foregroundStyle(.secondary) }
+            if let grid = qso.gridsquare { Text("Grid: \(grid)").font(.caption).foregroundStyle(.secondary) }
+            if let comment = qso.comment, !comment.isEmpty {
+                Text(comment).font(.caption2).foregroundStyle(.secondary).italic()
+            }
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    // MARK: - Map Filters
+
+    private var mapFiltersView: some View {
+        @Bindable var appState = appState
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Map Filters").font(.headline)
+
+            Picker("Time Range", selection: $appState.mapTimeRange) {
+                ForEach(MapTimeRange.allCases) { range in
+                    Text(range.rawValue).tag(range)
+                }
+            }
+
+            Picker("Band", selection: $appState.filterBand) {
+                Text("All Bands").tag(nil as Band?)
+                ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
+                Divider()
+                ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
+            }
+
+            Picker("Mode", selection: $appState.filterMode) {
+                Text("All Modes").tag(nil as Mode?)
+                ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
+            }
+
+            Divider()
+
+            Picker("Color by", selection: $appState.mapColorBy) {
+                ForEach(MapColorOption.allCases) { opt in
+                    Text(opt.rawValue).tag(opt)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    // MARK: - Legend
+
+    private var legendView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Legend (\(appState.mapColorBy.rawValue))").font(.headline)
+            Divider()
+
+            switch appState.mapColorBy {
+            case .band:
+                ForEach(legendBands, id: \.0) { name, color in
+                    HStack(spacing: 8) {
+                        Circle().fill(color).frame(width: 10, height: 10)
+                        Text(name).font(.caption)
+                    }
+                }
+            case .mode:
+                ForEach(legendModes, id: \.0) { name, color in
+                    HStack(spacing: 8) {
+                        Circle().fill(color).frame(width: 10, height: 10)
+                        Text(name).font(.caption)
+                    }
+                }
+            case .snr:
+                ForEach(legendSNR, id: \.0) { label, color in
+                    HStack(spacing: 8) {
+                        Circle().fill(color).frame(width: 10, height: 10)
+                        Text(label).font(.caption)
+                    }
+                }
+            }
+        }
+    }
+
+    private var legendBands: [(String, Color)] {
+        [("160m", .purple), ("80m", .indigo), ("40m", .blue), ("30m", .cyan),
+         ("20m", .green), ("17m", .mint), ("15m", .yellow), ("12m", .orange),
+         ("10m", .red), ("6m", .pink), ("2m", .brown), ("70cm", .gray)]
+    }
+
+    private var legendModes: [(String, Color)] {
+        [("SSB", .blue), ("CW", .red), ("FT8", .green), ("FT4", .mint),
+         ("FM", .orange), ("AM", .purple), ("RTTY", .cyan), ("Other", .gray)]
+    }
+
+    private var legendSNR: [(String, Color)] {
+        [("S9 (Strong)", .green), ("S7-S8", .yellow), ("S5-S6", .orange),
+         ("S3-S4", .red), ("S1-S2 (Weak)", .purple), ("Unknown", .gray)]
+    }
+
+    // MARK: - Pin Coloring
+
+    private func pinColor(for pin: QSOMapPin) -> Color {
+        switch appState.mapColorBy {
+        case .band: return bandColor(pin.band)
+        case .mode: return modeColor(pin.mode)
+        case .snr: return snrColor(pin.rstRcvd)
+        }
+    }
+
+    private func bandColor(_ band: String) -> Color {
         switch band {
         case "160m": return .purple; case "80m": return .indigo
         case "40m": return .blue;    case "30m": return .cyan
@@ -79,6 +313,27 @@ struct ContactMapView: View {
         case "10m": return .red;     case "6m": return .pink
         case "2m": return .brown;    case "70cm": return .gray
         default: return .blue
+        }
+    }
+
+    private func modeColor(_ mode: String) -> Color {
+        switch mode {
+        case "SSB": return .blue;  case "CW": return .red
+        case "FT8": return .green; case "FT4": return .mint
+        case "FM": return .orange; case "AM": return .purple
+        case "RTTY": return .cyan
+        default: return .gray
+        }
+    }
+
+    private func snrColor(_ rst: String) -> Color {
+        guard rst.count >= 2, let s = Int(String(rst.prefix(1))) else { return .gray }
+        switch s {
+        case 9: return .green
+        case 7...8: return .yellow
+        case 5...6: return .orange
+        case 3...4: return .red
+        default: return .purple
         }
     }
 }

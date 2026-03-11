@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct QSODetailView: View {
+    @Environment(AppState.self) private var appState
     let qso: QSO
     var onEdit: (QSO) -> Void
 
@@ -10,14 +11,19 @@ struct QSODetailView: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading) {
-                        Text(qso.call)
-                            .font(.largeTitle)
-                            .fontDesign(.monospaced)
-                            .bold()
+                        Button(action: { appState.showLogFiltered(callsign: qso.call) }) {
+                            Text(qso.call)
+                                .font(.largeTitle)
+                                .fontDesign(.monospaced)
+                                .bold()
+                        }
+                        .buttonStyle(.plain)
+
                         Text(qso.displayDate)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    Button("Show on Map") { appState.showOnMap(qso: qso) }
                     Button("Edit") { onEdit(qso) }
                 }
 
@@ -28,13 +34,27 @@ struct QSODetailView: View {
                     DetailSection(title: "Station") {
                         DetailRow(label: "Name", value: qso.name)
                         DetailRow(label: "QTH", value: qso.qth)
-                        DetailRow(label: "Country", value: qso.country)
-                        DetailRow(label: "State", value: qso.state)
-                        DetailRow(label: "County", value: qso.county)
-                        DetailRow(label: "Grid", value: qso.gridsquare)
-                        DetailRow(label: "CQ Zone", value: qso.cqZone.map { "\($0)" })
-                        DetailRow(label: "ITU Zone", value: qso.ituZone.map { "\($0)" })
-                        DetailRow(label: "Continent", value: qso.continent)
+                        clickableDetailRow(label: "Country", value: qso.country) {
+                            if let c = qso.country { appState.showLogFiltered(country: c) }
+                        }
+                        clickableDetailRow(label: "State", value: qso.state) {
+                            if let s = qso.state { appState.showLogFiltered(state: s) }
+                        }
+                        clickableDetailRow(label: "County", value: qso.county) {
+                            if let c = qso.county { appState.showLogFiltered(county: c) }
+                        }
+                        clickableDetailRow(label: "Grid", value: qso.gridsquare) {
+                            if let g = qso.gridsquare { appState.showLogFiltered(grid: g) }
+                        }
+                        clickableDetailRow(label: "CQ Zone", value: qso.cqZone.map { "\($0)" }) {
+                            if let z = qso.cqZone { appState.showLogFiltered(cqZone: z) }
+                        }
+                        clickableDetailRow(label: "ITU Zone", value: qso.ituZone.map { "\($0)" }) {
+                            if let z = qso.ituZone { appState.showLogFiltered(ituZone: z) }
+                        }
+                        clickableDetailRow(label: "Continent", value: qso.continent) {
+                            if let c = qso.continent { appState.showLogFiltered(continent: c) }
+                        }
                         DetailRow(label: "IOTA", value: qso.iota)
                     }
                 }
@@ -105,6 +125,23 @@ struct QSODetailView: View {
                 Spacer()
             }
             .padding()
+        }
+    }
+
+    @ViewBuilder
+    private func clickableDetailRow(label: String, value: String?, action: @escaping () -> Void) -> some View {
+        if let value = value, !value.isEmpty {
+            HStack {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 90, alignment: .trailing)
+                Button(action: action) {
+                    Text(value).foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+            .font(.callout)
         }
     }
 }

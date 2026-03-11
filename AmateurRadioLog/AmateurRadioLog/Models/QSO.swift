@@ -180,4 +180,24 @@ final class QSO {
             }
         }
     }
+
+    // MARK: - Sort keys (non-optional for Table sorting)
+    var bandSort: String { bandRaw ?? "" }
+    var modeSort: String { modeRaw ?? "" }
+    var nameSort: String { name ?? "" }
+    var countrySort: String { country ?? "" }
+    var gridSort: String { gridsquare ?? "" }
+    var rstSentSort: String { rstSent ?? "" }
+    var rstRcvdSort: String { rstRcvd ?? "" }
+    var stateSort: String { state ?? "" }
+
+    /// RST received as a numeric value for SNR statistics
+    var snrValue: Int? {
+        guard let rst = rstRcvd else { return nil }
+        // For signal reports like "59", "599", extract the S-meter reading
+        if rst.count >= 2, let first = rst.first, first.isNumber {
+            return Int(String(rst.dropFirst().prefix(1)))
+        }
+        return nil
+    }
 }

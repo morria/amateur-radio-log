@@ -2,6 +2,48 @@ import Foundation
 import SwiftUI
 import SwiftData
 
+// MARK: - Map Types
+
+enum MapTimeRange: String, CaseIterable, Identifiable {
+    case lastDay = "24h"
+    case lastWeek = "Week"
+    case lastMonth = "Month"
+    case lastQuarter = "Quarter"
+    case lastYear = "Year"
+    case allTime = "All Time"
+
+    var id: String { rawValue }
+
+    var startDate: Date? {
+        let cal = Calendar.current
+        let now = Date()
+        switch self {
+        case .lastDay: return cal.date(byAdding: .day, value: -1, to: now)
+        case .lastWeek: return cal.date(byAdding: .weekOfYear, value: -1, to: now)
+        case .lastMonth: return cal.date(byAdding: .month, value: -1, to: now)
+        case .lastQuarter: return cal.date(byAdding: .month, value: -3, to: now)
+        case .lastYear: return cal.date(byAdding: .year, value: -1, to: now)
+        case .allTime: return nil
+        }
+    }
+}
+
+enum MapColorOption: String, CaseIterable, Identifiable {
+    case band = "Band"
+    case mode = "Mode"
+    case snr = "SNR"
+    var id: String { rawValue }
+}
+
+enum SyncDirection: String, CaseIterable, Identifiable {
+    case upload = "Upload"
+    case download = "Download"
+    case both = "Both"
+    var id: String { rawValue }
+}
+
+// MARK: - App State
+
 @MainActor
 @Observable
 final class AppState {
@@ -9,10 +51,170 @@ final class AppState {
     var errorMessage: String?
     var statusMessage: String?
 
-    // Services
+    // MARK: - Navigation
+    var selectedTab: NavigationTab = .log
+    var mapHighlightQSOId: String?
+
+    // MARK: - Shared Filters
+    var searchText: String = ""
+    var filterBand: Band?
+    var filterMode: Mode?
+    var filterCallsign: String?
+    var filterCountry: String?
+    var filterState: String?
+    var filterGrid: String?
+    var filterCQZone: Int?
+    var filterITUZone: Int?
+    var filterContinent: String?
+    var filterCounty: String?
+
+    // MARK: - Map-specific
+    var mapTimeRange: MapTimeRange = .allTime
+    var mapColorBy: MapColorOption = .band
+
+    // MARK: - Last-used QSO defaults
+    @ObservationIgnored
+    var lastBand: Band? {
+        get { UserDefaults.standard.string(forKey: "lastBand").flatMap { Band(rawValue: $0) } }
+        set { UserDefaults.standard.set(newValue?.rawValue, forKey: "lastBand") }
+    }
+    @ObservationIgnored
+    var lastMode: Mode? {
+        get { UserDefaults.standard.string(forKey: "lastMode").flatMap { Mode(rawValue: $0) } }
+        set { UserDefaults.standard.set(newValue?.rawValue, forKey: "lastMode") }
+    }
+    @ObservationIgnored
+    var lastFreq: Double? {
+        get { let v = UserDefaults.standard.double(forKey: "lastFreq"); return v == 0 ? nil : v }
+        set { UserDefaults.standard.set(newValue ?? 0, forKey: "lastFreq") }
+    }
+    @ObservationIgnored
+    var lastPower: Double? {
+        get { let v = UserDefaults.standard.double(forKey: "lastPower"); return v == 0 ? nil : v }
+        set { UserDefaults.standard.set(newValue ?? 0, forKey: "lastPower") }
+    }
+
+    // MARK: - Services
     let qrzService = QRZService()
     let hamQTHService = HamQTHService()
     let lotwService = LoTWService()
+
+    // MARK: - Filter State
+
+    var hasActiveFilters: Bool {
+        !searchText.isEmpty || filterBand != nil || filterMode != nil
+            || filterCallsign != nil || filterCountry != nil || filterState != nil
+            || filterGrid != nil || filterCQZone != nil || filterITUZone != nil
+            || filterContinent != nil || filterCounty != nil
+    }
+
+    var activeFieldFilters: [(String, String)] {
+        var result: [(String, String)] = []
+        if let v = filterCallsign { result.append(("Callsign", v)) }
+        if let v = filterCountry { result.append(("Country", v)) }
+        if let v = filterState { result.append(("State", v)) }
+        if let v = filterGrid { result.append(("Grid", v)) }
+        if let v = filterCQZone { result.append(("CQ Zone", "\(v)")) }
+        if let v = filterITUZone { result.append(("ITU Zone", "\(v)")) }
+        if let v = filterContinent { result.append(("Continent", v)) }
+        if let v = filterCounty { result.append(("County", v)) }
+        return result
+    }
+
+    func clearFilters() {
+        searchText = ""
+        filterBand = nil
+        filterMode = nil
+        clearFieldFilters()
+    }
+
+    func clearFieldFilters() {
+        filterCallsign = nil
+        filterCountry = nil
+        filterState = nil
+        filterGrid = nil
+        filterCQZone = nil
+        filterITUZone = nil
+        filterContinent = nil
+        filterCounty = nil
+    }
+
+    func removeFieldFilter(_ label: String) {
+        switch label {
+        case "Callsign": filterCallsign = nil
+        case "Country": filterCountry = nil
+        case "State": filterState = nil
+        case "Grid": filterGrid = nil
+        case "CQ Zone": filterCQZone = nil
+        case "ITU Zone": filterITUZone = nil
+        case "Continent": filterContinent = nil
+        case "County": filterCounty = nil
+        default: break
+        }
+    }
+
+    func filteredQSOs(from qsos: [QSO]) -> [QSO] {
+        qsos.filter { qso in
+            if !searchText.isEmpty {
+                let s = searchText.uppercased()
+                let matches = qso.call.uppercased().contains(s)
+                    || (qso.name?.uppercased().contains(s) ?? false)
+                    || (qso.country?.uppercased().contains(s) ?? false)
+                    || (qso.qth?.uppercased().contains(s) ?? false)
+                    || (qso.gridsquare?.uppercased().contains(s) ?? false)
+                    || (qso.state?.uppercased().contains(s) ?? false)
+                    || (qso.comment?.uppercased().contains(s) ?? false)
+                if !matches { return false }
+            }
+            if let band = filterBand, qso.bandRaw != band.rawValue { return false }
+            if let mode = filterMode, qso.modeRaw != mode.rawValue { return false }
+            if let v = filterCallsign, qso.call != v { return false }
+            if let v = filterCountry, qso.country != v { return false }
+            if let v = filterState, qso.state != v { return false }
+            if let v = filterGrid, qso.gridsquare != v { return false }
+            if let v = filterCQZone, qso.cqZone != v { return false }
+            if let v = filterITUZone, qso.ituZone != v { return false }
+            if let v = filterContinent, qso.continent != v { return false }
+            if let v = filterCounty, qso.county != v { return false }
+            return true
+        }
+    }
+
+    // MARK: - Navigation Actions
+
+    func showOnMap(qso: QSO) {
+        mapHighlightQSOId = "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)"
+        selectedTab = .map
+    }
+
+    func showFilteredOnMap() {
+        selectedTab = .map
+    }
+
+    func showLogFiltered(callsign: String? = nil, country: String? = nil, state: String? = nil,
+                         grid: String? = nil, band: Band? = nil, mode: Mode? = nil,
+                         cqZone: Int? = nil, ituZone: Int? = nil, continent: String? = nil,
+                         county: String? = nil) {
+        clearFilters()
+        filterCallsign = callsign
+        filterCountry = country
+        filterState = state
+        filterGrid = grid
+        filterBand = band
+        filterMode = mode
+        filterCQZone = cqZone
+        filterITUZone = ituZone
+        filterContinent = continent
+        filterCounty = county
+        selectedTab = .log
+    }
+
+    func saveLastUsed(from data: QSOEditData) {
+        if let b = data.band { lastBand = b }
+        if let m = data.mode { lastMode = m }
+        if let f = data.freq { lastFreq = f }
+        if let p = data.txPower { lastPower = p }
+    }
 
     // MARK: - Callsign Lookup
 
@@ -68,9 +270,22 @@ final class AppState {
         ADIFWriter().write(qsos: qsos)
     }
 
+    // MARK: - Deduplication
+
+    private func isDuplicate(_ qso: QSO, existingQSOs: [QSO]) -> Bool {
+        let timePrefix = String(qso.timeOn.prefix(4))
+        let band = qso.bandRaw ?? ""
+        return existingQSOs.contains { existing in
+            existing.call == qso.call
+                && existing.qsoDate == qso.qsoDate
+                && String(existing.timeOn.prefix(4)) == timePrefix
+                && (existing.bandRaw ?? "") == band
+        }
+    }
+
     // MARK: - LoTW Sync
 
-    func syncLoTW(context: ModelContext) async {
+    func syncLoTW(context: ModelContext, direction: SyncDirection = .both) async {
         let creds = KeychainManager.loadCredentials(for: .lotw)
         guard !creds.isEmpty else {
             errorMessage = "LoTW credentials not configured"
@@ -79,26 +294,58 @@ final class AppState {
 
         isLoading = true
         statusMessage = "Syncing with LoTW..."
+        var messages: [String] = []
 
         do {
-            let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
-            var confirmed = 0
-            for qsl in qsls {
-                let call = qsl.call
-                let date = qsl.qsoDate
-                let predicate = #Predicate<QSO> { q in
-                    q.call == call && q.qsoDate == date
-                }
-                let matches = try context.fetch(FetchDescriptor(predicate: predicate))
-                for match in matches {
-                    match.lotwQslRcvd = "Y"
-                    match.lotwStatus = "confirmed"
-                    confirmed += 1
+            // Upload
+            if direction == .upload || direction == .both {
+                let status = "local"
+                let predicate = #Predicate<QSO> { q in q.syncStatus == status }
+                let unsynced = try context.fetch(FetchDescriptor(predicate: predicate))
+                if !unsynced.isEmpty {
+                    let adif = ADIFWriter().write(qsos: unsynced)
+                    let _ = try await lotwService.uploadADIF(
+                        username: creds.username, password: creds.password, adifContent: adif)
+                    for qso in unsynced { qso.lotwQslSent = "Y" }
+                    try context.save()
+                    messages.append("Uploaded \(unsynced.count) to LoTW")
                 }
             }
-            try context.save()
+
+            // Download
+            if direction == .download || direction == .both {
+                let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
+                var confirmed = 0
+                for qsl in qsls {
+                    let call = qsl.call
+                    let date = qsl.qsoDate
+                    let predicate = #Predicate<QSO> { q in
+                        q.call == call && q.qsoDate == date
+                    }
+                    let matches = try context.fetch(FetchDescriptor(predicate: predicate))
+                    if matches.isEmpty {
+                        // New QSO from LoTW - check dedup
+                        let allQSOs = try context.fetch(FetchDescriptor<QSO>())
+                        if !isDuplicate(qsl, existingQSOs: allQSOs) {
+                            qsl.lotwQslRcvd = "Y"
+                            qsl.lotwStatus = "confirmed"
+                            context.insert(qsl)
+                            confirmed += 1
+                        }
+                    } else {
+                        for match in matches {
+                            match.lotwQslRcvd = "Y"
+                            match.lotwStatus = "confirmed"
+                            confirmed += 1
+                        }
+                    }
+                }
+                try context.save()
+                messages.append("\(confirmed) LoTW confirmations")
+            }
+
             isLoading = false
-            statusMessage = "LoTW: \(confirmed) QSOs confirmed"
+            statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
             errorMessage = "LoTW sync failed: \(error.localizedDescription)"
@@ -107,7 +354,7 @@ final class AppState {
 
     // MARK: - QRZ Sync
 
-    func syncQRZ(context: ModelContext) async {
+    func syncQRZ(context: ModelContext, direction: SyncDirection = .both) async {
         let creds = KeychainManager.loadCredentials(for: .qrz)
         guard !creds.isEmpty else {
             errorMessage = "QRZ credentials not configured"
@@ -116,25 +363,48 @@ final class AppState {
 
         isLoading = true
         statusMessage = "Syncing with QRZ..."
+        var messages: [String] = []
 
         do {
             if await !qrzService.isAuthenticated {
                 try await qrzService.authenticate(username: creds.username, password: creds.password)
             }
 
-            let status = "local"
-            let predicate = #Predicate<QSO> { q in q.syncStatus == status }
-            let unsynced = try context.fetch(FetchDescriptor(predicate: predicate))
+            let apiKey = KeychainManager.load(account: "QRZ.com.apikey") ?? creds.password
 
-            if !unsynced.isEmpty {
-                let count = try await qrzService.uploadQSOs(unsynced, apiKey: creds.password)
-                for qso in unsynced { qso.syncStatus = "synced" }
-                try context.save()
-                statusMessage = "Uploaded \(count) QSOs to QRZ"
-            } else {
-                statusMessage = "QRZ sync complete"
+            // Upload
+            if direction == .upload || direction == .both {
+                let status = "local"
+                let predicate = #Predicate<QSO> { q in q.syncStatus == status }
+                let unsynced = try context.fetch(FetchDescriptor(predicate: predicate))
+                if !unsynced.isEmpty {
+                    let count = try await qrzService.uploadQSOs(unsynced, apiKey: apiKey)
+                    for qso in unsynced { qso.syncStatus = "synced" }
+                    try context.save()
+                    messages.append("Uploaded \(count) to QRZ")
+                }
             }
+
+            // Download
+            if direction == .download || direction == .both {
+                let downloaded = try await qrzService.downloadQSOs(apiKey: apiKey)
+                let allQSOs = try context.fetch(FetchDescriptor<QSO>())
+                var added = 0
+                for qso in downloaded {
+                    if !isDuplicate(qso, existingQSOs: allQSOs) {
+                        qso.syncStatus = "synced"
+                        context.insert(qso)
+                        added += 1
+                    }
+                }
+                if added > 0 {
+                    try context.save()
+                }
+                messages.append("Downloaded \(added) new from QRZ")
+            }
+
             isLoading = false
+            statusMessage = messages.isEmpty ? "QRZ sync complete" : messages.joined(separator: ", ")
         } catch {
             isLoading = false
             errorMessage = "QRZ sync failed: \(error.localizedDescription)"
