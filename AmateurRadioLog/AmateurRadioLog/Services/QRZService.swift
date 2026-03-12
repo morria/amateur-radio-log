@@ -79,36 +79,45 @@ actor QRZService {
     // MARK: - Logbook Upload
 
     func uploadQSOs(_ qsos: [QSO], apiKey: String) async throws -> Int {
-        let writer = ADIFWriter()
-        let adif = writer.write(qsos: qsos)
-
         guard let url = URL(string: "https://logbook.qrz.com/api") else {
             throw ServiceError.networkError("Invalid URL")
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let writer = ADIFWriter()
+        var uploaded = 0
+        var lastError: String?
 
-        let body = "KEY=\(apiKey)&ACTION=INSERT&ADIF=\(adif.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? adif)"
-        request.httpBody = body.data(using: .utf8)
+        // QRZ API accepts one record per INSERT call
+        for qso in qsos {
+            let record = writer.writeSingleRecord(qso)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let responseStr = String(data: data, encoding: .utf8) ?? ""
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-        if responseStr.contains("RESULT=OK") || responseStr.contains("COUNT=") {
-            // Extract count
-            if let range = responseStr.range(of: "COUNT="),
-               let endRange = responseStr[range.upperBound...].rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) {
-                let countStr = responseStr[range.upperBound..<endRange.lowerBound]
-                return Int(countStr) ?? qsos.count
+            let encodedRecord = record.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? record
+            let body = "KEY=\(apiKey)&ACTION=INSERT&ADIF=\(encodedRecord)"
+            request.httpBody = body.data(using: .utf8)
+
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let responseStr = String(data: data, encoding: .utf8) ?? ""
+
+            if responseStr.contains("RESULT=OK") {
+                uploaded += 1
+            } else if responseStr.contains("RESULT=FAIL") {
+                // Extract reason
+                if let range = responseStr.range(of: "REASON=") {
+                    lastError = String(responseStr[range.upperBound...])
+                        .components(separatedBy: "&").first
+                }
             }
-            return qsos.count
-        } else if responseStr.contains("RESULT=FAIL") {
-            throw ServiceError.serverError(responseStr)
         }
 
-        return 0
+        if uploaded == 0 && !qsos.isEmpty {
+            throw ServiceError.serverError(lastError ?? "Upload failed for all QSOs")
+        }
+
+        return uploaded
     }
 
     // MARK: - Logbook Download

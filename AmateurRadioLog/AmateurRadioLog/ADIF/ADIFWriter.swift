@@ -26,6 +26,11 @@ final class ADIFWriter {
         try content.write(to: url, atomically: true, encoding: .utf8)
     }
 
+    /// Write a single QSO record without ADIF file header (for API uploads)
+    func writeSingleRecord(_ q: QSO) -> String {
+        writeRecord(q)
+    }
+
     // MARK: - Private
 
     private func writeRecord(_ q: QSO) -> String {
