@@ -148,7 +148,7 @@ struct QSOLogView: View {
     var onDelete: (QSO) -> Void
     var onNew: () -> Void
 
-    @State private var showDetailPanel = true
+    @State private var showDetailPanel = false
 
     var body: some View {
         VStack(spacing: 0) {

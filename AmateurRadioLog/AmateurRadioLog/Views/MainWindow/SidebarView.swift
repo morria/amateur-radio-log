@@ -9,7 +9,10 @@ struct SidebarView: View {
 
     var body: some View {
         @Bindable var appState = appState
-        List(selection: $appState.selectedTab) {
+        List(selection: Binding<NavigationTab?>(
+            get: { appState.selectedTab },
+            set: { if let tab = $0 { appState.selectedTab = tab } }
+        )) {
             Section("Views") {
                 ForEach(NavigationTab.allCases) { tab in
                     Label(tab.rawValue, systemImage: tab.icon)

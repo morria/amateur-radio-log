@@ -158,6 +158,8 @@ final class AppState {
             if !searchText.isEmpty {
                 let s = searchText.uppercased()
                 let matches = qso.call.uppercased().contains(s)
+                    || qso.qsoDate.contains(s)
+                    || qso.timeOn.contains(s)
                     || (qso.name?.uppercased().contains(s) ?? false)
                     || (qso.country?.uppercased().contains(s) ?? false)
                     || (qso.qth?.uppercased().contains(s) ?? false)

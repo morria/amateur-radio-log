@@ -25,6 +25,7 @@ struct ContactMapView: View {
     @State private var selectedPin: QSOMapPin?
     @State private var showFilters = false
     @State private var showLegend = false
+    @State private var showCallsignSheet = false
 
     private var filteredQSOs: [QSO] {
         var result = appState.filteredQSOs(from: qsos)
@@ -44,7 +45,6 @@ struct ContactMapView: View {
             let band = qso.band?.displayName ?? ""
             let mode = qso.mode?.displayName ?? ""
             let rst = qso.rstRcvd ?? ""
-            // Include colorBy in the colorKey so pin IDs change when color mode changes
             let colorKey: String
             switch colorBy {
             case .band: colorKey = "b-\(band)"
@@ -70,74 +70,19 @@ struct ContactMapView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        macOSLayout
+        #else
+        iOSLayout
+        #endif
+    }
+
+    // MARK: - macOS Layout (side panel)
+
+    #if os(macOS)
+    private var macOSLayout: some View {
         HStack(spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                Map(position: $cameraPosition, selection: $selectedPin) {
-                    ForEach(pins) { pin in
-                        Annotation(pin.callsign, coordinate: pin.coordinate) {
-                            Circle()
-                                .fill(pinColor(for: pin))
-                                .stroke(selectedPin == pin ? Color.white : Color.clear, lineWidth: 2)
-                                .frame(width: 10, height: 10)
-                                .shadow(radius: 1)
-                        }
-                        .tag(pin)
-                    }
-                }
-                .mapStyle(.standard)
-
-                VStack(alignment: .trailing, spacing: 8) {
-                    // Stats overlay
-                    GroupBox {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(pins.count) mapped").font(.caption).bold()
-                            Text("\(filteredQSOs.count - pins.count) no coords")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-
-                    // Clear filters button (visible when filters active)
-                    if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
-                        Button(action: {
-                            appState.clearFilters()
-                            appState.mapTimeRange = .allTime
-                        }) {
-                            Label("Clear Filters", systemImage: "xmark.circle")
-                                .font(.caption)
-                                .padding(8)
-                                .background(.regularMaterial)
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    // Filter button
-                    Button(action: { showFilters.toggle() }) {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.title3)
-                            .padding(8)
-                            .background(.regularMaterial)
-                            .clipShape(Circle())
-                    }
-                    .popover(isPresented: $showFilters) {
-                        mapFiltersView.padding().frame(width: 280)
-                    }
-
-                    // Legend button
-                    Button(action: { showLegend.toggle() }) {
-                        Image(systemName: "paintpalette")
-                            .font(.title3)
-                            .padding(8)
-                            .background(.regularMaterial)
-                            .clipShape(Circle())
-                    }
-                    .popover(isPresented: $showLegend) {
-                        legendView.padding().frame(width: 220)
-                    }
-                }
-                .padding()
-            }
-
-            // Right panel: QSO list for selected callsign
+            mapContent
             if selectedPin != nil && !selectedCallsignQSOs.isEmpty {
                 Divider()
                 callsignDetailPanel
@@ -145,33 +90,168 @@ struct ContactMapView: View {
             }
         }
         .onChange(of: appState.mapHighlightQSOId) { _, newId in
-            if let newId {
-                // Match by prefix since pin IDs now include colorKey
-                if let pin = pins.first(where: { $0.id.hasPrefix(newId) }) {
-                    selectedPin = pin
-                    cameraPosition = .region(MKCoordinateRegion(
-                        center: pin.coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
-                    ))
-                }
-                appState.mapHighlightQSOId = nil
-            }
+            handleHighlight(newId)
         }
-        .onAppear {
-            if let id = appState.mapHighlightQSOId {
-                if let pin = pins.first(where: { $0.id.hasPrefix(id) }) {
-                    selectedPin = pin
-                    cameraPosition = .region(MKCoordinateRegion(
-                        center: pin.coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
-                    ))
+        .onAppear { handleHighlight(appState.mapHighlightQSOId) }
+    }
+    #endif
+
+    // MARK: - iOS Layout (sheet for callsign detail)
+
+    #if os(iOS)
+    private var iOSLayout: some View {
+        mapContent
+            .sheet(isPresented: $showCallsignSheet) {
+                if let pin = selectedPin {
+                    NavigationStack {
+                        callsignSheetContent(pin: pin)
+                            .navigationTitle(pin.callsign)
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Done") { showCallsignSheet = false }
+                                }
+                            }
+                    }
+                    .presentationDetents([.medium, .large])
                 }
-                appState.mapHighlightQSOId = nil
             }
+            .onChange(of: selectedPin) { _, newPin in
+                showCallsignSheet = newPin != nil && !selectedCallsignQSOs.isEmpty
+            }
+            .onChange(of: appState.mapHighlightQSOId) { _, newId in
+                handleHighlight(newId)
+            }
+            .onAppear { handleHighlight(appState.mapHighlightQSOId) }
+    }
+
+    private func callsignSheetContent(pin: QSOMapPin) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(selectedCallsignQSOs, id: \.persistentModelID) { qso in
+                    qsoCard(qso)
+                }
+            }
+            .padding()
+        }
+    }
+    #endif
+
+    private func handleHighlight(_ id: String?) {
+        guard let id else { return }
+        if let pin = pins.first(where: { $0.id.hasPrefix(id) }) {
+            selectedPin = pin
+            cameraPosition = .region(MKCoordinateRegion(
+                center: pin.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 5, longitudeDelta: 5)
+            ))
+        }
+        appState.mapHighlightQSOId = nil
+    }
+
+    // MARK: - Shared Map Content
+
+    private var mapContent: some View {
+        ZStack(alignment: .topTrailing) {
+            Map(position: $cameraPosition, selection: $selectedPin) {
+                ForEach(pins) { pin in
+                    Annotation(pin.callsign, coordinate: pin.coordinate) {
+                        Circle()
+                            .fill(pinColor(for: pin))
+                            .stroke(selectedPin == pin ? Color.white : Color.clear, lineWidth: 2)
+                            .frame(width: 10, height: 10)
+                            .shadow(radius: 1)
+                    }
+                    .tag(pin)
+                }
+            }
+            .mapStyle(.standard)
+
+            VStack(alignment: .trailing, spacing: 8) {
+                // Stats overlay
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(pins.count) mapped").font(.caption).bold()
+                        Text("\(filteredQSOs.count - pins.count) no coords")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+
+                // Clear filters button
+                if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
+                    Button(action: {
+                        appState.clearFilters()
+                        appState.mapTimeRange = .allTime
+                    }) {
+                        Label("Clear Filters", systemImage: "xmark.circle")
+                            .font(.caption)
+                            .padding(8)
+                            .background(.regularMaterial)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                // Filter button
+                Button(action: { showFilters.toggle() }) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.title3)
+                        .padding(8)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                }
+                #if os(macOS)
+                .popover(isPresented: $showFilters) {
+                    mapFiltersView.padding().frame(width: 280)
+                }
+                #else
+                .sheet(isPresented: $showFilters) {
+                    NavigationStack {
+                        Form { mapFiltersContent }
+                            .navigationTitle("Map Filters")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Done") { showFilters = false }
+                                }
+                            }
+                    }
+                    .presentationDetents([.medium])
+                }
+                #endif
+
+                // Legend button
+                Button(action: { showLegend.toggle() }) {
+                    Image(systemName: "paintpalette")
+                        .font(.title3)
+                        .padding(8)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                }
+                #if os(macOS)
+                .popover(isPresented: $showLegend) {
+                    legendView.padding().frame(width: 220)
+                }
+                #else
+                .sheet(isPresented: $showLegend) {
+                    NavigationStack {
+                        legendView.padding()
+                            .navigationTitle("Legend")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Done") { showLegend = false }
+                                }
+                            }
+                    }
+                    .presentationDetents([.medium])
+                }
+                #endif
+            }
+            .padding()
         }
     }
 
-    // MARK: - Callsign Detail Panel
+    // MARK: - Callsign Detail Panel (macOS)
 
     private var callsignDetailPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -257,39 +337,45 @@ struct ContactMapView: View {
         @Bindable var appState = appState
         return VStack(alignment: .leading, spacing: 12) {
             Text("Map Filters").font(.headline)
+            mapFiltersContent
+        }
+    }
 
-            Picker("Time Range", selection: $appState.mapTimeRange) {
-                ForEach(MapTimeRange.allCases) { range in
-                    Text(range.rawValue).tag(range)
-                }
+    @ViewBuilder
+    private var mapFiltersContent: some View {
+        @Bindable var appState = appState
+
+        Picker("Time Range", selection: $appState.mapTimeRange) {
+            ForEach(MapTimeRange.allCases) { range in
+                Text(range.rawValue).tag(range)
             }
+        }
 
-            Picker("Band", selection: $appState.filterBand) {
-                Text("All Bands").tag(nil as Band?)
-                ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
-                Divider()
-                ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
-            }
-
-            Picker("Mode", selection: $appState.filterMode) {
-                Text("All Modes").tag(nil as Mode?)
-                ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
-            }
-
+        Picker("Band", selection: $appState.filterBand) {
+            Text("All Bands").tag(nil as Band?)
+            ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
             Divider()
+            ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
+        }
 
-            Picker("Color by", selection: $appState.mapColorBy) {
-                ForEach(MapColorOption.allCases) { opt in
-                    Text(opt.rawValue).tag(opt)
-                }
+        Picker("Mode", selection: $appState.filterMode) {
+            Text("All Modes").tag(nil as Mode?)
+            ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
+        }
+
+        Divider()
+
+        Picker("Color by", selection: $appState.mapColorBy) {
+            ForEach(MapColorOption.allCases) { opt in
+                Text(opt.rawValue).tag(opt)
             }
-            .pickerStyle(.segmented)
+        }
+        .pickerStyle(.segmented)
 
-            if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
-                Button("Clear All Filters") {
-                    appState.clearFilters()
-                    appState.mapTimeRange = .allTime
-                }
+        if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
+            Button("Clear All Filters") {
+                appState.clearFilters()
+                appState.mapTimeRange = .allTime
             }
         }
     }
@@ -386,3 +472,4 @@ struct ContactMapView: View {
         }
     }
 }
+
