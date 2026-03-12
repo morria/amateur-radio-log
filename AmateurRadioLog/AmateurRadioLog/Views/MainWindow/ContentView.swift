@@ -186,23 +186,25 @@ struct QSOLogView: View {
     #if os(macOS)
     @ViewBuilder
     private var detailPane: some View {
-        if let qso = selectedQSO {
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button(action: { withAnimation { showDetailPanel = false } }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Close Detail Panel")
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button(action: { withAnimation { showDetailPanel = false } }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 6)
-                QSODetailView(qso: qso, onEdit: onEdit)
+                .buttonStyle(.plain)
+                .help("Close Detail Panel")
             }
-        } else {
-            VStack { Spacer(); Text("Select a QSO").foregroundStyle(.secondary); Spacer() }
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+
+            if let qso = selectedQSO {
+                QSODetailView(qso: qso, onEdit: onEdit)
+            } else {
+                VStack { Spacer(); Text("Select a QSO").foregroundStyle(.secondary); Spacer() }
+            }
         }
     }
     #endif

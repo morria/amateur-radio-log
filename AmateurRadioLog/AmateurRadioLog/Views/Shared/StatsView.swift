@@ -53,6 +53,58 @@ struct StatsView: View {
     private var uniqueCalls: Int { Set(qsos.map(\.call)).count }
     private var uniqueCountries: Int { Set(qsos.compactMap(\.country)).count }
 
+    private var longestQSO: QSO? {
+        qsos.filter { $0.timeOff != nil && !$0.timeOff!.isEmpty }.max { a, b in
+            qsoDuration(a) < qsoDuration(b)
+        }
+    }
+
+    private func qsoDuration(_ qso: QSO) -> Int {
+        guard let off = qso.timeOff, !off.isEmpty else { return 0 }
+        let onMin = timeToMinutes(qso.timeOn)
+        let offMin = timeToMinutes(off)
+        let diff = offMin - onMin
+        return diff >= 0 ? diff : diff + 1440  // handle midnight wrap
+    }
+
+    private func timeToMinutes(_ t: String) -> Int {
+        guard t.count >= 4 else { return 0 }
+        let h = Int(t.prefix(2)) ?? 0
+        let m = Int(t.dropFirst(2).prefix(2)) ?? 0
+        return h * 60 + m
+    }
+
+    private func formatDuration(_ minutes: Int) -> String {
+        if minutes >= 60 {
+            return "\(minutes / 60)h \(minutes % 60)m"
+        }
+        return "\(minutes)m"
+    }
+
+    private var highestSNR: QSO? {
+        qsos.filter { $0.rstRcvd != nil }.max { a, b in
+            (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
+        }
+    }
+
+    private var lowestSNR: QSO? {
+        qsos.filter { $0.rstRcvd != nil && !$0.rstRcvd!.isEmpty }.min { a, b in
+            (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
+        }
+    }
+
+    private var furthestQSO: QSO? {
+        // QSO with the most distant grid square (by crude distance approximation)
+        // Uses latitude difference as a rough proxy
+        let myGrid = UserDefaults.standard.string(forKey: "myGridsquare") ?? ""
+        guard let myCoord = MaidenheadConverter.toCoordinate(grid: myGrid) else { return nil }
+        return qsos.filter { $0.latitude != nil && $0.longitude != nil }.max { a, b in
+            let distA = abs(a.latitude! - myCoord.latitude) + abs(a.longitude! - myCoord.longitude)
+            let distB = abs(b.latitude! - myCoord.latitude) + abs(b.longitude! - myCoord.longitude)
+            return distA < distB
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -60,6 +112,26 @@ struct StatsView: View {
                     StatCard(title: "Total QSOs", value: "\(qsos.count)", icon: "antenna.radiowaves.left.and.right")
                     StatCard(title: "Unique Calls", value: "\(uniqueCalls)", icon: "person.2")
                     StatCard(title: "Countries", value: "\(uniqueCountries)", icon: "globe")
+                }
+
+                // Records
+                GroupBox("Records") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let qso = longestQSO {
+                            let dur = qsoDuration(qso)
+                            recordRow(label: "Longest QSO", value: "\(formatDuration(dur)) with \(qso.call)", qso: qso)
+                        }
+                        if let qso = highestSNR {
+                            recordRow(label: "Highest SNR", value: "\(qso.rstRcvd ?? "") from \(qso.call)", qso: qso)
+                        }
+                        if let qso = lowestSNR {
+                            recordRow(label: "Lowest SNR", value: "\(qso.rstRcvd ?? "") from \(qso.call)", qso: qso)
+                        }
+                        if let qso = furthestQSO {
+                            recordRow(label: "Furthest QSO", value: "\(qso.call) — \(qso.country ?? qso.gridsquare ?? "?")", qso: qso)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
 
                 #if os(macOS)
@@ -142,6 +214,17 @@ struct StatsView: View {
             }
             .padding()
         }
+    }
+
+    private func recordRow(label: String, value: String, qso: QSO) -> some View {
+        Button(action: { appState.showLogFiltered(callsign: qso.call) }) {
+            HStack {
+                Text(label).font(.caption).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
+                Text(value).font(.callout)
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func clickableBarChart<S: Sequence>(_ title: String, data: S, onTap: @escaping (String) -> Void) -> some View where S.Element == (String, Int) {

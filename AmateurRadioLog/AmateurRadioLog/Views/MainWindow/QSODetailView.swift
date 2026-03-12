@@ -19,8 +19,14 @@ struct QSODetailView: View {
                         }
                         .buttonStyle(.plain)
 
-                        Text(qso.displayDate)
-                            .foregroundStyle(.secondary)
+                        Button(action: {
+                            appState.clearFilters()
+                            appState.searchText = qso.qsoDate
+                        }) {
+                            Text(qso.displayDate)
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.plain)
                     }
                     Spacer()
                     Button("Show on Map") { appState.showOnMap(qso: qso) }

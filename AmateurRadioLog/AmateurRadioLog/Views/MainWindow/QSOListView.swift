@@ -31,6 +31,11 @@ struct QSOListView: View {
             TableColumn("Date", value: \.qsoDate) { qso in
                 Text(ADIFDateFormatter.displayDate(qso.qsoDate))
                     .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.blue)
+                    .onTapGesture {
+                        appState.clearFilters()
+                        appState.searchText = qso.qsoDate
+                    }
             }
             .width(min: 70, ideal: 90)
 
@@ -50,11 +55,19 @@ struct QSOListView: View {
 
             TableColumn("Band", value: \.bandSort) { qso in
                 Text(qso.band?.displayName ?? "—").font(.caption)
+                    .foregroundStyle(qso.band != nil ? .blue : .primary)
+                    .onTapGesture {
+                        if let b = qso.band { appState.showLogFiltered(band: b) }
+                    }
             }
             .width(min: 30, ideal: 40)
 
             TableColumn("Mode", value: \.modeSort) { qso in
                 Text(qso.mode?.displayName ?? "—").font(.caption)
+                    .foregroundStyle(qso.mode != nil ? .blue : .primary)
+                    .onTapGesture {
+                        if let m = qso.mode { appState.showLogFiltered(mode: m) }
+                    }
             }
             .width(min: 30, ideal: 40)
 

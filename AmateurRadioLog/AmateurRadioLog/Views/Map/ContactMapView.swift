@@ -206,7 +206,12 @@ struct ContactMapView: View {
     private func qsoCard(_ qso: QSO) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(qso.displayDate).font(.caption).foregroundStyle(.secondary)
+                Text(qso.displayDate).font(.caption).foregroundStyle(.blue)
+                    .onTapGesture {
+                        appState.clearFilters()
+                        appState.searchText = qso.qsoDate
+                        appState.selectedTab = .log
+                    }
                 Spacer()
                 if let band = qso.band {
                     Text(band.displayName)
@@ -215,6 +220,7 @@ struct ContactMapView: View {
                         .padding(.vertical, 1)
                         .background(.blue.opacity(0.15))
                         .clipShape(Capsule())
+                        .onTapGesture { appState.showLogFiltered(band: band) }
                 }
                 if let mode = qso.mode {
                     Text(mode.displayName)
@@ -223,6 +229,7 @@ struct ContactMapView: View {
                         .padding(.vertical, 1)
                         .background(.green.opacity(0.15))
                         .clipShape(Capsule())
+                        .onTapGesture { appState.showLogFiltered(mode: mode) }
                 }
             }
             if let freq = qso.freq {
