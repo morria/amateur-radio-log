@@ -275,9 +275,13 @@ final class AppState {
     // MARK: - Deduplication
 
     private func isDuplicate(_ qso: QSO, existingQSOs: [QSO]) -> Bool {
+        findLocalMatch(for: qso, in: existingQSOs) != nil
+    }
+
+    private func findLocalMatch(for qso: QSO, in existingQSOs: [QSO]) -> QSO? {
         let timePrefix = String(qso.timeOn.prefix(4))
         let band = qso.bandRaw ?? ""
-        return existingQSOs.contains { existing in
+        return existingQSOs.first { existing in
             existing.call == qso.call
                 && existing.qsoDate == qso.qsoDate
                 && String(existing.timeOn.prefix(4)) == timePrefix
@@ -299,51 +303,50 @@ final class AppState {
         var messages: [String] = []
 
         do {
-            // Upload
+            // Upload: send QSOs not yet sent to LoTW
             if direction == .upload || direction == .both {
-                let status = "local"
-                let predicate = #Predicate<QSO> { q in q.syncStatus == status }
-                let unsynced = try context.fetch(FetchDescriptor(predicate: predicate))
-                if !unsynced.isEmpty {
-                    let adif = ADIFWriter().write(qsos: unsynced)
+                let sent = "Y"
+                let predicate = #Predicate<QSO> { q in q.lotwQslSent != sent }
+                let toUpload = try context.fetch(FetchDescriptor(predicate: predicate))
+                    .filter { $0.lotwQslSent == nil || $0.lotwQslSent!.isEmpty }
+                if !toUpload.isEmpty {
+                    let adif = ADIFWriter().write(qsos: toUpload)
                     let _ = try await lotwService.uploadADIF(
                         username: creds.username, password: creds.password, adifContent: adif)
-                    for qso in unsynced { qso.lotwQslSent = "Y" }
+                    for qso in toUpload { qso.lotwQslSent = "Y" }
                     try context.save()
-                    messages.append("Uploaded \(unsynced.count) to LoTW")
+                    messages.append("Uploaded \(toUpload.count) to LoTW")
+                } else {
+                    messages.append("Nothing new to upload")
                 }
             }
 
-            // Download
+            // Download: get confirmations
             if direction == .download || direction == .both {
                 let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
+                let allQSOs = try context.fetch(FetchDescriptor<QSO>())
                 var confirmed = 0
+                var added = 0
                 for qsl in qsls {
-                    let call = qsl.call
-                    let date = qsl.qsoDate
-                    let predicate = #Predicate<QSO> { q in
-                        q.call == call && q.qsoDate == date
-                    }
-                    let matches = try context.fetch(FetchDescriptor(predicate: predicate))
-                    if matches.isEmpty {
-                        // New QSO from LoTW - check dedup
-                        let allQSOs = try context.fetch(FetchDescriptor<QSO>())
-                        if !isDuplicate(qsl, existingQSOs: allQSOs) {
-                            qsl.lotwQslRcvd = "Y"
-                            qsl.lotwStatus = "confirmed"
-                            context.insert(qsl)
+                    if let local = findLocalMatch(for: qsl, in: allQSOs) {
+                        if local.lotwQslRcvd != "Y" {
+                            local.lotwQslRcvd = "Y"
+                            local.lotwStatus = "confirmed"
                             confirmed += 1
                         }
                     } else {
-                        for match in matches {
-                            match.lotwQslRcvd = "Y"
-                            match.lotwStatus = "confirmed"
-                            confirmed += 1
-                        }
+                        // New QSO from LoTW
+                        qsl.lotwQslRcvd = "Y"
+                        qsl.lotwQslSent = "Y"
+                        qsl.lotwStatus = "confirmed"
+                        context.insert(qsl)
+                        added += 1
                     }
                 }
                 try context.save()
-                messages.append("\(confirmed) LoTW confirmations")
+                if confirmed > 0 { messages.append("\(confirmed) new confirmations") }
+                if added > 0 { messages.append("\(added) new QSOs from LoTW") }
+                if confirmed == 0 && added == 0 { messages.append("No new confirmations") }
             }
 
             isLoading = false
@@ -443,40 +446,54 @@ final class AppState {
             }
 
             let apiKey = KeychainManager.load(account: "QRZ.com.apikey") ?? creds.password
+            var localQSOs = try context.fetch(FetchDescriptor<QSO>())
 
-            // Upload
-            if direction == .upload || direction == .both {
-                let status = "local"
-                let predicate = #Predicate<QSO> { q in q.syncStatus == status }
-                let unsynced = try context.fetch(FetchDescriptor(predicate: predicate))
-                if !unsynced.isEmpty {
-                    let count = try await qrzService.uploadQSOs(unsynced, apiKey: apiKey)
-                    for qso in unsynced { qso.syncStatus = "synced" }
-                    try context.save()
-                    messages.append("Uploaded \(count) to QRZ")
+            // Step 1: Always download to reconcile what's already on QRZ
+            statusMessage = "Downloading from QRZ..."
+            let remoteQSOs = try await qrzService.downloadQSOs(apiKey: apiKey)
+            var added = 0
+
+            for remote in remoteQSOs {
+                if let local = findLocalMatch(for: remote, in: localQSOs) {
+                    // Already have it locally — mark as synced
+                    local.qrzSynced = true
+                } else if direction == .download || direction == .both {
+                    // New QSO from QRZ — insert locally
+                    remote.qrzSynced = true
+                    context.insert(remote)
+                    localQSOs.append(remote)
+                    added += 1
+                } else {
+                    // Upload-only mode: just mark that it exists remotely
+                    // by finding a weaker match (call+date) if possible
                 }
             }
 
-            // Download
+            // Also mark any local QSOs that matched remote as synced
+            // (handles cases where the match was found above)
+            if added > 0 || !remoteQSOs.isEmpty {
+                try context.save()
+            }
             if direction == .download || direction == .both {
-                let downloaded = try await qrzService.downloadQSOs(apiKey: apiKey)
-                let allQSOs = try context.fetch(FetchDescriptor<QSO>())
-                var added = 0
-                for qso in downloaded {
-                    if !isDuplicate(qso, existingQSOs: allQSOs) {
-                        qso.syncStatus = "synced"
-                        context.insert(qso)
-                        added += 1
-                    }
-                }
-                if added > 0 {
+                messages.append("\(added) new from QRZ")
+            }
+
+            // Step 2: Upload local QSOs not yet on QRZ
+            if direction == .upload || direction == .both {
+                let toUpload = localQSOs.filter { !$0.qrzSynced }
+                if !toUpload.isEmpty {
+                    statusMessage = "Uploading \(toUpload.count) QSOs to QRZ..."
+                    let count = try await qrzService.uploadQSOs(toUpload, apiKey: apiKey)
+                    for qso in toUpload { qso.qrzSynced = true }
                     try context.save()
+                    messages.append("Uploaded \(count) to QRZ")
+                } else {
+                    messages.append("Nothing new to upload")
                 }
-                messages.append("Downloaded \(added) new from QRZ")
             }
 
             isLoading = false
-            statusMessage = messages.isEmpty ? "QRZ sync complete" : messages.joined(separator: ", ")
+            statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
             errorMessage = "QRZ sync failed: \(error.localizedDescription)"

@@ -87,8 +87,9 @@ final class QSO {
 
     // Sync metadata
     var qrzLogId: String?
+    var qrzSynced: Bool = false
     var lotwStatus: String = "none"
-    var syncStatus: String = "local"
+    var syncStatus: String = "local"  // legacy, unused
 
     // Overflow ADIF fields as JSON string
     var extraFieldsJSON: String?
