@@ -354,6 +354,76 @@ final class AppState {
         }
     }
 
+    // MARK: - HamQTH Sync (Callsign Enrichment)
+
+    func syncHamQTH(context: ModelContext) async {
+        let creds = KeychainManager.loadCredentials(for: .hamqth)
+        guard !creds.isEmpty else {
+            errorMessage = "HamQTH credentials not configured"
+            return
+        }
+
+        isLoading = true
+        statusMessage = "Looking up callsigns via HamQTH..."
+
+        do {
+            if await !hamQTHService.isAuthenticated {
+                try await hamQTHService.authenticate(username: creds.username, password: creds.password)
+            }
+
+            let allQSOs = try context.fetch(FetchDescriptor<QSO>())
+            // Get unique callsigns that have missing data
+            let qsosNeedingData = allQSOs.filter { qso in
+                qso.name == nil || qso.country == nil || qso.gridsquare == nil
+                    || qso.latitude == nil || qso.state == nil || qso.continent == nil
+            }
+            let callsignsToLookup = Array(Set(qsosNeedingData.map(\.call)))
+
+            if callsignsToLookup.isEmpty {
+                isLoading = false
+                statusMessage = "All QSOs already have complete data"
+                return
+            }
+
+            var enriched = 0
+            for (index, callsign) in callsignsToLookup.enumerated() {
+                statusMessage = "Looking up \(callsign) (\(index + 1)/\(callsignsToLookup.count))..."
+
+                do {
+                    let result = try await hamQTHService.lookup(callsign: callsign)
+                    let matchingQSOs = allQSOs.filter { $0.call == callsign }
+                    for qso in matchingQSOs {
+                        var changed = false
+                        if qso.name == nil, let name = result.fullName { qso.name = name; changed = true }
+                        if qso.country == nil, let country = result.country { qso.country = country; changed = true }
+                        if qso.gridsquare == nil, let grid = result.grid { qso.gridsquare = grid; changed = true }
+                        if qso.state == nil, let state = result.state { qso.state = state; changed = true }
+                        if qso.county == nil, let county = result.county { qso.county = county; changed = true }
+                        if qso.latitude == nil, let lat = result.latitude { qso.latitude = lat; changed = true }
+                        if qso.longitude == nil, let lon = result.longitude { qso.longitude = lon; changed = true }
+                        if qso.cqZone == nil, let cq = result.cqZone { qso.cqZone = cq; changed = true }
+                        if qso.ituZone == nil, let itu = result.ituZone { qso.ituZone = itu; changed = true }
+                        if qso.continent == nil, let cont = result.continent { qso.continent = cont; changed = true }
+                        if qso.qth == nil, let city = result.city { qso.qth = city; changed = true }
+                        if changed { enriched += 1 }
+                    }
+                } catch {
+                    continue  // Skip failed lookups
+                }
+
+                // Rate limiting
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+
+            try context.save()
+            isLoading = false
+            statusMessage = "Enriched \(enriched) QSOs from \(callsignsToLookup.count) callsigns"
+        } catch {
+            isLoading = false
+            errorMessage = "HamQTH sync failed: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - QRZ Sync
 
     func syncQRZ(context: ModelContext, direction: SyncDirection = .both) async {

@@ -6,6 +6,7 @@ struct SidebarView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showQRZSync = false
     @State private var showLoTWSync = false
+    @State private var showHamQTHSync = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -26,6 +27,9 @@ struct SidebarView: View {
                 }
                 Button(action: { showLoTWSync = true }) {
                     Label("Sync LoTW", systemImage: "arrow.triangle.2.circlepath")
+                }
+                Button(action: { showHamQTHSync = true }) {
+                    Label("Sync HamQTH", systemImage: "arrow.triangle.2.circlepath")
                 }
             }
 
@@ -51,6 +55,11 @@ struct SidebarView: View {
                 Task { await appState.syncLoTW(context: modelContext, direction: direction) }
             }
         }
+        .sheet(isPresented: $showHamQTHSync) {
+            SyncConfigSheet(provider: "HamQTH") { _ in
+                Task { await appState.syncHamQTH(context: modelContext) }
+            }
+        }
     }
 }
 
@@ -71,24 +80,33 @@ struct SyncConfigSheet: View {
                     Text(provider).font(.headline)
                 }
 
-                Section("Direction") {
-                    Picker("Sync Direction", selection: $direction) {
-                        ForEach(SyncDirection.allCases) { dir in
-                            Text(dir.rawValue).tag(dir)
-                        }
+                if provider == "HamQTH" {
+                    Section("Action") {
+                        Text("Look up all callsigns via HamQTH and fill in missing data: name, country, grid, coordinates, state, CQ/ITU zone, and continent.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Only QSOs with incomplete data will be looked up. Existing fields are never overwritten.")
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
-                    .pickerStyle(.segmented)
+                } else {
+                    Section("Direction") {
+                        Picker("Sync Direction", selection: $direction) {
+                            ForEach(SyncDirection.allCases) { dir in
+                                Text(dir.rawValue).tag(dir)
+                            }
+                        }
+                        .pickerStyle(.segmented)
 
-                    switch direction {
-                    case .upload:
-                        Text("Upload local QSOs to \(provider).")
-                            .font(.caption).foregroundStyle(.secondary)
-                    case .download:
-                        Text("Download QSOs from \(provider). Duplicates will be skipped.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    case .both:
-                        Text("Upload local QSOs and download new QSOs from \(provider). Duplicates will be skipped.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        switch direction {
+                        case .upload:
+                            Text("Upload local QSOs to \(provider).")
+                                .font(.caption).foregroundStyle(.secondary)
+                        case .download:
+                            Text("Download QSOs from \(provider). Duplicates will be skipped.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        case .both:
+                            Text("Upload local QSOs and download new QSOs from \(provider). Duplicates will be skipped.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
 
