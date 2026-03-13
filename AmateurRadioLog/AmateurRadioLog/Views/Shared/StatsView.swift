@@ -13,8 +13,8 @@ struct StatsView: View {
             let key = qso.band?.displayName ?? "Unknown"
             counts[key, default: 0] += 1
         }
+        // Keep frequency order (Band.allCases is already low→high)
         var result = Band.allCases.map { ($0.displayName, counts[$0.displayName]!) }
-        result.sort { $0.1 > $1.1 }
         if let unknown = counts["Unknown"], unknown > 0 {
             result.append(("Unknown", unknown))
         }
@@ -196,34 +196,6 @@ struct StatsView: View {
 
     // MARK: - Records
 
-    private var longestQSO: QSO? {
-        qsos.filter { $0.timeOff != nil && !$0.timeOff!.isEmpty }.max { a, b in
-            qsoDuration(a) < qsoDuration(b)
-        }
-    }
-
-    private func qsoDuration(_ qso: QSO) -> Int {
-        guard let off = qso.timeOff, !off.isEmpty else { return 0 }
-        let onMin = timeToMinutes(qso.timeOn)
-        let offMin = timeToMinutes(off)
-        let diff = offMin - onMin
-        return diff >= 0 ? diff : diff + 1440
-    }
-
-    private func timeToMinutes(_ t: String) -> Int {
-        guard t.count >= 4 else { return 0 }
-        let h = Int(t.prefix(2)) ?? 0
-        let m = Int(t.dropFirst(2).prefix(2)) ?? 0
-        return h * 60 + m
-    }
-
-    private func formatDuration(_ minutes: Int) -> String {
-        if minutes >= 60 {
-            return "\(minutes / 60)h \(minutes % 60)m"
-        }
-        return "\(minutes)m"
-    }
-
     private var highestSNR: QSO? {
         qsos.filter { $0.rstRcvd != nil }.max { a, b in
             (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
@@ -252,20 +224,17 @@ struct StatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Summary cards
-                HStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 16) {
                     StatCard(title: "Total QSOs", value: "\(qsos.count)", icon: "antenna.radiowaves.left.and.right")
                     StatCard(title: "Unique Calls", value: "\(uniqueCalls)", icon: "person.2")
                     StatCard(title: "Countries", value: "\(uniqueCountries)", icon: "globe")
                     StatCard(title: "US States", value: "\(workedStates)/50", icon: "flag")
                 }
+                .fixedSize(horizontal: false, vertical: true)
 
                 // Records
                 GroupBox("Records") {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let qso = longestQSO {
-                            let dur = qsoDuration(qso)
-                            recordRow(label: "Longest QSO", value: "\(formatDuration(dur)) with \(qso.call)", qso: qso)
-                        }
                         if let qso = highestSNR {
                             recordRow(label: "Highest SNR", value: "\(qso.rstRcvd ?? "") from \(qso.call)", qso: qso)
                         }

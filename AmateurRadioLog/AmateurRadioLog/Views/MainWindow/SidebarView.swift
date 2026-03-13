@@ -7,6 +7,7 @@ struct SidebarView: View {
     @State private var showQRZSync = false
     @State private var showLoTWSync = false
     @State private var showHamQTHSync = false
+    @State private var showSettings = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -35,9 +36,7 @@ struct SidebarView: View {
 
             #if os(iOS)
             Section("Settings") {
-                NavigationLink {
-                    SettingsView()
-                } label: {
+                Button(action: { showSettings = true }) {
                     Label("Settings", systemImage: "gear")
                 }
             }
@@ -60,6 +59,20 @@ struct SidebarView: View {
                 Task { await appState.syncHamQTH(context: modelContext) }
             }
         }
+        #if os(iOS)
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView()
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showSettings = false }
+                        }
+                    }
+            }
+        }
+        #endif
     }
 }
 

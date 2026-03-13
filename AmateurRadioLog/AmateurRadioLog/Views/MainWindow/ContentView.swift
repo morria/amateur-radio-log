@@ -38,11 +38,21 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
                 #endif
         } detail: {
+            #if os(iOS)
+            NavigationStack {
+                switch appState.selectedTab {
+                case .log:  logView
+                case .map:  ContactMapView(qsos: allQSOs)
+                case .stats: StatsView(qsos: allQSOs)
+                }
+            }
+            #else
             switch appState.selectedTab {
             case .log:  logView
             case .map:  ContactMapView(qsos: allQSOs)
             case .stats: StatsView(qsos: allQSOs)
             }
+            #endif
         }
         .navigationSplitViewStyle(.balanced)
         #if os(macOS)

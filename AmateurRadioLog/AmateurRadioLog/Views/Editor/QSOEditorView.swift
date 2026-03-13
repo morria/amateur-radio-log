@@ -23,19 +23,17 @@ struct QSOEditorView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                Form {
-                    contactSection
-                    frequencySection
-                    signalSection
-                    stationSection
-                    notesSection
-                    lookupSection
-                }
-                #if os(macOS)
-                .formStyle(.grouped)
-                #endif
+            Form {
+                contactSection
+                frequencySection
+                signalSection
+                stationSection
+                notesSection
+                lookupSection
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle(data.isNew ? "New QSO" : "Edit QSO")
             #if os(macOS)
             .frame(width: 550, height: 650)
