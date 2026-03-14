@@ -184,6 +184,7 @@ struct QSOListView: View {
                     .tint(.green)
             }
         }
+        .listStyle(.plain)
         .navigationDestination(for: PersistentIdentifier.self) { id in
             if let qso = data.first(where: { $0.persistentModelID == id }) {
                 QSODetailView(qso: qso, onEdit: onEdit)
