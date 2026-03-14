@@ -81,7 +81,7 @@ final class LocationManager: NSObject {
     }
 }
 
-extension LocationManager: @preconcurrency CLLocationManagerDelegate {
+extension LocationManager: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         let location = locations.last
         Task { @MainActor in
