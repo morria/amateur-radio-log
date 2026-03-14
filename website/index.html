@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amateur Radio Log - Ham Radio Logging for Mac, iPad & iPhone</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -34,7 +36,8 @@
             max-width: 1100px; margin: 0 auto; padding: 14px 24px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        nav .logo { font-size: 18px; font-weight: 700; }
+        nav .logo { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        nav .logo img { width: 28px; height: 28px; border-radius: 6px; }
         nav .links { display: flex; gap: 24px; }
         nav .links a { color: var(--muted); font-size: 14px; }
         nav .links a:hover { color: var(--text); }
@@ -43,6 +46,11 @@
         .hero {
             text-align: center; padding: 160px 24px 80px;
             background: linear-gradient(180deg, #0a0a1a 0%, var(--bg) 100%);
+        }
+        .hero .app-icon {
+            width: 128px; height: 128px; border-radius: 28px;
+            margin: 0 auto 32px;
+            box-shadow: 0 8px 32px rgba(59,130,246,0.3);
         }
         .hero h1 {
             font-size: clamp(36px, 5vw, 56px); font-weight: 800;
@@ -136,7 +144,7 @@
 <body>
     <nav>
         <div class="inner">
-            <div class="logo">Amateur Radio Log</div>
+            <div class="logo"><img src="icon.png" alt="Amateur Radio Log icon">Amateur Radio Log</div>
             <div class="links">
                 <a href="#features">Features</a>
                 <a href="#platforms">Platforms</a>
@@ -147,6 +155,7 @@
     </nav>
 
     <section class="hero">
+        <img src="icon.png" alt="Amateur Radio Log" class="app-icon">
         <h1>Your <span>Radio Log</span>,<br>Everywhere.</h1>
         <p>A fast, native ham radio logging app for Mac, iPad and iPhone. Import and export ADIF, sync with QRZ, HamQTH and LoTW, and see all your contacts on a map.</p>
 
