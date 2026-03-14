@@ -20,6 +20,9 @@ struct QSOMapPin: Identifiable, Hashable {
 
 struct ContactMapView: View {
     @Environment(AppState.self) private var appState
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    #endif
     let qsos: [QSO]
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPin: QSOMapPin?
@@ -166,6 +169,24 @@ struct ContactMapView: View {
                 }
             }
             .mapStyle(currentMapStyle)
+
+            #if os(iOS)
+            // Back button top-left
+            VStack {
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .padding(10)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding()
+            #endif
 
             VStack(alignment: .trailing, spacing: 8) {
                 // Stats overlay

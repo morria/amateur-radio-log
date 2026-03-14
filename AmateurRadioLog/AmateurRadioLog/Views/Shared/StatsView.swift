@@ -2,6 +2,9 @@ import SwiftUI
 
 struct StatsView: View {
     @Environment(AppState.self) private var appState
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    #endif
     let qsos: [QSO]
 
     @State private var statsBand: Band?
@@ -245,6 +248,12 @@ struct StatsView: View {
                 // Filters
                 GroupBox {
                     HStack(spacing: 16) {
+                        #if os(iOS)
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "chevron.left")
+                                .font(.body.weight(.semibold))
+                        }
+                        #endif
                         Picker("Band", selection: $statsBand) {
                             Text("All Bands").tag(nil as Band?)
                             ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }

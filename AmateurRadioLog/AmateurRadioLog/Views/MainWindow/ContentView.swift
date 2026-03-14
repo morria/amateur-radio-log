@@ -40,18 +40,8 @@ struct ContentView: View {
                 #endif
         } detail: {
             #if os(iOS)
-            ZStack {
-                logView
-                    .opacity(appState.selectedTab == .log ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .log)
-                ContactMapView(qsos: allQSOs)
-                    .opacity(appState.selectedTab == .map ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .map)
-                StatsView(qsos: allQSOs)
-                    .opacity(appState.selectedTab == .stats ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .stats)
-            }
-            .navigationBarTitleDisplayMode(.inline)
+            iOSDetailView
+                .toolbar(.hidden, for: .navigationBar)
             #else
             ZStack {
                 logView
@@ -178,6 +168,24 @@ struct ContentView: View {
         if data.txPower == nil { data.txPower = appState.lastPower }
         return data
     }
+
+    #if os(iOS)
+    private var iOSDetailView: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                logView
+                    .opacity(appState.selectedTab == .log ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .log)
+                ContactMapView(qsos: allQSOs)
+                    .opacity(appState.selectedTab == .map ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .map)
+                StatsView(qsos: allQSOs)
+                    .opacity(appState.selectedTab == .stats ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .stats)
+            }
+        }
+    }
+    #endif
 
     private var logView: some View {
         QSOLogView(

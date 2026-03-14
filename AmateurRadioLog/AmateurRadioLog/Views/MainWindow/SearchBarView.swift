@@ -2,12 +2,21 @@ import SwiftUI
 
 struct SearchBarView: View {
     @Environment(AppState.self) private var appState
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    #endif
     @State private var showFilters = false
 
     var body: some View {
         @Bindable var appState = appState
         VStack(spacing: 6) {
             HStack(spacing: 12) {
+                #if os(iOS)
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                }
+                #endif
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Search callsign, name, location...", text: $appState.searchText)
