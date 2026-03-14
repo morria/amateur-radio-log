@@ -14,7 +14,9 @@ struct SearchBarView: View {
                 #if os(iOS)
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
-                        .font(.body.weight(.semibold))
+                        .font(.title2.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 #endif
                 HStack {
@@ -28,9 +30,13 @@ struct SearchBarView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                #if os(iOS)
+                .padding(10)
+                #else
                 .padding(6)
+                #endif
                 .background(.quaternary)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 #if os(macOS)
                 Button(action: { showFilters.toggle() }) {
@@ -45,6 +51,9 @@ struct SearchBarView: View {
                     filterMenuContent
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.title2)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                         .foregroundStyle(appState.filterBand != nil || appState.filterMode != nil ? .blue : .secondary)
                 }
                 #endif
