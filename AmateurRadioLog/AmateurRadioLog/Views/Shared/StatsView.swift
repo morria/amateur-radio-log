@@ -4,12 +4,33 @@ struct StatsView: View {
     @Environment(AppState.self) private var appState
     let qsos: [QSO]
 
+    @State private var statsBand: Band?
+    @State private var statsMode: Mode?
+    @State private var statsTimeRange: MapTimeRange = .allTime
+
+    private var filteredStatsQSOs: [QSO] {
+        var result = qsos
+        if let band = statsBand {
+            result = result.filter { $0.bandRaw == band.rawValue }
+        }
+        if let mode = statsMode {
+            result = result.filter { $0.modeRaw == mode.rawValue }
+        }
+        if let startDate = statsTimeRange.startDate {
+            result = result.filter { qso in
+                guard let dt = qso.dateTime else { return false }
+                return dt >= startDate
+            }
+        }
+        return result
+    }
+
     // MARK: - Band counts (all bands)
 
     private var bandCounts: [(String, Int)] {
         var counts: [String: Int] = [:]
         for band in Band.allCases { counts[band.displayName] = 0 }
-        for qso in qsos {
+        for qso in filteredStatsQSOs {
             let key = qso.band?.displayName ?? "Unknown"
             counts[key, default: 0] += 1
         }
@@ -26,7 +47,7 @@ struct StatsView: View {
     private var modeCounts: [(String, Int)] {
         var counts: [String: Int] = [:]
         for mode in Mode.allCases { counts[mode.displayName] = 0 }
-        for qso in qsos {
+        for qso in filteredStatsQSOs {
             let key = qso.mode?.displayName ?? "Unknown"
             counts[key, default: 0] += 1
         }
@@ -42,7 +63,7 @@ struct StatsView: View {
 
     private var snrCounts: [(String, Int)] {
         var groups: [String: Int] = [:]
-        for qso in qsos {
+        for qso in filteredStatsQSOs {
             guard let rst = qso.rstRcvd, rst.count >= 2,
                   let s = Int(String(rst.prefix(1))) else {
                 groups["Unknown", default: 0] += 1
@@ -75,7 +96,7 @@ struct StatsView: View {
     private var stateCounts: [(String, Int)] {
         var counts: [String: Int] = [:]
         for st in Self.allUSStates { counts[st] = 0 }
-        for qso in qsos {
+        for qso in filteredStatsQSOs {
             if let st = qso.state, !st.isEmpty { counts[st, default: 0] += 1 }
         }
         return Self.allUSStates.map { ($0, counts[$0] ?? 0) }
@@ -149,7 +170,7 @@ struct StatsView: View {
         }
 
         // Count from actual QSOs
-        for qso in qsos {
+        for qso in filteredStatsQSOs {
             guard let country = qso.country, !country.isEmpty else { continue }
             countryCounts[country, default: 0] += 1
             if countryContinent[country] == nil {
@@ -190,28 +211,28 @@ struct StatsView: View {
 
     // MARK: - Summary Stats
 
-    private var uniqueCalls: Int { Set(qsos.map(\.call)).count }
-    private var uniqueCountries: Int { Set(qsos.compactMap(\.country)).count }
+    private var uniqueCalls: Int { Set(filteredStatsQSOs.map(\.call)).count }
+    private var uniqueCountries: Int { Set(filteredStatsQSOs.compactMap(\.country)).count }
     private var workedStates: Int { stateCounts.filter { $0.1 > 0 }.count }
 
     // MARK: - Records
 
     private var highestSNR: QSO? {
-        qsos.filter { $0.rstRcvd != nil }.max { a, b in
+        filteredStatsQSOs.filter { $0.rstRcvd != nil }.max { a, b in
             (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
         }
     }
 
     private var lowestSNR: QSO? {
-        qsos.filter { $0.rstRcvd != nil && !$0.rstRcvd!.isEmpty }.min { a, b in
+        filteredStatsQSOs.filter { $0.rstRcvd != nil && !$0.rstRcvd!.isEmpty }.min { a, b in
             (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
         }
     }
 
     private var furthestQSO: QSO? {
-        let myGrid = UserDefaults.standard.string(forKey: "myGridsquare") ?? ""
+        let myGrid = NSUbiquitousKeyValueStore.default.string(forKey: "myGridsquare") ?? ""
         guard let myCoord = MaidenheadConverter.toCoordinate(grid: myGrid) else { return nil }
-        return qsos.filter { $0.latitude != nil && $0.longitude != nil }.max { a, b in
+        return filteredStatsQSOs.filter { $0.latitude != nil && $0.longitude != nil }.max { a, b in
             let distA = abs(a.latitude! - myCoord.latitude) + abs(a.longitude! - myCoord.longitude)
             let distB = abs(b.latitude! - myCoord.latitude) + abs(b.longitude! - myCoord.longitude)
             return distA < distB
@@ -220,12 +241,53 @@ struct StatsView: View {
 
     // MARK: - Body
 
+    private var hasStatsFilters: Bool {
+        statsBand != nil || statsMode != nil || statsTimeRange != .allTime
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                // Filters
+                GroupBox {
+                    HStack(spacing: 16) {
+                        Picker("Band", selection: $statsBand) {
+                            Text("All Bands").tag(nil as Band?)
+                            ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
+                            Divider()
+                            ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
+                        }
+                        .frame(maxWidth: 160)
+
+                        Picker("Mode", selection: $statsMode) {
+                            Text("All Modes").tag(nil as Mode?)
+                            ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
+                        }
+                        .frame(maxWidth: 160)
+
+                        Picker("Time", selection: $statsTimeRange) {
+                            ForEach(MapTimeRange.allCases) { range in
+                                Text(range.rawValue).tag(range)
+                            }
+                        }
+                        .frame(maxWidth: 140)
+
+                        if hasStatsFilters {
+                            Button("Clear") {
+                                statsBand = nil
+                                statsMode = nil
+                                statsTimeRange = .allTime
+                            }
+                            .controlSize(.small)
+                        }
+
+                        Spacer()
+                    }
+                }
+
                 // Summary cards
                 HStack(alignment: .top, spacing: 16) {
-                    StatCard(title: "Total QSOs", value: "\(qsos.count)", icon: "antenna.radiowaves.left.and.right")
+                    StatCard(title: "Total QSOs", value: "\(filteredStatsQSOs.count)", icon: "antenna.radiowaves.left.and.right")
                     StatCard(title: "Unique Calls", value: "\(uniqueCalls)", icon: "person.2")
                     StatCard(title: "Countries", value: "\(uniqueCountries)", icon: "globe")
                     StatCard(title: "US States", value: "\(workedStates)/50", icon: "flag")

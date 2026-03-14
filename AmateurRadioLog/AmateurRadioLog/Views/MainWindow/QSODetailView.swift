@@ -9,28 +9,28 @@ struct QSODetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Header
-                HStack {
-                    VStack(alignment: .leading) {
-                        Button(action: { appState.showLogFiltered(callsign: qso.call) }) {
-                            Text(qso.call)
-                                .font(.largeTitle)
-                                .fontDesign(.monospaced)
-                                .bold()
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: {
-                            appState.clearFilters()
-                            appState.searchText = qso.qsoDate
-                        }) {
-                            Text(qso.displayDate)
-                                .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 8) {
+                    Button(action: { appState.showLogFiltered(callsign: qso.call) }) {
+                        Text(qso.call)
+                            .font(.largeTitle)
+                            .fontDesign(.monospaced)
+                            .bold()
                     }
-                    Spacer()
-                    Button("Show on Map") { appState.showOnMap(qso: qso) }
-                    Button("Edit") { onEdit(qso) }
+                    .buttonStyle(.plain)
+
+                    Button(action: {
+                        appState.clearFilters()
+                        appState.searchText = qso.qsoDate
+                    }) {
+                        Text(qso.displayDate)
+                            .foregroundStyle(.blue)
+                    }
+                    .buttonStyle(.plain)
+
+                    HStack(spacing: 12) {
+                        Button("Show on Map") { appState.showOnMap(qso: qso) }
+                        Button("Edit") { onEdit(qso) }
+                    }
                 }
 
                 Divider()

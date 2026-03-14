@@ -23,6 +23,9 @@ struct AmateurRadioLogApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .onOpenURL { url in
+                    appState.pendingImportURL = url
+                }
         }
         .modelContainer(container)
         #if os(macOS)

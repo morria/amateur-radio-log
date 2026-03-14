@@ -149,19 +149,12 @@ final class QSO {
     }
 
     var dateTime: Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = timeOn.count == 6 ? "yyyyMMddHHmmss" : "yyyyMMddHHmm"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.date(from: qsoDate + timeOn)
+        ADIFDateFormatter.dateTime(dateStr: qsoDate, timeOn: timeOn)
     }
 
     var displayDate: String {
         guard let dt = dateTime else { return qsoDate }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: dt) + " UTC"
+        return ADIFDateFormatter.displayDateTime(dt)
     }
 
     var displayFrequency: String {

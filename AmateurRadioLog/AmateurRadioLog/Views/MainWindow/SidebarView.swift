@@ -7,6 +7,7 @@ struct SidebarView: View {
     @State private var showQRZSync = false
     @State private var showLoTWSync = false
     @State private var showHamQTHSync = false
+    @State private var showPOTAExport = false
     @State private var showSettings = false
 
     var body: some View {
@@ -34,6 +35,12 @@ struct SidebarView: View {
                 }
             }
 
+            Section("Export") {
+                Button(action: { showPOTAExport = true }) {
+                    Label("POTA Export", systemImage: "tree")
+                }
+            }
+
             #if os(iOS)
             Section("Settings") {
                 Button(action: { showSettings = true }) {
@@ -55,9 +62,12 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showHamQTHSync) {
-            SyncConfigSheet(provider: "HamQTH") { _ in
-                Task { await appState.syncHamQTH(context: modelContext) }
+            SyncConfigSheet(provider: "HamQTH") { direction in
+                Task { await appState.syncHamQTH(context: modelContext, direction: direction) }
             }
+        }
+        .sheet(isPresented: $showPOTAExport) {
+            POTAExportSheet()
         }
         #if os(iOS)
         .sheet(isPresented: $showSettings) {
@@ -93,33 +103,24 @@ struct SyncConfigSheet: View {
                     Text(provider).font(.headline)
                 }
 
-                if provider == "HamQTH" {
-                    Section("Action") {
-                        Text("Look up all callsigns via HamQTH and fill in missing data: name, country, grid, coordinates, state, CQ/ITU zone, and continent.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text("Only QSOs with incomplete data will be looked up. Existing fields are never overwritten.")
-                            .font(.caption2).foregroundStyle(.secondary)
+                Section("Direction") {
+                    Picker("Sync Direction", selection: $direction) {
+                        ForEach(SyncDirection.allCases) { dir in
+                            Text(dir.rawValue).tag(dir)
+                        }
                     }
-                } else {
-                    Section("Direction") {
-                        Picker("Sync Direction", selection: $direction) {
-                            ForEach(SyncDirection.allCases) { dir in
-                                Text(dir.rawValue).tag(dir)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                    .pickerStyle(.segmented)
 
-                        switch direction {
-                        case .upload:
-                            Text("Upload local QSOs to \(provider).")
-                                .font(.caption).foregroundStyle(.secondary)
-                        case .download:
-                            Text("Download QSOs from \(provider). Duplicates will be skipped.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        case .both:
-                            Text("Upload local QSOs and download new QSOs from \(provider). Duplicates will be skipped.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                    switch direction {
+                    case .upload:
+                        Text("Upload local QSOs to \(provider).")
+                            .font(.caption).foregroundStyle(.secondary)
+                    case .download:
+                        Text("Download QSOs from \(provider). Duplicates will be skipped.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    case .both:
+                        Text("Upload local QSOs and download new QSOs from \(provider). Duplicates will be skipped.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
 
@@ -133,8 +134,9 @@ struct SyncConfigSheet: View {
 
                 Section {
                     if appState.isLoading {
-                        HStack {
-                            ProgressView().controlSize(.small)
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(.linear)
                             Text(appState.statusMessage ?? "Syncing...")
                                 .font(.caption).foregroundStyle(.secondary)
                         }

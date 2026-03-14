@@ -76,6 +76,67 @@ actor HamQTHService {
         )
     }
 
+    // MARK: - Logbook Upload
+
+    func uploadQSOs(_ qsos: [QSO], username: String, password: String) async throws -> Int {
+        guard let url = URL(string: "https://www.hamqth.com/qso_realtime.php") else {
+            throw ServiceError.networkError("Invalid URL")
+        }
+
+        let writer = ADIFWriter()
+        var uploaded = 0
+        var lastError: String?
+
+        for qso in qsos {
+            let record = writer.writeSingleRecord(qso)
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+            let encodedRecord = record.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? record
+            let encodedUser = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
+            let encodedPass = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
+            let body = "u=\(encodedUser)&p=\(encodedPass)&cmd=insert&prg=AmateurRadioLog&adif=\(encodedRecord)"
+            request.httpBody = body.data(using: .utf8)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+
+            if statusCode == 200 {
+                uploaded += 1
+            } else {
+                lastError = String(data: data, encoding: .utf8) ?? "HTTP \(statusCode)"
+            }
+        }
+
+        if uploaded == 0 && !qsos.isEmpty {
+            throw ServiceError.serverError(lastError ?? "Upload failed for all QSOs")
+        }
+
+        return uploaded
+    }
+
+    // MARK: - Logbook Download
+
+    func downloadQSOs(username: String, password: String) async throws -> [QSO] {
+        let encodedUser = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
+        let encodedPass = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
+        let urlStr = "https://www.hamqth.com/adif.php?u=\(encodedUser)&p=\(encodedPass)&prg=AmateurRadioLog"
+        guard let url = URL(string: urlStr) else {
+            throw ServiceError.networkError("Invalid URL")
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
+        guard let adifStr = String(data: data, encoding: .utf8), !adifStr.isEmpty else {
+            return []
+        }
+
+        let parser = ADIFParser()
+        let file = try parser.parse(string: adifStr)
+        return parser.recordsToQSOs(file.records)
+    }
+
     func logout() {
         sessionId = nil
     }

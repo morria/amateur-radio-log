@@ -38,6 +38,8 @@
 		E3D2944619CAF7D427C8A578 /* ServiceCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */; };
 		F803FBB2B739CF4D92328E6F /* MaidenheadConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08F30157C8A4BAC3D6761377 /* MaidenheadConverter.swift */; };
 		FBD3A6B24B5CE855CA3F8070 /* HamQTHService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */; };
+		A1B2C3D4E5F60718A1B2C3D4 /* POTAExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718A1B2C3D5 /* POTAExportSheet.swift */; };
+		B1C2D3E4F5A60819B1C2D3E4 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A60819B1C2D3E5 /* LocationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +71,7 @@
 		6D213CB06684EA31D0ECBEB1 /* Amateur Radio Log.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Amateur Radio Log.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceCredentials.swift; sourceTree = "<group>"; };
 		751E4D19CC969EC2263A7F5E /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
+		B1C2D3E4F5A60819B1C2D3E5 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		78E3BA1BA315779F6F1BFDBE /* Band.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Band.swift; sourceTree = "<group>"; };
 		797C4DCC41A6E63706ECBAED /* QSODetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSODetailView.swift; sourceTree = "<group>"; };
 		8BA8C2116BF90D70986F30FA /* ServiceError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceError.swift; sourceTree = "<group>"; };
@@ -82,6 +85,7 @@
 		D250A1822805EEF592F8859A /* QSO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSO.swift; sourceTree = "<group>"; };
 		D3BAE4C3BE98BF2EEE041BCF /* QSOEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOEditorView.swift; sourceTree = "<group>"; };
 		D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HamQTHService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718A1B2C3D5 /* POTAExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POTAExportSheet.swift; sourceTree = "<group>"; };
 		D8EBCDAD1FEEA1D174C9F87C /* ADIFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ADIFParser.swift; sourceTree = "<group>"; };
 		DC69A3DA9ED827733908D386 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignLookupResult.swift; sourceTree = "<group>"; };
@@ -120,6 +124,7 @@
 			children = (
 				D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */,
 				751E4D19CC969EC2263A7F5E /* KeychainManager.swift */,
+				B1C2D3E4F5A60819B1C2D3E5 /* LocationManager.swift */,
 				93A962F6080E90AEB5E8199B /* LoTWService.swift */,
 				192D4A21004CED7D40145A8E /* QRZService.swift */,
 				8BA8C2116BF90D70986F30FA /* ServiceError.swift */,
@@ -207,6 +212,14 @@
 			path = Utilities;
 			sourceTree = "<group>";
 		};
+		A1B2C3D4E5F60718A1B2C3D6 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718A1B2C3D5 /* POTAExportSheet.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
 		D96138A96E37C2AC547946C1 /* Editor */ = {
 			isa = PBXGroup;
 			children = (
@@ -256,6 +269,7 @@
 			isa = PBXGroup;
 			children = (
 				D96138A96E37C2AC547946C1 /* Editor */,
+				A1B2C3D4E5F60718A1B2C3D6 /* Export */,
 				E12574E51924995267ECBEE5 /* MainWindow */,
 				F1EA1DD122F9C33FFA2D9ED6 /* Map */,
 				4AF5E0F01790D8C55152ED64 /* Settings */,
@@ -368,9 +382,11 @@
 				189835AEC87A7447B263578F /* HamLogApp.swift in Sources */,
 				FBD3A6B24B5CE855CA3F8070 /* HamQTHService.swift in Sources */,
 				B34998BF85699C26C7DA09AA /* KeychainManager.swift in Sources */,
+				B1C2D3E4F5A60819B1C2D3E4 /* LocationManager.swift in Sources */,
 				9CC7306B7E7DDB9D5E51A514 /* LoTWService.swift in Sources */,
 				F803FBB2B739CF4D92328E6F /* MaidenheadConverter.swift in Sources */,
 				26EF4116A34E2852176E8B59 /* Mode.swift in Sources */,
+				A1B2C3D4E5F60718A1B2C3D4 /* POTAExportSheet.swift in Sources */,
 				01144C3D5FFFEF3128DD2DD1 /* PreviewData.swift in Sources */,
 				77FD27672E7FA0EE35477972 /* QRZService.swift in Sources */,
 				6C13E0D8CCD6A444B34AA48D /* QSO.swift in Sources */,
@@ -557,6 +573,7 @@
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AmateurRadioLog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Amateur Radio Log";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -568,7 +585,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.amateurradiolog.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLog;
 				PRODUCT_NAME = "Amateur Radio Log";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -594,6 +611,7 @@
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AmateurRadioLog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Amateur Radio Log";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -605,7 +623,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.amateurradiolog.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLog;
 				PRODUCT_NAME = "Amateur Radio Log";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";

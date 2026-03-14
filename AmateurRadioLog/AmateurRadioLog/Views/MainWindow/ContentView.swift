@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var showingNewQSO = false
     @State private var showingImporter = false
     @State private var showingExportSheet = false
+    @State private var showingSetup = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
     var body: some View {
@@ -40,17 +41,29 @@ struct ContentView: View {
         } detail: {
             #if os(iOS)
             NavigationStack {
-                switch appState.selectedTab {
-                case .log:  logView
-                case .map:  ContactMapView(qsos: allQSOs)
-                case .stats: StatsView(qsos: allQSOs)
+                ZStack {
+                    logView
+                        .opacity(appState.selectedTab == .log ? 1 : 0)
+                        .allowsHitTesting(appState.selectedTab == .log)
+                    ContactMapView(qsos: allQSOs)
+                        .opacity(appState.selectedTab == .map ? 1 : 0)
+                        .allowsHitTesting(appState.selectedTab == .map)
+                    StatsView(qsos: allQSOs)
+                        .opacity(appState.selectedTab == .stats ? 1 : 0)
+                        .allowsHitTesting(appState.selectedTab == .stats)
                 }
             }
             #else
-            switch appState.selectedTab {
-            case .log:  logView
-            case .map:  ContactMapView(qsos: allQSOs)
-            case .stats: StatsView(qsos: allQSOs)
+            ZStack {
+                logView
+                    .opacity(appState.selectedTab == .log ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .log)
+                ContactMapView(qsos: allQSOs)
+                    .opacity(appState.selectedTab == .map ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .map)
+                StatsView(qsos: allQSOs)
+                    .opacity(appState.selectedTab == .stats ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .stats)
             }
             #endif
         }
@@ -96,6 +109,60 @@ struct ContentView: View {
             Button("OK") { appState.errorMessage = nil }
         } message: {
             Text(appState.errorMessage ?? "")
+        }
+        .sheet(isPresented: $showingSetup) {
+            NavigationStack {
+                #if os(macOS)
+                SettingsView()
+                    .navigationTitle("Welcome to Amateur Radio Log")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingSetup = false }
+                        }
+                    }
+                #else
+                Form {
+                    Section("My Station") {
+                        GeneralSettingsView()
+                    }
+                    Section("Defaults") {
+                        GeneralDefaultsView()
+                    }
+                    Section("QRZ.com") {
+                        QRZSettingsView()
+                    }
+                    Section("HamQTH") {
+                        HamQTHSettingsView()
+                    }
+                    Section {
+                        LoTWSettingsView()
+                    } header: {
+                        Text("LoTW")
+                    }
+                }
+                .navigationTitle("Welcome")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingSetup = false }
+                    }
+                }
+                #endif
+            }
+        }
+        .onAppear {
+            let callsign = NSUbiquitousKeyValueStore.default.string(forKey: "stationCallsign") ?? ""
+            if callsign.isEmpty {
+                showingSetup = true
+            }
+        }
+        .onChange(of: appState.pendingImportURL) { _, url in
+            if let url {
+                let accessed = url.startAccessingSecurityScopedResource()
+                appState.importADIF(from: url, context: modelContext)
+                if accessed { url.stopAccessingSecurityScopedResource() }
+                appState.pendingImportURL = nil
+            }
         }
         #if os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: .newQSO)) { _ in showingNewQSO = true }
@@ -177,6 +244,11 @@ struct QSOLogView: View {
                         .frame(width: 280)
                 }
             }
+            .onChange(of: selectedQSO) { _, newValue in
+                if newValue != nil && !showDetailPanel {
+                    withAnimation { showDetailPanel = true }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Button(action: { withAnimation { showDetailPanel.toggle() } }) {
@@ -223,7 +295,7 @@ struct QSOLogView: View {
 // MARK: - ADIF Document
 
 struct ADIFDocument: FileDocument {
-    static let adifType = UTType(filenameExtension: "adi", conformingTo: .plainText) ?? .plainText
+    static let adifType = UTType("com.amateurradiolog.adif") ?? UTType(filenameExtension: "adi", conformingTo: .plainText) ?? .plainText
     static var readableContentTypes: [UTType] { [adifType, .plainText] }
     static var writableContentTypes: [UTType] { [adifType] }
     var content: String

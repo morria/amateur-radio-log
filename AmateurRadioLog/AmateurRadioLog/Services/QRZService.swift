@@ -134,24 +134,41 @@ actor QRZService {
         let body = "KEY=\(apiKey)&ACTION=FETCH&OPTION=ALL"
         request.httpBody = body.data(using: .utf8)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
-        guard let responseStr = String(data: data, encoding: .utf8) else {
-            throw ServiceError.parseError("Unable to decode response")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard let responseStr = String(data: data, encoding: .utf8)
+                ?? String(data: data, encoding: .isoLatin1)
+                ?? String(data: data, encoding: .ascii) else {
+            throw ServiceError.parseError("Unable to decode \(data.count) byte response (HTTP \(statusCode))")
+        }
+
+        if responseStr.contains("RESULT=FAIL") {
+            // Extract reason
+            if let range = responseStr.range(of: "REASON=") {
+                let reason = String(responseStr[range.upperBound...])
+                    .components(separatedBy: "&").first ?? "Unknown"
+                throw ServiceError.serverError("QRZ: \(reason)")
+            }
+            throw ServiceError.serverError("QRZ download failed: \(responseStr.prefix(200))")
         }
 
         // Response contains ADIF data after ADIF= tag
         if let adifRange = responseStr.range(of: "ADIF=") {
             let adifStr = String(responseStr[adifRange.upperBound...])
+            if adifStr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return []
+            }
             let parser = ADIFParser()
             let file = try parser.parse(string: adifStr)
             return parser.recordsToQSOs(file.records)
         }
 
-        if responseStr.contains("RESULT=FAIL") {
-            throw ServiceError.serverError(responseStr)
+        // No ADIF data and no error — empty logbook
+        if responseStr.contains("RESULT=OK") {
+            return []
         }
 
-        return []
+        throw ServiceError.parseError("Unexpected QRZ response: \(responseStr.prefix(200))")
     }
 
     func logout() {

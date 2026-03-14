@@ -165,7 +165,7 @@ struct ContactMapView: View {
                     .tag(pin)
                 }
             }
-            .mapStyle(.standard)
+            .mapStyle(currentMapStyle)
 
             VStack(alignment: .trailing, spacing: 8) {
                 // Stats overlay
@@ -331,6 +331,16 @@ struct ContactMapView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
+    // MARK: - Map Style
+
+    private var currentMapStyle: MapStyle {
+        switch appState.mapStyle {
+        case .standard: return .standard(pointsOfInterest: .excludingAll)
+        case .imagery:  return .imagery
+        case .hybrid:   return .hybrid(pointsOfInterest: .excludingAll)
+        }
+    }
+
     // MARK: - Map Filters
 
     private var mapFiltersView: some View {
@@ -364,6 +374,13 @@ struct ContactMapView: View {
         }
 
         Divider()
+
+        Picker("Map Style", selection: $appState.mapStyle) {
+            ForEach(MapStyleOption.allCases) { opt in
+                Text(opt.rawValue).tag(opt)
+            }
+        }
+        .pickerStyle(.segmented)
 
         Picker("Color by", selection: $appState.mapColorBy) {
             ForEach(MapColorOption.allCases) { opt in

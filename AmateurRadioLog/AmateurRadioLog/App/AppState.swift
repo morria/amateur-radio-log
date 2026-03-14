@@ -35,6 +35,13 @@ enum MapColorOption: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum MapStyleOption: String, CaseIterable, Identifiable {
+    case standard = "Standard"
+    case imagery = "Satellite"
+    case hybrid = "Hybrid"
+    var id: String { rawValue }
+}
+
 enum SyncDirection: String, CaseIterable, Identifiable {
     case upload = "Upload"
     case download = "Download"
@@ -50,6 +57,7 @@ final class AppState {
     var isLoading = false
     var errorMessage: String?
     var statusMessage: String?
+    var pendingImportURL: URL?
 
     // MARK: - Navigation
     var selectedTab: NavigationTab = .log
@@ -71,27 +79,31 @@ final class AppState {
     // MARK: - Map-specific
     var mapTimeRange: MapTimeRange = .allTime
     var mapColorBy: MapColorOption = .band
+    var mapStyle: MapStyleOption = .imagery
 
-    // MARK: - Last-used QSO defaults
+    // MARK: - Last-used QSO defaults (iCloud synced)
+    @ObservationIgnored
+    private var cloud: NSUbiquitousKeyValueStore { .default }
+
     @ObservationIgnored
     var lastBand: Band? {
-        get { UserDefaults.standard.string(forKey: "lastBand").flatMap { Band(rawValue: $0) } }
-        set { UserDefaults.standard.set(newValue?.rawValue, forKey: "lastBand") }
+        get { cloud.string(forKey: "lastBand").flatMap { Band(rawValue: $0) } }
+        set { cloud.set(newValue?.rawValue, forKey: "lastBand") }
     }
     @ObservationIgnored
     var lastMode: Mode? {
-        get { UserDefaults.standard.string(forKey: "lastMode").flatMap { Mode(rawValue: $0) } }
-        set { UserDefaults.standard.set(newValue?.rawValue, forKey: "lastMode") }
+        get { cloud.string(forKey: "lastMode").flatMap { Mode(rawValue: $0) } }
+        set { cloud.set(newValue?.rawValue, forKey: "lastMode") }
     }
     @ObservationIgnored
     var lastFreq: Double? {
-        get { let v = UserDefaults.standard.double(forKey: "lastFreq"); return v == 0 ? nil : v }
-        set { UserDefaults.standard.set(newValue ?? 0, forKey: "lastFreq") }
+        get { let v = cloud.double(forKey: "lastFreq"); return v == 0 ? nil : v }
+        set { cloud.set(newValue ?? 0, forKey: "lastFreq") }
     }
     @ObservationIgnored
     var lastPower: Double? {
-        get { let v = UserDefaults.standard.double(forKey: "lastPower"); return v == 0 ? nil : v }
-        set { UserDefaults.standard.set(newValue ?? 0, forKey: "lastPower") }
+        get { let v = cloud.double(forKey: "lastPower"); return v == 0 ? nil : v }
+        set { cloud.set(newValue ?? 0, forKey: "lastPower") }
     }
 
     // MARK: - Services
@@ -357,9 +369,9 @@ final class AppState {
         }
     }
 
-    // MARK: - HamQTH Sync (Callsign Enrichment)
+    // MARK: - HamQTH Sync
 
-    func syncHamQTH(context: ModelContext) async {
+    func syncHamQTH(context: ModelContext, direction: SyncDirection = .both) async {
         let creds = KeychainManager.loadCredentials(for: .hamqth)
         guard !creds.isEmpty else {
             errorMessage = "HamQTH credentials not configured"
@@ -367,60 +379,59 @@ final class AppState {
         }
 
         isLoading = true
-        statusMessage = "Looking up callsigns via HamQTH..."
+        statusMessage = "Syncing with HamQTH..."
+        var messages: [String] = []
 
         do {
-            if await !hamQTHService.isAuthenticated {
-                try await hamQTHService.authenticate(username: creds.username, password: creds.password)
-            }
+            var localQSOs = try context.fetch(FetchDescriptor<QSO>())
 
-            let allQSOs = try context.fetch(FetchDescriptor<QSO>())
-            // Get unique callsigns that have missing data
-            let qsosNeedingData = allQSOs.filter { qso in
-                qso.name == nil || qso.country == nil || qso.gridsquare == nil
-                    || qso.latitude == nil || qso.state == nil || qso.continent == nil
-            }
-            let callsignsToLookup = Array(Set(qsosNeedingData.map(\.call)))
+            // Step 1: Download from HamQTH
+            statusMessage = "Downloading from HamQTH..."
+            let remoteQSOs = try await hamQTHService.downloadQSOs(
+                username: creds.username, password: creds.password)
+            var added = 0
 
-            if callsignsToLookup.isEmpty {
-                isLoading = false
-                statusMessage = "All QSOs already have complete data"
-                return
-            }
-
-            var enriched = 0
-            for (index, callsign) in callsignsToLookup.enumerated() {
-                statusMessage = "Looking up \(callsign) (\(index + 1)/\(callsignsToLookup.count))..."
-
-                do {
-                    let result = try await hamQTHService.lookup(callsign: callsign)
-                    let matchingQSOs = allQSOs.filter { $0.call == callsign }
-                    for qso in matchingQSOs {
-                        var changed = false
-                        if qso.name == nil, let name = result.fullName { qso.name = name; changed = true }
-                        if qso.country == nil, let country = result.country { qso.country = country; changed = true }
-                        if qso.gridsquare == nil, let grid = result.grid { qso.gridsquare = grid; changed = true }
-                        if qso.state == nil, let state = result.state { qso.state = state; changed = true }
-                        if qso.county == nil, let county = result.county { qso.county = county; changed = true }
-                        if qso.latitude == nil, let lat = result.latitude { qso.latitude = lat; changed = true }
-                        if qso.longitude == nil, let lon = result.longitude { qso.longitude = lon; changed = true }
-                        if qso.cqZone == nil, let cq = result.cqZone { qso.cqZone = cq; changed = true }
-                        if qso.ituZone == nil, let itu = result.ituZone { qso.ituZone = itu; changed = true }
-                        if qso.continent == nil, let cont = result.continent { qso.continent = cont; changed = true }
-                        if qso.qth == nil, let city = result.city { qso.qth = city; changed = true }
-                        if changed { enriched += 1 }
+            if direction == .download || direction == .both {
+                for remote in remoteQSOs {
+                    if findLocalMatch(for: remote, in: localQSOs) == nil {
+                        context.insert(remote)
+                        localQSOs.append(remote)
+                        added += 1
                     }
-                } catch {
-                    continue  // Skip failed lookups
+                }
+                if added > 0 { try context.save() }
+                messages.append("\(added) new from HamQTH")
+            }
+
+            // Step 2: Upload local QSOs newer than the latest remote QSO
+            if direction == .upload || direction == .both {
+                let latestRemote = remoteQSOs
+                    .map { "\($0.qsoDate)\($0.timeOn)" }
+                    .max() ?? ""
+
+                let toUpload: [QSO]
+                if latestRemote.isEmpty {
+                    toUpload = localQSOs
+                } else {
+                    toUpload = localQSOs.filter { local in
+                        let localStamp = "\(local.qsoDate)\(local.timeOn)"
+                        guard localStamp >= latestRemote else { return false }
+                        return findLocalMatch(for: local, in: remoteQSOs) == nil
+                    }
                 }
 
-                // Rate limiting
-                try? await Task.sleep(for: .milliseconds(200))
+                if !toUpload.isEmpty {
+                    statusMessage = "Uploading \(toUpload.count) QSOs to HamQTH..."
+                    let count = try await hamQTHService.uploadQSOs(
+                        toUpload, username: creds.username, password: creds.password)
+                    messages.append("Uploaded \(count) to HamQTH")
+                } else {
+                    messages.append("Nothing new to upload")
+                }
             }
 
-            try context.save()
             isLoading = false
-            statusMessage = "Enriched \(enriched) QSOs from \(callsignsToLookup.count) callsigns"
+            statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
             errorMessage = "HamQTH sync failed: \(error.localizedDescription)"
@@ -448,44 +459,49 @@ final class AppState {
             let apiKey = KeychainManager.load(account: "QRZ.com.apikey") ?? creds.password
             var localQSOs = try context.fetch(FetchDescriptor<QSO>())
 
-            // Step 1: Always download to reconcile what's already on QRZ
+            // Step 1: Download from QRZ
             statusMessage = "Downloading from QRZ..."
             let remoteQSOs = try await qrzService.downloadQSOs(apiKey: apiKey)
             var added = 0
 
-            for remote in remoteQSOs {
-                if let local = findLocalMatch(for: remote, in: localQSOs) {
-                    // Already have it locally — mark as synced
-                    local.qrzSynced = true
-                } else if direction == .download || direction == .both {
-                    // New QSO from QRZ — insert locally
-                    remote.qrzSynced = true
-                    context.insert(remote)
-                    localQSOs.append(remote)
-                    added += 1
-                } else {
-                    // Upload-only mode: just mark that it exists remotely
-                    // by finding a weaker match (call+date) if possible
-                }
-            }
-
-            // Also mark any local QSOs that matched remote as synced
-            // (handles cases where the match was found above)
-            if added > 0 || !remoteQSOs.isEmpty {
-                try context.save()
-            }
+            // Add any remote QSOs we don't have locally
             if direction == .download || direction == .both {
+                for remote in remoteQSOs {
+                    if findLocalMatch(for: remote, in: localQSOs) == nil {
+                        context.insert(remote)
+                        localQSOs.append(remote)
+                        added += 1
+                    }
+                }
+                if added > 0 { try context.save() }
                 messages.append("\(added) new from QRZ")
             }
 
-            // Step 2: Upload local QSOs not yet on QRZ
+            // Step 2: Upload local QSOs newer than the latest remote QSO
             if direction == .upload || direction == .both {
-                let toUpload = localQSOs.filter { !$0.qrzSynced }
+                // Find the latest date+time on QRZ to use as a watermark
+                let latestRemote = remoteQSOs
+                    .map { "\($0.qsoDate)\($0.timeOn)" }
+                    .max() ?? ""
+
+                // Only upload local QSOs at or after that watermark
+                // that aren't already in the remote set
+                let toUpload: [QSO]
+                if latestRemote.isEmpty {
+                    // QRZ logbook is empty — upload everything
+                    toUpload = localQSOs
+                } else {
+                    toUpload = localQSOs.filter { local in
+                        let localStamp = "\(local.qsoDate)\(local.timeOn)"
+                        guard localStamp >= latestRemote else { return false }
+                        // Skip if already on QRZ
+                        return findLocalMatch(for: local, in: remoteQSOs) == nil
+                    }
+                }
+
                 if !toUpload.isEmpty {
                     statusMessage = "Uploading \(toUpload.count) QSOs to QRZ..."
                     let count = try await qrzService.uploadQSOs(toUpload, apiKey: apiKey)
-                    for qso in toUpload { qso.qrzSynced = true }
-                    try context.save()
                     messages.append("Uploaded \(count) to QRZ")
                 } else {
                     messages.append("Nothing new to upload")

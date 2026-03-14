@@ -7,11 +7,12 @@ enum KeychainManager {
     static func save(account: String, password: String) throws {
         let data = Data(password.utf8)
 
-        // Delete existing
+        // Delete existing (both synced and non-synced)
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
         ]
         SecItemDelete(deleteQuery as CFDictionary)
 
@@ -20,7 +21,8 @@ enum KeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
+            kSecAttrSynchronizable as String: true
         ]
 
         let status = SecItemAdd(addQuery as CFDictionary, nil)
@@ -34,6 +36,7 @@ enum KeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -48,7 +51,8 @@ enum KeychainManager {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
         ]
         SecItemDelete(query as CFDictionary)
     }
