@@ -40,19 +40,18 @@ struct ContentView: View {
                 #endif
         } detail: {
             #if os(iOS)
-            NavigationStack {
-                ZStack {
-                    logView
-                        .opacity(appState.selectedTab == .log ? 1 : 0)
-                        .allowsHitTesting(appState.selectedTab == .log)
-                    ContactMapView(qsos: allQSOs)
-                        .opacity(appState.selectedTab == .map ? 1 : 0)
-                        .allowsHitTesting(appState.selectedTab == .map)
-                    StatsView(qsos: allQSOs)
-                        .opacity(appState.selectedTab == .stats ? 1 : 0)
-                        .allowsHitTesting(appState.selectedTab == .stats)
-                }
+            ZStack {
+                logView
+                    .opacity(appState.selectedTab == .log ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .log)
+                ContactMapView(qsos: allQSOs)
+                    .opacity(appState.selectedTab == .map ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .map)
+                StatsView(qsos: allQSOs)
+                    .opacity(appState.selectedTab == .stats ? 1 : 0)
+                    .allowsHitTesting(appState.selectedTab == .stats)
             }
+            .navigationBarTitleDisplayMode(.inline)
             #else
             ZStack {
                 logView

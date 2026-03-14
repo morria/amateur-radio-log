@@ -217,12 +217,6 @@ struct StatsView: View {
 
     // MARK: - Records
 
-    private var highestSNR: QSO? {
-        filteredStatsQSOs.filter { $0.rstRcvd != nil }.max { a, b in
-            (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
-        }
-    }
-
     private var lowestSNR: QSO? {
         filteredStatsQSOs.filter { $0.rstRcvd != nil && !$0.rstRcvd!.isEmpty }.min { a, b in
             (Int(a.rstRcvd ?? "0") ?? 0) < (Int(b.rstRcvd ?? "0") ?? 0)
@@ -257,20 +251,32 @@ struct StatsView: View {
                             Divider()
                             ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
                         }
+                        #if os(macOS)
                         .frame(maxWidth: 160)
+                        #else
+                        .pickerStyle(.menu)
+                        #endif
 
                         Picker("Mode", selection: $statsMode) {
                             Text("All Modes").tag(nil as Mode?)
                             ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
                         }
+                        #if os(macOS)
                         .frame(maxWidth: 160)
+                        #else
+                        .pickerStyle(.menu)
+                        #endif
 
                         Picker("Time", selection: $statsTimeRange) {
                             ForEach(MapTimeRange.allCases) { range in
                                 Text(range.rawValue).tag(range)
                             }
                         }
+                        #if os(macOS)
                         .frame(maxWidth: 140)
+                        #else
+                        .pickerStyle(.menu)
+                        #endif
 
                         if hasStatsFilters {
                             Button("Clear") {
@@ -297,9 +303,6 @@ struct StatsView: View {
                 // Records
                 GroupBox("Records") {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let qso = highestSNR {
-                            recordRow(label: "Highest SNR", value: "\(qso.rstRcvd ?? "") from \(qso.call)", qso: qso)
-                        }
                         if let qso = lowestSNR {
                             recordRow(label: "Lowest SNR", value: "\(qso.rstRcvd ?? "") from \(qso.call)", qso: qso)
                         }
@@ -313,14 +316,18 @@ struct StatsView: View {
                 // Band & Mode charts
                 #if os(macOS)
                 HStack(alignment: .top, spacing: 24) {
-                    barChart("QSOs by Band", data: bandCounts) { label in
-                        if let band = Band.allCases.first(where: { $0.displayName == label }) {
-                            appState.showLogFiltered(band: band)
+                    if statsBand == nil {
+                        barChart("QSOs by Band", data: bandCounts) { label in
+                            if let band = Band.allCases.first(where: { $0.displayName == label }) {
+                                appState.showLogFiltered(band: band)
+                            }
                         }
                     }
-                    barChart("QSOs by Mode", data: modeCounts) { label in
-                        if let mode = Mode.allCases.first(where: { $0.displayName == label }) {
-                            appState.showLogFiltered(mode: mode)
+                    if statsMode == nil {
+                        barChart("QSOs by Mode", data: modeCounts) { label in
+                            if let mode = Mode.allCases.first(where: { $0.displayName == label }) {
+                                appState.showLogFiltered(mode: mode)
+                            }
                         }
                     }
                 }
@@ -329,14 +336,18 @@ struct StatsView: View {
                 barChart("QSOs by SNR", data: snrCounts) { _ in }
                     .frame(maxWidth: 500)
                 #else
-                barChart("QSOs by Band", data: bandCounts) { label in
-                    if let band = Band.allCases.first(where: { $0.displayName == label }) {
-                        appState.showLogFiltered(band: band)
+                if statsBand == nil {
+                    barChart("QSOs by Band", data: bandCounts) { label in
+                        if let band = Band.allCases.first(where: { $0.displayName == label }) {
+                            appState.showLogFiltered(band: band)
+                        }
                     }
                 }
-                barChart("QSOs by Mode", data: modeCounts) { label in
-                    if let mode = Mode.allCases.first(where: { $0.displayName == label }) {
-                        appState.showLogFiltered(mode: mode)
+                if statsMode == nil {
+                    barChart("QSOs by Mode", data: modeCounts) { label in
+                        if let mode = Mode.allCases.first(where: { $0.displayName == label }) {
+                            appState.showLogFiltered(mode: mode)
+                        }
                     }
                 }
                 barChart("QSOs by SNR", data: snrCounts) { _ in }
