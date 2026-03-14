@@ -246,46 +246,95 @@ struct StatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Filters
-                GroupBox {
-                    HStack(spacing: 16) {
-                        #if os(iOS)
+                #if os(iOS)
+                VStack(spacing: 8) {
+                    HStack {
                         Button(action: { dismiss() }) {
                             Image(systemName: "chevron.left")
-                                .font(.body.weight(.semibold))
+                                .font(.title2.weight(.semibold))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
-                        #endif
+                        Spacer()
+                        if hasStatsFilters {
+                            Button("Clear Filters") {
+                                statsBand = nil
+                                statsMode = nil
+                                statsTimeRange = .allTime
+                            }
+                            .font(.subheadline)
+                        }
+                    }
+                    HStack(spacing: 12) {
+                        Menu {
+                            Picker("Band", selection: $statsBand) {
+                                Text("All Bands").tag(nil as Band?)
+                                ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
+                                Divider()
+                                ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
+                            }
+                        } label: {
+                            Text(statsBand?.displayName ?? "All Bands")
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.quaternary)
+                                .clipShape(Capsule())
+                        }
+                        Menu {
+                            Picker("Mode", selection: $statsMode) {
+                                Text("All Modes").tag(nil as Mode?)
+                                ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
+                            }
+                        } label: {
+                            Text(statsMode?.displayName ?? "All Modes")
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.quaternary)
+                                .clipShape(Capsule())
+                        }
+                        Menu {
+                            Picker("Time", selection: $statsTimeRange) {
+                                ForEach(MapTimeRange.allCases) { range in
+                                    Text(range.rawValue).tag(range)
+                                }
+                            }
+                        } label: {
+                            Text(statsTimeRange.rawValue)
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.quaternary)
+                                .clipShape(Capsule())
+                        }
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal)
+                #else
+                GroupBox {
+                    HStack(spacing: 16) {
                         Picker("Band", selection: $statsBand) {
                             Text("All Bands").tag(nil as Band?)
                             ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
                             Divider()
                             ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
                         }
-                        #if os(macOS)
                         .frame(maxWidth: 160)
-                        #else
-                        .pickerStyle(.menu)
-                        #endif
 
                         Picker("Mode", selection: $statsMode) {
                             Text("All Modes").tag(nil as Mode?)
                             ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
                         }
-                        #if os(macOS)
                         .frame(maxWidth: 160)
-                        #else
-                        .pickerStyle(.menu)
-                        #endif
 
                         Picker("Time", selection: $statsTimeRange) {
                             ForEach(MapTimeRange.allCases) { range in
                                 Text(range.rawValue).tag(range)
                             }
                         }
-                        #if os(macOS)
                         .frame(maxWidth: 140)
-                        #else
-                        .pickerStyle(.menu)
-                        #endif
 
                         if hasStatsFilters {
                             Button("Clear") {
@@ -299,8 +348,17 @@ struct StatsView: View {
                         Spacer()
                     }
                 }
+                #endif
 
                 // Summary cards
+                #if os(iOS)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    StatCard(title: "Total QSOs", value: "\(filteredStatsQSOs.count)", icon: "antenna.radiowaves.left.and.right")
+                    StatCard(title: "Unique Calls", value: "\(uniqueCalls)", icon: "person.2")
+                    StatCard(title: "Countries", value: "\(uniqueCountries)", icon: "globe")
+                    StatCard(title: "US States", value: "\(workedStates)/50", icon: "flag")
+                }
+                #else
                 HStack(alignment: .top, spacing: 16) {
                     StatCard(title: "Total QSOs", value: "\(filteredStatsQSOs.count)", icon: "antenna.radiowaves.left.and.right")
                     StatCard(title: "Unique Calls", value: "\(uniqueCalls)", icon: "person.2")
@@ -308,15 +366,16 @@ struct StatsView: View {
                     StatCard(title: "US States", value: "\(workedStates)/50", icon: "flag")
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                #endif
 
                 // Records
                 GroupBox("Records") {
                     VStack(alignment: .leading, spacing: 8) {
                         if let qso = lowestSNR {
-                            recordRow(label: "Lowest SNR", value: "\(qso.rstRcvd ?? "") from \(qso.call)", qso: qso)
+                            recordRow(label: "Lowest SNR", detail: qso.rstRcvd ?? "", qso: qso)
                         }
                         if let qso = furthestQSO {
-                            recordRow(label: "Furthest QSO", value: "\(qso.call) \u{2014} \(qso.country ?? qso.gridsquare ?? "?")", qso: qso)
+                            recordRow(label: "Furthest QSO", detail: qso.country ?? qso.gridsquare ?? "", qso: qso)
                         }
                     }
                     .padding(.vertical, 4)
@@ -421,15 +480,18 @@ struct StatsView: View {
 
     // MARK: - Helpers
 
-    private func recordRow(label: String, value: String, qso: QSO) -> some View {
-        Button(action: { appState.showLogFiltered(callsign: qso.call) }) {
-            HStack {
-                Text(label).font(.caption).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
-                Text(value).font(.callout)
-                Spacer()
+    private func recordRow(label: String, detail: String, qso: QSO) -> some View {
+        HStack {
+            Text(label).font(.caption).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
+            Button(action: { appState.showLogFiltered(callsign: qso.call) }) {
+                Text(qso.call).font(.callout.monospaced()).bold().foregroundStyle(.blue)
             }
+            .buttonStyle(.plain)
+            if !detail.isEmpty {
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
         }
-        .buttonStyle(.plain)
     }
 
     private func barChart<S: Sequence>(_ title: String, data: S, onTap: @escaping (String) -> Void) -> some View where S.Element == (String, Int) {
@@ -475,9 +537,13 @@ struct StatCard: View {
             VStack(spacing: 8) {
                 Image(systemName: icon).font(.title2).foregroundStyle(.blue)
                 Text(value).font(.title).bold()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                 Text(title).font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.vertical, 8)
         }
     }

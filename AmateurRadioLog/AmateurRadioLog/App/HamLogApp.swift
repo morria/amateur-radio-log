@@ -5,6 +5,11 @@ import SwiftData
 struct AmateurRadioLogApp: App {
     @State private var appState = AppState()
 
+    init() {
+        // Kick off iCloud key-value sync so settings are available on first launch
+        NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
     var container: ModelContainer {
         let schema = Schema([QSO.self])
         let config = ModelConfiguration(

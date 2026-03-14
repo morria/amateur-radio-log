@@ -81,6 +81,7 @@ struct GeneralSettingsView: View {
             }
         }
         .padding()
+        .onAppear { refreshFromCloud() }
         .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
             refreshFromCloud()
         }
@@ -97,6 +98,7 @@ struct GeneralSettingsView: View {
                 .onChange(of: myGridsquare) { _, v in cloud.set(v, forKey: "myGridsquare") }
             gpsButton
         }
+        .onAppear { refreshFromCloud() }
         .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
             refreshFromCloud()
         }
@@ -191,7 +193,7 @@ struct QRZSettingsView: View {
             Section("QRZ.com Credentials") {
                 TextField("Username (Callsign)", text: $username)
                 SecureField("Password", text: $password)
-                TextField("API Key (for logbook)", text: $apiKey)
+                SecureField("API Key (for logbook)", text: $apiKey)
             }
             Section {
                 HStack {
@@ -226,7 +228,7 @@ struct QRZSettingsView: View {
             .textInputAutocapitalization(.characters)
         SecureField("Password", text: $password)
             .textContentType(.password)
-        TextField("API Key (for logbook)", text: $apiKey)
+        SecureField("API Key (for logbook)", text: $apiKey)
             .autocorrectionDisabled()
 
         credentialActions

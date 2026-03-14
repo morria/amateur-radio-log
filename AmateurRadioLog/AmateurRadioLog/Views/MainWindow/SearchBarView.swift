@@ -41,20 +41,31 @@ struct SearchBarView: View {
                 #if os(macOS)
                 Button(action: { showFilters.toggle() }) {
                     Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
-                        .foregroundStyle(appState.filterBand != nil || appState.filterMode != nil ? .blue : .secondary)
+                        .foregroundStyle(appState.hasActiveFilters ? .blue : .secondary)
                 }
                 .popover(isPresented: $showFilters) {
                     filterContent.padding().frame(width: 280)
                 }
                 #else
-                Menu {
-                    filterMenuContent
-                } label: {
+                Button(action: { showFilters = true }) {
                     Image(systemName: "line.3.horizontal.decrease.circle")
                         .font(.title2)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
-                        .foregroundStyle(appState.filterBand != nil || appState.filterMode != nil ? .blue : .secondary)
+                        .foregroundStyle(appState.hasActiveFilters ? .blue : .secondary)
+                }
+                .sheet(isPresented: $showFilters) {
+                    NavigationStack {
+                        iOSFilterSheet
+                            .navigationTitle("Filters")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Done") { showFilters = false }
+                                }
+                            }
+                    }
+                    .presentationDetents([.medium])
                 }
                 #endif
 
@@ -116,24 +127,89 @@ struct SearchBarView: View {
                 Text("All Modes").tag(nil as Mode?)
                 ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
             }
+
+            Picker("Date", selection: $appState.filterTimeRange) {
+                ForEach(MapTimeRange.allCases) { range in
+                    Text(range.rawValue).tag(range)
+                }
+            }
+
+            HStack {
+                Text("Country")
+                TextField("e.g. United States", text: Binding(
+                    get: { appState.filterCountry ?? "" },
+                    set: { appState.filterCountry = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+            }
+
+            HStack {
+                Text("Grid")
+                TextField("e.g. FN", text: $appState.filterGridPrefix)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .onChange(of: appState.filterGridPrefix) { _, v in
+                        appState.filterGridPrefix = v.uppercased()
+                    }
+            }
         }
     }
 
-    @ViewBuilder
-    private var filterMenuContent: some View {
-        Menu("Band") {
-            Button("All Bands") { appState.filterBand = nil }
-            Divider()
-            ForEach(Band.hfBands) { band in
-                Button(band.displayName) { appState.filterBand = band }
+    #if os(iOS)
+    private var iOSFilterSheet: some View {
+        @Bindable var appState = appState
+        return Form {
+            Section {
+                Picker("Band", selection: $appState.filterBand) {
+                    Text("All Bands").tag(nil as Band?)
+                    ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
+                    Divider()
+                    ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
+                }
+
+                Picker("Mode", selection: $appState.filterMode) {
+                    Text("All Modes").tag(nil as Mode?)
+                    ForEach(Mode.commonModes) { Text($0.displayName).tag($0 as Mode?) }
+                }
+
+                Picker("Date", selection: $appState.filterTimeRange) {
+                    ForEach(MapTimeRange.allCases) { range in
+                        Text(range.rawValue).tag(range)
+                    }
+                }
             }
-        }
-        Menu("Mode") {
-            Button("All Modes") { appState.filterMode = nil }
-            Divider()
-            ForEach(Mode.commonModes) { mode in
-                Button(mode.displayName) { appState.filterMode = mode }
+
+            Section {
+                HStack {
+                    Text("Country")
+                    TextField("e.g. United States", text: Binding(
+                        get: { appState.filterCountry ?? "" },
+                        set: { appState.filterCountry = $0.isEmpty ? nil : $0 }
+                    ))
+                    .autocorrectionDisabled()
+                    .multilineTextAlignment(.trailing)
+                }
+
+                HStack {
+                    Text("Grid Prefix")
+                    TextField("e.g. FN", text: $appState.filterGridPrefix)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.characters)
+                        .multilineTextAlignment(.trailing)
+                        .onChange(of: appState.filterGridPrefix) { _, v in
+                            appState.filterGridPrefix = v.uppercased()
+                        }
+                }
+            }
+
+            if appState.hasActiveFilters {
+                Section {
+                    Button("Clear All Filters", role: .destructive) {
+                        appState.clearFilters()
+                    }
+                }
             }
         }
     }
+    #endif
 }

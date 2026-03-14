@@ -139,10 +139,21 @@ struct ContentView: View {
                 #endif
             }
         }
-        .onAppear {
+        .task {
+            // Give iCloud key-value store time to sync before deciding to show Welcome
+            try? await Task.sleep(for: .seconds(1.5))
             let callsign = NSUbiquitousKeyValueStore.default.string(forKey: "stationCallsign") ?? ""
             if callsign.isEmpty {
                 showingSetup = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
+            // Dismiss Welcome sheet if callsign arrived from iCloud
+            if showingSetup {
+                let callsign = NSUbiquitousKeyValueStore.default.string(forKey: "stationCallsign") ?? ""
+                if !callsign.isEmpty {
+                    showingSetup = false
+                }
             }
         }
         .onChange(of: appState.pendingImportURL) { _, url in
@@ -170,19 +181,30 @@ struct ContentView: View {
     }
 
     #if os(iOS)
+    @State private var hasShownMap = false
+    @State private var hasShownStats = false
+
     private var iOSDetailView: some View {
         VStack(spacing: 0) {
             ZStack {
                 logView
                     .opacity(appState.selectedTab == .log ? 1 : 0)
                     .allowsHitTesting(appState.selectedTab == .log)
-                ContactMapView(qsos: allQSOs)
-                    .opacity(appState.selectedTab == .map ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .map)
-                StatsView(qsos: allQSOs)
-                    .opacity(appState.selectedTab == .stats ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .stats)
+                if hasShownMap {
+                    ContactMapView(qsos: allQSOs)
+                        .opacity(appState.selectedTab == .map ? 1 : 0)
+                        .allowsHitTesting(appState.selectedTab == .map)
+                }
+                if hasShownStats {
+                    StatsView(qsos: allQSOs)
+                        .opacity(appState.selectedTab == .stats ? 1 : 0)
+                        .allowsHitTesting(appState.selectedTab == .stats)
+                }
             }
+        }
+        .onChange(of: appState.selectedTab) { _, tab in
+            if tab == .map { hasShownMap = true }
+            if tab == .stats { hasShownStats = true }
         }
     }
     #endif

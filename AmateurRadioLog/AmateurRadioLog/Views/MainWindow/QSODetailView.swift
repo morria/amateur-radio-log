@@ -18,6 +18,29 @@ struct QSODetailView: View {
                     }
                     .buttonStyle(.plain)
 
+                    HStack(spacing: 8) {
+                        if !KeychainManager.loadCredentials(for: .qrz).isEmpty {
+                            Link(destination: URL(string: "https://www.qrz.com/db/\(qso.call)")!) {
+                                Text("QRZ")
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(.blue.opacity(0.15))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        if !KeychainManager.loadCredentials(for: .hamqth).isEmpty {
+                            Link(destination: URL(string: "https://www.hamqth.com/\(qso.call)")!) {
+                                Text("HamQTH")
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(.green.opacity(0.15))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+
                     Button(action: {
                         appState.clearFilters()
                         appState.searchText = qso.qsoDate

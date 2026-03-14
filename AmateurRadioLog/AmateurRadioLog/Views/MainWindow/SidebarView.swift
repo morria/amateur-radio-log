@@ -29,7 +29,7 @@ struct SidebarView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button(action: { showLoTWSync = true }) {
-                    Label("Sync LoTW", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Download LoTW", systemImage: "arrow.down.circle")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button(action: { showHamQTHSync = true }) {
@@ -62,8 +62,8 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showLoTWSync) {
-            SyncConfigSheet(provider: "LoTW") { direction in
-                Task { await appState.syncLoTW(context: modelContext, direction: direction) }
+            LoTWDownloadSheet {
+                Task { await appState.syncLoTW(context: modelContext) }
             }
         }
         .sheet(isPresented: $showHamQTHSync) {
@@ -129,14 +129,6 @@ struct SyncConfigSheet: View {
                     }
                 }
 
-                if provider == "LoTW" {
-                    Section {
-                        Text("Note: LoTW upload sends unsigned ADIF. For full LoTW integration, use TQSL to sign and upload your ADIF files.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
                 Section {
                     if appState.isLoading {
                         VStack(alignment: .leading, spacing: 8) {
@@ -165,6 +157,60 @@ struct SyncConfigSheet: View {
                         onSync(direction)
                     }
                     .disabled(appState.isLoading)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - LoTW Download Sheet
+
+struct LoTWDownloadSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    let onDownload: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Download QSL confirmations from LoTW. New QSOs and confirmations will be added to your log.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Text("Upload is not supported — LoTW requires digitally signed logs. Use TQSL to sign and upload your ADIF files.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    if appState.isLoading {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(.linear)
+                            Text(appState.statusMessage ?? "Downloading...")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let status = appState.statusMessage, !status.isEmpty {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+            .navigationTitle("Download LoTW")
+            #if os(macOS)
+            .frame(width: 400, height: 280)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Download") { onDownload() }
+                        .disabled(appState.isLoading)
                 }
             }
         }

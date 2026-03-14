@@ -162,7 +162,11 @@ struct ContactMapView: View {
                         Circle()
                             .fill(pinColor(for: pin))
                             .stroke(selectedPin == pin ? Color.white : Color.clear, lineWidth: 2)
+                            #if os(iOS)
+                            .frame(width: 18, height: 18)
+                            #else
                             .frame(width: 10, height: 10)
+                            #endif
                             .shadow(radius: 1)
                     }
                     .tag(pin)

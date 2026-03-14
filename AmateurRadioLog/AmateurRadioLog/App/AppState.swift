@@ -9,6 +9,7 @@ enum MapTimeRange: String, CaseIterable, Identifiable {
     case lastWeek = "Week"
     case lastMonth = "Month"
     case lastQuarter = "Quarter"
+    case yearToDate = "YTD"
     case lastYear = "Year"
     case allTime = "All Time"
 
@@ -22,6 +23,7 @@ enum MapTimeRange: String, CaseIterable, Identifiable {
         case .lastWeek: return cal.date(byAdding: .weekOfYear, value: -1, to: now)
         case .lastMonth: return cal.date(byAdding: .month, value: -1, to: now)
         case .lastQuarter: return cal.date(byAdding: .month, value: -3, to: now)
+        case .yearToDate: return cal.date(from: cal.dateComponents([.year], from: now))
         case .lastYear: return cal.date(byAdding: .year, value: -1, to: now)
         case .allTime: return nil
         }
@@ -67,10 +69,12 @@ final class AppState {
     var searchText: String = ""
     var filterBand: Band?
     var filterMode: Mode?
+    var filterTimeRange: MapTimeRange = .allTime
     var filterCallsign: String?
     var filterCountry: String?
     var filterState: String?
     var filterGrid: String?
+    var filterGridPrefix: String = ""
     var filterCQZone: Int?
     var filterITUZone: Int?
     var filterContinent: String?
@@ -115,6 +119,7 @@ final class AppState {
 
     var hasActiveFilters: Bool {
         !searchText.isEmpty || filterBand != nil || filterMode != nil
+            || filterTimeRange != .allTime || !filterGridPrefix.isEmpty
             || filterCallsign != nil || filterCountry != nil || filterState != nil
             || filterGrid != nil || filterCQZone != nil || filterITUZone != nil
             || filterContinent != nil || filterCounty != nil
@@ -122,6 +127,8 @@ final class AppState {
 
     var activeFieldFilters: [(String, String)] {
         var result: [(String, String)] = []
+        if filterTimeRange != .allTime { result.append(("Date", filterTimeRange.rawValue)) }
+        if !filterGridPrefix.isEmpty { result.append(("Grid Prefix", filterGridPrefix)) }
         if let v = filterCallsign { result.append(("Callsign", v)) }
         if let v = filterCountry { result.append(("Country", v)) }
         if let v = filterState { result.append(("State", v)) }
@@ -137,6 +144,8 @@ final class AppState {
         searchText = ""
         filterBand = nil
         filterMode = nil
+        filterTimeRange = .allTime
+        filterGridPrefix = ""
         clearFieldFilters()
     }
 
@@ -153,6 +162,8 @@ final class AppState {
 
     func removeFieldFilter(_ label: String) {
         switch label {
+        case "Date": filterTimeRange = .allTime
+        case "Grid Prefix": filterGridPrefix = ""
         case "Callsign": filterCallsign = nil
         case "Country": filterCountry = nil
         case "State": filterState = nil
@@ -182,6 +193,13 @@ final class AppState {
             }
             if let band = filterBand, qso.bandRaw != band.rawValue { return false }
             if let mode = filterMode, qso.modeRaw != mode.rawValue { return false }
+            if let startDate = filterTimeRange.startDate {
+                guard let dt = qso.dateTime, dt >= startDate else { return false }
+            }
+            if !filterGridPrefix.isEmpty {
+                guard let grid = qso.gridsquare?.uppercased(),
+                      grid.hasPrefix(filterGridPrefix.uppercased()) else { return false }
+            }
             if let v = filterCallsign, qso.call != v { return false }
             if let v = filterCountry, qso.country != v { return false }
             if let v = filterState, qso.state != v { return false }
@@ -303,7 +321,7 @@ final class AppState {
 
     // MARK: - LoTW Sync
 
-    func syncLoTW(context: ModelContext, direction: SyncDirection = .both) async {
+    func syncLoTW(context: ModelContext) async {
         let creds = KeychainManager.loadCredentials(for: .lotw)
         guard !creds.isEmpty else {
             errorMessage = "LoTW credentials not configured"
@@ -311,55 +329,34 @@ final class AppState {
         }
 
         isLoading = true
-        statusMessage = "Syncing with LoTW..."
-        var messages: [String] = []
+        statusMessage = "Downloading from LoTW..."
 
         do {
-            // Upload: send QSOs not yet sent to LoTW
-            if direction == .upload || direction == .both {
-                let sent = "Y"
-                let predicate = #Predicate<QSO> { q in q.lotwQslSent != sent }
-                let toUpload = try context.fetch(FetchDescriptor(predicate: predicate))
-                    .filter { $0.lotwQslSent == nil || $0.lotwQslSent!.isEmpty }
-                if !toUpload.isEmpty {
-                    let adif = ADIFWriter().write(qsos: toUpload)
-                    let _ = try await lotwService.uploadADIF(
-                        username: creds.username, password: creds.password, adifContent: adif)
-                    for qso in toUpload { qso.lotwQslSent = "Y" }
-                    try context.save()
-                    messages.append("Uploaded \(toUpload.count) to LoTW")
-                } else {
-                    messages.append("Nothing new to upload")
-                }
-            }
-
-            // Download: get confirmations
-            if direction == .download || direction == .both {
-                let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
-                let allQSOs = try context.fetch(FetchDescriptor<QSO>())
-                var confirmed = 0
-                var added = 0
-                for qsl in qsls {
-                    if let local = findLocalMatch(for: qsl, in: allQSOs) {
-                        if local.lotwQslRcvd != "Y" {
-                            local.lotwQslRcvd = "Y"
-                            local.lotwStatus = "confirmed"
-                            confirmed += 1
-                        }
-                    } else {
-                        // New QSO from LoTW
-                        qsl.lotwQslRcvd = "Y"
-                        qsl.lotwQslSent = "Y"
-                        qsl.lotwStatus = "confirmed"
-                        context.insert(qsl)
-                        added += 1
+            let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
+            let allQSOs = try context.fetch(FetchDescriptor<QSO>())
+            var confirmed = 0
+            var added = 0
+            for qsl in qsls {
+                if let local = findLocalMatch(for: qsl, in: allQSOs) {
+                    if local.lotwQslRcvd != "Y" {
+                        local.lotwQslRcvd = "Y"
+                        local.lotwStatus = "confirmed"
+                        confirmed += 1
                     }
+                } else {
+                    qsl.lotwQslRcvd = "Y"
+                    qsl.lotwQslSent = "Y"
+                    qsl.lotwStatus = "confirmed"
+                    context.insert(qsl)
+                    added += 1
                 }
-                try context.save()
-                if confirmed > 0 { messages.append("\(confirmed) new confirmations") }
-                if added > 0 { messages.append("\(added) new QSOs from LoTW") }
-                if confirmed == 0 && added == 0 { messages.append("No new confirmations") }
             }
+            try context.save()
+
+            var messages: [String] = []
+            if confirmed > 0 { messages.append("\(confirmed) new confirmations") }
+            if added > 0 { messages.append("\(added) new QSOs from LoTW") }
+            if messages.isEmpty { messages.append("No new confirmations") }
 
             isLoading = false
             statusMessage = messages.joined(separator: ", ")
