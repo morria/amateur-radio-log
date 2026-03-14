@@ -26,18 +26,22 @@ struct SidebarView: View {
             Section("Sync") {
                 Button(action: { showQRZSync = true }) {
                     Label("Sync QRZ", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button(action: { showLoTWSync = true }) {
                     Label("Sync LoTW", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button(action: { showHamQTHSync = true }) {
                     Label("Sync HamQTH", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
             Section("Export") {
                 Button(action: { showPOTAExport = true }) {
                     Label("POTA Export", systemImage: "tree")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
@@ -45,6 +49,7 @@ struct SidebarView: View {
             Section("Settings") {
                 Button(action: { showSettings = true }) {
                     Label("Settings", systemImage: "gear")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             #endif
