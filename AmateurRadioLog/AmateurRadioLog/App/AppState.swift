@@ -15,6 +15,18 @@ enum MapTimeRange: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedName: String {
+        switch self {
+        case .lastDay: return String(localized: "24h")
+        case .lastWeek: return String(localized: "Week")
+        case .lastMonth: return String(localized: "Month")
+        case .lastQuarter: return String(localized: "Quarter")
+        case .yearToDate: return String(localized: "YTD")
+        case .lastYear: return String(localized: "Year")
+        case .allTime: return String(localized: "All Time")
+        }
+    }
+
     var startDate: Date? {
         let cal = Calendar.current
         let now = Date()
@@ -35,13 +47,27 @@ enum MapColorOption: String, CaseIterable, Identifiable {
     case mode = "Mode"
     case snr = "SNR"
     var id: String { rawValue }
+    var localizedName: String {
+        switch self {
+        case .band: return String(localized: "Band")
+        case .mode: return String(localized: "Mode")
+        case .snr: return String(localized: "SNR")
+        }
+    }
 }
 
 enum MapStyleOption: String, CaseIterable, Identifiable {
     case standard = "Standard"
-    case imagery = "Satellite"
+    case satellite = "Satellite"
     case hybrid = "Hybrid"
     var id: String { rawValue }
+    var localizedName: String {
+        switch self {
+        case .standard: return String(localized: "Standard")
+        case .satellite: return String(localized: "Satellite")
+        case .hybrid: return String(localized: "Hybrid")
+        }
+    }
 }
 
 enum SyncDirection: String, CaseIterable, Identifiable {
@@ -49,6 +75,13 @@ enum SyncDirection: String, CaseIterable, Identifiable {
     case download = "Download"
     case both = "Both"
     var id: String { rawValue }
+    var localizedName: String {
+        switch self {
+        case .upload: return String(localized: "Upload")
+        case .download: return String(localized: "Download")
+        case .both: return String(localized: "Both")
+        }
+    }
 }
 
 // MARK: - App State
@@ -83,7 +116,7 @@ final class AppState {
     // MARK: - Map-specific
     var mapTimeRange: MapTimeRange = .allTime
     var mapColorBy: MapColorOption = .band
-    var mapStyle: MapStyleOption = .imagery
+    var mapStyle: MapStyleOption = .hybrid
 
     // MARK: - Last-used QSO defaults (synced via SwiftData/CloudKit)
     @ObservationIgnored
@@ -279,7 +312,7 @@ final class AppState {
 
     func importADIF(from url: URL, context: ModelContext) {
         isLoading = true
-        statusMessage = "Importing..."
+        statusMessage = String(localized: "Importing...")
 
         do {
             let parser = ADIFParser()
@@ -290,10 +323,10 @@ final class AppState {
             }
             try context.save()
             isLoading = false
-            statusMessage = "Imported \(qsos.count) QSOs"
+            statusMessage = String(localized: "Imported \(qsos.count) QSOs")
         } catch {
             isLoading = false
-            errorMessage = "Import failed: \(error.localizedDescription)"
+            errorMessage = String(localized: "Import failed: \(error.localizedDescription)")
         }
     }
 
@@ -325,12 +358,12 @@ final class AppState {
     func syncLoTW(context: ModelContext) async {
         let creds = KeychainManager.loadCredentials(for: .lotw)
         guard !creds.isEmpty else {
-            errorMessage = "LoTW credentials not configured"
+            errorMessage = String(localized: "LoTW credentials not configured")
             return
         }
 
         isLoading = true
-        statusMessage = "Downloading from LoTW..."
+        statusMessage = String(localized: "Downloading from LoTW...")
 
         do {
             let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
@@ -355,15 +388,15 @@ final class AppState {
             try context.save()
 
             var messages: [String] = []
-            if confirmed > 0 { messages.append("\(confirmed) new confirmations") }
-            if added > 0 { messages.append("\(added) new QSOs from LoTW") }
-            if messages.isEmpty { messages.append("No new confirmations") }
+            if confirmed > 0 { messages.append(String(localized: "\(confirmed) new confirmations")) }
+            if added > 0 { messages.append(String(localized: "\(added) new QSOs from LoTW")) }
+            if messages.isEmpty { messages.append(String(localized: "No new confirmations")) }
 
             isLoading = false
             statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
-            errorMessage = "LoTW sync failed: \(error.localizedDescription)"
+            errorMessage = String(localized: "LoTW sync failed: \(error.localizedDescription)")
         }
     }
 
@@ -372,59 +405,58 @@ final class AppState {
     func syncHamQTH(context: ModelContext, direction: SyncDirection = .both) async {
         let creds = KeychainManager.loadCredentials(for: .hamqth)
         guard !creds.isEmpty else {
-            errorMessage = "HamQTH credentials not configured"
+            errorMessage = String(localized: "HamQTH credentials not configured")
             return
         }
 
         isLoading = true
-        statusMessage = "Syncing with HamQTH..."
+        statusMessage = String(localized: "Syncing with HamQTH...")
         var messages: [String] = []
 
         do {
             var localQSOs = try context.fetch(FetchDescriptor<QSO>())
 
             // Step 1: Download from HamQTH
-            statusMessage = "Downloading from HamQTH..."
+            statusMessage = String(localized: "Downloading from HamQTH...")
             let remoteQSOs = try await hamQTHService.downloadQSOs(
                 username: creds.username, password: creds.password)
+
+            // Mark local QSOs that already exist on HamQTH
+            for local in localQSOs {
+                if !local.hamqthSynced && findLocalMatch(for: local, in: remoteQSOs) != nil {
+                    local.hamqthSynced = true
+                }
+            }
+
             var added = 0
 
             if direction == .download || direction == .both {
                 for remote in remoteQSOs {
                     if findLocalMatch(for: remote, in: localQSOs) == nil {
+                        remote.hamqthSynced = true
                         context.insert(remote)
                         localQSOs.append(remote)
                         added += 1
                     }
                 }
                 if added > 0 { try context.save() }
-                messages.append("\(added) new from HamQTH")
+                messages.append(String(localized: "\(added) new from HamQTH"))
             }
 
-            // Step 2: Upload local QSOs newer than the latest remote QSO
+            // Step 2: Upload any local QSOs not on HamQTH
             if direction == .upload || direction == .both {
-                let latestRemote = remoteQSOs
-                    .map { "\($0.qsoDate)\($0.timeOn)" }
-                    .max() ?? ""
-
-                let toUpload: [QSO]
-                if latestRemote.isEmpty {
-                    toUpload = localQSOs
-                } else {
-                    toUpload = localQSOs.filter { local in
-                        let localStamp = "\(local.qsoDate)\(local.timeOn)"
-                        guard localStamp >= latestRemote else { return false }
-                        return findLocalMatch(for: local, in: remoteQSOs) == nil
-                    }
-                }
+                let toUpload = localQSOs.filter { !$0.hamqthSynced }
 
                 if !toUpload.isEmpty {
-                    statusMessage = "Uploading \(toUpload.count) QSOs to HamQTH..."
+                    statusMessage = String(localized: "Uploading \(toUpload.count) QSOs to HamQTH...")
                     let count = try await hamQTHService.uploadQSOs(
                         toUpload, username: creds.username, password: creds.password)
-                    messages.append("Uploaded \(count) to HamQTH")
+                    // Mark uploaded QSOs as synced
+                    for qso in toUpload { qso.hamqthSynced = true }
+                    try context.save()
+                    messages.append(String(localized: "Uploaded \(count) to HamQTH"))
                 } else {
-                    messages.append("Nothing new to upload")
+                    messages.append(String(localized: "Nothing new to upload"))
                 }
             }
 
@@ -432,7 +464,7 @@ final class AppState {
             statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
-            errorMessage = "HamQTH sync failed: \(error.localizedDescription)"
+            errorMessage = String(localized: "HamQTH sync failed: \(error.localizedDescription)")
         }
     }
 
@@ -441,12 +473,12 @@ final class AppState {
     func syncQRZ(context: ModelContext, direction: SyncDirection = .both) async {
         let creds = KeychainManager.loadCredentials(for: .qrz)
         guard !creds.isEmpty else {
-            errorMessage = "QRZ credentials not configured"
+            errorMessage = String(localized: "QRZ credentials not configured")
             return
         }
 
         isLoading = true
-        statusMessage = "Syncing with QRZ..."
+        statusMessage = String(localized: "Syncing with QRZ...")
         var messages: [String] = []
 
         do {
@@ -458,51 +490,45 @@ final class AppState {
             var localQSOs = try context.fetch(FetchDescriptor<QSO>())
 
             // Step 1: Download from QRZ
-            statusMessage = "Downloading from QRZ..."
+            statusMessage = String(localized: "Downloading from QRZ...")
             let remoteQSOs = try await qrzService.downloadQSOs(apiKey: apiKey)
+
+            // Mark local QSOs that already exist on QRZ
+            for local in localQSOs {
+                if !local.qrzSynced && findLocalMatch(for: local, in: remoteQSOs) != nil {
+                    local.qrzSynced = true
+                }
+            }
+
             var added = 0
 
             // Add any remote QSOs we don't have locally
             if direction == .download || direction == .both {
                 for remote in remoteQSOs {
                     if findLocalMatch(for: remote, in: localQSOs) == nil {
+                        remote.qrzSynced = true
                         context.insert(remote)
                         localQSOs.append(remote)
                         added += 1
                     }
                 }
                 if added > 0 { try context.save() }
-                messages.append("\(added) new from QRZ")
+                messages.append(String(localized: "\(added) new from QRZ"))
             }
 
-            // Step 2: Upload local QSOs newer than the latest remote QSO
+            // Step 2: Upload any local QSOs not on QRZ
             if direction == .upload || direction == .both {
-                // Find the latest date+time on QRZ to use as a watermark
-                let latestRemote = remoteQSOs
-                    .map { "\($0.qsoDate)\($0.timeOn)" }
-                    .max() ?? ""
-
-                // Only upload local QSOs at or after that watermark
-                // that aren't already in the remote set
-                let toUpload: [QSO]
-                if latestRemote.isEmpty {
-                    // QRZ logbook is empty — upload everything
-                    toUpload = localQSOs
-                } else {
-                    toUpload = localQSOs.filter { local in
-                        let localStamp = "\(local.qsoDate)\(local.timeOn)"
-                        guard localStamp >= latestRemote else { return false }
-                        // Skip if already on QRZ
-                        return findLocalMatch(for: local, in: remoteQSOs) == nil
-                    }
-                }
+                let toUpload = localQSOs.filter { !$0.qrzSynced }
 
                 if !toUpload.isEmpty {
-                    statusMessage = "Uploading \(toUpload.count) QSOs to QRZ..."
+                    statusMessage = String(localized: "Uploading \(toUpload.count) QSOs to QRZ...")
                     let count = try await qrzService.uploadQSOs(toUpload, apiKey: apiKey)
-                    messages.append("Uploaded \(count) to QRZ")
+                    // Mark uploaded QSOs as synced
+                    for qso in toUpload { qso.qrzSynced = true }
+                    try context.save()
+                    messages.append(String(localized: "Uploaded \(count) to QRZ"))
                 } else {
-                    messages.append("Nothing new to upload")
+                    messages.append(String(localized: "Nothing new to upload"))
                 }
             }
 
@@ -510,7 +536,7 @@ final class AppState {
             statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
-            errorMessage = "QRZ sync failed: \(error.localizedDescription)"
+            errorMessage = String(localized: "QRZ sync failed: \(error.localizedDescription)")
         }
     }
 }

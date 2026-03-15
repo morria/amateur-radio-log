@@ -135,6 +135,7 @@ struct QRZSettingsView: View {
     @State private var password = ""
     @State private var apiKey = ""
     @State private var status = ""
+    @State private var statusIsError = false
     @State private var isTesting = false
 
     var body: some View {
@@ -165,7 +166,7 @@ struct QRZSettingsView: View {
                 if !status.isEmpty {
                     Text(status)
                         .font(.caption)
-                        .foregroundStyle(status.contains("Success") || status == "Saved" ? .green : .red)
+                        .foregroundStyle(statusIsError ? .red : .green)
                 }
             }
         }
@@ -208,7 +209,7 @@ struct QRZSettingsView: View {
             if !status.isEmpty {
                 Text(status)
                     .font(.caption)
-                    .foregroundStyle(status.contains("Success") || status == "Saved" ? .green : .red)
+                    .foregroundStyle(statusIsError ? .red : .green)
             }
         }
     }
@@ -227,9 +228,11 @@ struct QRZSettingsView: View {
             if !apiKey.isEmpty {
                 try KeychainManager.save(account: "QRZ.com.apikey", password: apiKey)
             }
-            status = "Saved"
+            status = String(localized: "Saved")
+            statusIsError = false
         } catch {
-            status = "Save failed: \(error.localizedDescription)"
+            status = String(localized: "Save failed: \(error.localizedDescription)")
+            statusIsError = true
         }
     }
 
@@ -239,9 +242,11 @@ struct QRZSettingsView: View {
         let service = QRZService()
         do {
             try await service.authenticate(username: username, password: password)
-            status = "Success! Connected to QRZ.com"
+            status = String(localized: "Success! Connected to QRZ.com")
+            statusIsError = false
         } catch {
-            status = "Failed: \(error.localizedDescription)"
+            status = String(localized: "Failed: \(error.localizedDescription)")
+            statusIsError = true
         }
         isTesting = false
     }
@@ -253,6 +258,7 @@ struct HamQTHSettingsView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var status = ""
+    @State private var statusIsError = false
     @State private var isTesting = false
 
     var body: some View {
@@ -282,7 +288,7 @@ struct HamQTHSettingsView: View {
                 if !status.isEmpty {
                     Text(status)
                         .font(.caption)
-                        .foregroundStyle(status.contains("Success") || status == "Saved" ? .green : .red)
+                        .foregroundStyle(statusIsError ? .red : .green)
                 }
             }
         }
@@ -323,7 +329,7 @@ struct HamQTHSettingsView: View {
             if !status.isEmpty {
                 Text(status)
                     .font(.caption)
-                    .foregroundStyle(status.contains("Success") || status == "Saved" ? .green : .red)
+                    .foregroundStyle(statusIsError ? .red : .green)
             }
         }
     }
@@ -338,9 +344,11 @@ struct HamQTHSettingsView: View {
     private func save() {
         do {
             try KeychainManager.saveCredentials(ServiceCredentials(username: username, password: password), for: .hamqth)
-            status = "Saved"
+            status = String(localized: "Saved")
+            statusIsError = false
         } catch {
-            status = "Save failed: \(error.localizedDescription)"
+            status = String(localized: "Save failed: \(error.localizedDescription)")
+            statusIsError = true
         }
     }
 
@@ -350,9 +358,11 @@ struct HamQTHSettingsView: View {
         let service = HamQTHService()
         do {
             try await service.authenticate(username: username, password: password)
-            status = "Success! Connected to HamQTH.com"
+            status = String(localized: "Success! Connected to HamQTH.com")
+            statusIsError = false
         } catch {
-            status = "Failed: \(error.localizedDescription)"
+            status = String(localized: "Failed: \(error.localizedDescription)")
+            statusIsError = true
         }
         isTesting = false
     }
@@ -364,6 +374,7 @@ struct LoTWSettingsView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var status = ""
+    @State private var statusIsError = false
     @State private var isTesting = false
 
     var body: some View {
@@ -393,7 +404,7 @@ struct LoTWSettingsView: View {
                 if !status.isEmpty {
                     Text(status)
                         .font(.caption)
-                        .foregroundStyle(status.contains("Success") || status == "Saved" ? .green : .red)
+                        .foregroundStyle(statusIsError ? .red : .green)
                 }
 
                 Text("Note: LoTW upload requires digitally signed ADIF files via TQSL. Download of QSL confirmations works with these credentials.")
@@ -438,7 +449,7 @@ struct LoTWSettingsView: View {
             if !status.isEmpty {
                 Text(status)
                     .font(.caption)
-                    .foregroundStyle(status.contains("Success") || status == "Saved" ? .green : .red)
+                    .foregroundStyle(statusIsError ? .red : .green)
             }
         }
     }
@@ -453,9 +464,11 @@ struct LoTWSettingsView: View {
     private func save() {
         do {
             try KeychainManager.saveCredentials(ServiceCredentials(username: username, password: password), for: .lotw)
-            status = "Saved"
+            status = String(localized: "Saved")
+            statusIsError = false
         } catch {
-            status = "Save failed: \(error.localizedDescription)"
+            status = String(localized: "Save failed: \(error.localizedDescription)")
+            statusIsError = true
         }
     }
 
@@ -465,9 +478,16 @@ struct LoTWSettingsView: View {
         let service = LoTWService()
         do {
             let valid = try await service.verifyCredentials(username: username, password: password)
-            status = valid ? "Success! Connected to LoTW" : "Failed: Invalid credentials"
+            if valid {
+                status = String(localized: "Success! Connected to LoTW")
+                statusIsError = false
+            } else {
+                status = String(localized: "Failed: Invalid credentials")
+                statusIsError = true
+            }
         } catch {
-            status = "Failed: \(error.localizedDescription)"
+            status = String(localized: "Failed: \(error.localizedDescription)")
+            statusIsError = true
         }
         isTesting = false
     }

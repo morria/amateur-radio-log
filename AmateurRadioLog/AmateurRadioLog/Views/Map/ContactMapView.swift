@@ -341,9 +341,9 @@ struct ContactMapView: View {
 
     private var currentMapStyle: MapStyle {
         switch appState.mapStyle {
-        case .standard: return .standard(pointsOfInterest: .excludingAll)
-        case .imagery:  return .imagery
-        case .hybrid:   return .hybrid(pointsOfInterest: .excludingAll)
+        case .standard:  return .standard(pointsOfInterest: .excludingAll)
+        case .satellite: return .imagery
+        case .hybrid:    return .hybrid(pointsOfInterest: .excludingAll)
         }
     }
 
@@ -363,7 +363,7 @@ struct ContactMapView: View {
 
         Picker("Time Range", selection: $appState.mapTimeRange) {
             ForEach(MapTimeRange.allCases) { range in
-                Text(range.rawValue).tag(range)
+                Text(range.localizedName).tag(range)
             }
         }
 
@@ -383,14 +383,14 @@ struct ContactMapView: View {
 
         Picker("Map Style", selection: $appState.mapStyle) {
             ForEach(MapStyleOption.allCases) { opt in
-                Text(opt.rawValue).tag(opt)
+                Text(opt.localizedName).tag(opt)
             }
         }
         .pickerStyle(.segmented)
 
         Picker("Color by", selection: $appState.mapColorBy) {
             ForEach(MapColorOption.allCases) { opt in
-                Text(opt.rawValue).tag(opt)
+                Text(opt.localizedName).tag(opt)
             }
         }
         .pickerStyle(.segmented)
@@ -416,7 +416,7 @@ struct ContactMapView: View {
         return VStack(alignment: .leading, spacing: 0) {
             Button(action: { withAnimation { legendExpanded.toggle() } }) {
                 HStack(spacing: 4) {
-                    Text(appState.mapColorBy.rawValue)
+                    Text(appState.mapColorBy.localizedName)
                         .font(.caption2).bold()
                     Image(systemName: legendExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption2)

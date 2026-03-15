@@ -111,7 +111,7 @@ struct SyncConfigSheet: View {
                 Section("Direction") {
                     Picker("Sync Direction", selection: $direction) {
                         ForEach(SyncDirection.allCases) { dir in
-                            Text(dir.rawValue).tag(dir)
+                            Text(dir.localizedName).tag(dir)
                         }
                     }
                     .pickerStyle(.segmented)

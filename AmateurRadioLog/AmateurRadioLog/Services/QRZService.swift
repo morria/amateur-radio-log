@@ -102,7 +102,7 @@ actor QRZService {
             let (data, _) = try await URLSession.shared.data(for: request)
             let responseStr = String(data: data, encoding: .utf8) ?? ""
 
-            if responseStr.contains("RESULT=OK") {
+            if responseStr.contains("RESULT=OK") || responseStr.contains("RESULT=REPLACE") {
                 uploaded += 1
             } else if responseStr.contains("RESULT=FAIL") {
                 // Extract reason

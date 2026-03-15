@@ -130,7 +130,7 @@ struct SearchBarView: View {
 
             Picker("Date", selection: $appState.filterTimeRange) {
                 ForEach(MapTimeRange.allCases) { range in
-                    Text(range.rawValue).tag(range)
+                    Text(range.localizedName).tag(range)
                 }
             }
 
@@ -174,7 +174,7 @@ struct SearchBarView: View {
 
                 Picker("Date", selection: $appState.filterTimeRange) {
                     ForEach(MapTimeRange.allCases) { range in
-                        Text(range.rawValue).tag(range)
+                        Text(range.localizedName).tag(range)
                     }
                 }
             }

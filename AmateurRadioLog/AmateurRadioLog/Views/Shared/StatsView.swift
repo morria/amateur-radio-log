@@ -297,11 +297,11 @@ struct StatsView: View {
                         Menu {
                             Picker("Time", selection: $statsTimeRange) {
                                 ForEach(MapTimeRange.allCases) { range in
-                                    Text(range.rawValue).tag(range)
+                                    Text(range.localizedName).tag(range)
                                 }
                             }
                         } label: {
-                            Text(statsTimeRange.rawValue)
+                            Text(statsTimeRange.localizedName)
                                 .font(.subheadline)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -331,7 +331,7 @@ struct StatsView: View {
 
                         Picker("Time", selection: $statsTimeRange) {
                             ForEach(MapTimeRange.allCases) { range in
-                                Text(range.rawValue).tag(range)
+                                Text(range.localizedName).tag(range)
                             }
                         }
                         .frame(maxWidth: 140)
