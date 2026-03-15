@@ -227,7 +227,7 @@ struct StatsView: View {
     }
 
     private var furthestQSO: QSO? {
-        let myGrid = NSUbiquitousKeyValueStore.default.string(forKey: "myGridsquare") ?? ""
+        let myGrid = appState.settings?.myGridsquare ?? ""
         guard let myCoord = MaidenheadConverter.toCoordinate(grid: myGrid) else { return nil }
         return filteredStatsQSOs.filter { $0.latitude != nil && $0.longitude != nil }.max { a, b in
             let distA = abs(a.latitude! - myCoord.latitude) + abs(a.longitude! - myCoord.longitude)

@@ -139,21 +139,11 @@ struct ContentView: View {
                 #endif
             }
         }
-        .task {
-            // Give iCloud key-value store time to sync before deciding to show Welcome
-            try? await Task.sleep(for: .seconds(1.5))
-            let callsign = NSUbiquitousKeyValueStore.default.string(forKey: "stationCallsign") ?? ""
-            if callsign.isEmpty {
+        .onAppear {
+            let settings = AppSettings.shared(context: modelContext)
+            appState.settings = settings
+            if settings.stationCallsign.isEmpty {
                 showingSetup = true
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
-            // Dismiss Welcome sheet if callsign arrived from iCloud
-            if showingSetup {
-                let callsign = NSUbiquitousKeyValueStore.default.string(forKey: "stationCallsign") ?? ""
-                if !callsign.isEmpty {
-                    showingSetup = false
-                }
             }
         }
         .onChange(of: appState.pendingImportURL) { _, url in
@@ -183,23 +173,41 @@ struct ContentView: View {
     #if os(iOS)
     @State private var hasShownMap = false
     @State private var hasShownStats = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var iOSDetailView: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                logView
-                    .opacity(appState.selectedTab == .log ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .log)
-                if hasShownMap {
-                    ContactMapView(qsos: allQSOs)
-                        .opacity(appState.selectedTab == .map ? 1 : 0)
-                        .allowsHitTesting(appState.selectedTab == .map)
+        ZStack(alignment: .topLeading) {
+            VStack(spacing: 0) {
+                ZStack {
+                    logView
+                        .opacity(appState.selectedTab == .log ? 1 : 0)
+                        .allowsHitTesting(appState.selectedTab == .log)
+                    if hasShownMap {
+                        ContactMapView(qsos: allQSOs)
+                            .opacity(appState.selectedTab == .map ? 1 : 0)
+                            .allowsHitTesting(appState.selectedTab == .map)
+                    }
+                    if hasShownStats {
+                        StatsView(qsos: allQSOs)
+                            .opacity(appState.selectedTab == .stats ? 1 : 0)
+                            .allowsHitTesting(appState.selectedTab == .stats)
+                    }
                 }
-                if hasShownStats {
-                    StatsView(qsos: allQSOs)
-                        .opacity(appState.selectedTab == .stats ? 1 : 0)
-                        .allowsHitTesting(appState.selectedTab == .stats)
+            }
+
+            // iPad sidebar toggle — the system button is hidden along with .navigationBar
+            if horizontalSizeClass == .regular && columnVisibility == .detailOnly {
+                Button(action: {
+                    withAnimation { columnVisibility = .doubleColumn }
+                }) {
+                    Image(systemName: "sidebar.leading")
+                        .font(.body.weight(.semibold))
+                        .padding(10)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
                 }
+                .padding(.top, 8)
+                .padding(.leading, 12)
             }
         }
         .onChange(of: appState.selectedTab) { _, tab in

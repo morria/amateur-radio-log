@@ -27,7 +27,7 @@ struct ContactMapView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPin: QSOMapPin?
     @State private var showFilters = false
-    @State private var showLegend = false
+    @State private var legendExpanded = true
     @State private var showCallsignSheet = false
 
     private var filteredQSOs: [QSO] {
@@ -92,6 +92,7 @@ struct ContactMapView: View {
                     .frame(width: 300)
             }
         }
+        .navigationTitle("")
         .onChange(of: appState.mapHighlightQSOId) { _, newId in
             handleHighlight(newId)
         }
@@ -174,8 +175,8 @@ struct ContactMapView: View {
             }
             .mapStyle(currentMapStyle)
 
+            // Top-left: back button (iOS)
             #if os(iOS)
-            // Back button top-left
             VStack {
                 HStack {
                     Button(action: { dismiss() }) {
@@ -192,85 +193,65 @@ struct ContactMapView: View {
             .padding()
             #endif
 
-            VStack(alignment: .trailing, spacing: 8) {
-                // Stats overlay
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(pins.count) mapped").font(.caption).bold()
-                        Text("\(filteredQSOs.count - pins.count) no coords")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-
-                // Clear filters button
-                if appState.hasActiveFilters || appState.mapTimeRange != .allTime {
-                    Button(action: {
-                        appState.clearFilters()
-                        appState.mapTimeRange = .allTime
-                    }) {
-                        Label("Clear Filters", systemImage: "xmark.circle")
-                            .font(.caption)
-                            .padding(8)
+            // Top-right: filter button
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { showFilters.toggle() }) {
+                        Image(systemName: appState.hasActiveFilters || appState.mapTimeRange != .allTime
+                              ? "line.3.horizontal.decrease.circle.fill"
+                              : "line.3.horizontal.decrease.circle")
+                            .font(.title2)
+                            .padding(10)
                             .background(.regularMaterial)
-                            .clipShape(Capsule())
+                            .clipShape(Circle())
                     }
-                }
-
-                // Filter button
-                Button(action: { showFilters.toggle() }) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.title3)
-                        .padding(8)
-                        .background(.regularMaterial)
-                        .clipShape(Circle())
-                }
-                #if os(macOS)
-                .popover(isPresented: $showFilters) {
-                    mapFiltersView.padding().frame(width: 280)
-                }
-                #else
-                .sheet(isPresented: $showFilters) {
-                    NavigationStack {
-                        Form { mapFiltersContent }
-                            .navigationTitle("Map Filters")
-                            .navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button("Done") { showFilters = false }
+                    #if os(macOS)
+                    .popover(isPresented: $showFilters) {
+                        mapFiltersView.padding().frame(width: 280)
+                    }
+                    #else
+                    .sheet(isPresented: $showFilters) {
+                        NavigationStack {
+                            Form { mapFiltersContent }
+                                .navigationTitle("Map Filters")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbar {
+                                    ToolbarItem(placement: .topBarTrailing) {
+                                        Button("Done") { showFilters = false }
+                                    }
                                 }
-                            }
+                        }
+                        .presentationDetents([.medium])
                     }
-                    .presentationDetents([.medium])
+                    #endif
                 }
-                #endif
+                Spacer()
+            }
+            .padding()
 
-                // Legend button
-                Button(action: { showLegend.toggle() }) {
-                    Image(systemName: "paintpalette")
-                        .font(.title3)
-                        .padding(8)
+            // Bottom-left: legend
+            VStack {
+                Spacer()
+                HStack {
+                    compactLegend
+                    Spacer()
+                }
+            }
+            .padding()
+
+            // Bottom-right: stats
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text("\(pins.count) mapped")
+                        .font(.caption2).bold()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(.regularMaterial)
-                        .clipShape(Circle())
+                        .clipShape(Capsule())
                 }
-                #if os(macOS)
-                .popover(isPresented: $showLegend) {
-                    legendView.padding().frame(width: 220)
-                }
-                #else
-                .sheet(isPresented: $showLegend) {
-                    NavigationStack {
-                        legendView.padding()
-                            .navigationTitle("Legend")
-                            .navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button("Done") { showLegend = false }
-                                }
-                            }
-                    }
-                    .presentationDetents([.medium])
-                }
-                #endif
             }
             .padding()
         }
@@ -424,35 +405,40 @@ struct ContactMapView: View {
 
     // MARK: - Legend
 
-    private var legendView: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Legend (\(appState.mapColorBy.rawValue))").font(.headline)
-            Divider()
-
+    private var compactLegend: some View {
+        let items: [(String, Color)] = {
             switch appState.mapColorBy {
-            case .band:
-                ForEach(legendBands, id: \.0) { name, color in
-                    HStack(spacing: 8) {
-                        Circle().fill(color).frame(width: 10, height: 10)
-                        Text(name).font(.caption)
+            case .band: return legendBands
+            case .mode: return legendModes
+            case .snr: return legendSNR
+            }
+        }()
+        return VStack(alignment: .leading, spacing: 0) {
+            Button(action: { withAnimation { legendExpanded.toggle() } }) {
+                HStack(spacing: 4) {
+                    Text(appState.mapColorBy.rawValue)
+                        .font(.caption2).bold()
+                    Image(systemName: legendExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2)
+                }
+                .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+            if legendExpanded {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 50), spacing: 2)], alignment: .leading, spacing: 2) {
+                    ForEach(items, id: \.0) { name, color in
+                        HStack(spacing: 3) {
+                            Circle().fill(color).frame(width: 6, height: 6)
+                            Text(name).font(.system(size: 9))
+                        }
                     }
                 }
-            case .mode:
-                ForEach(legendModes, id: \.0) { name, color in
-                    HStack(spacing: 8) {
-                        Circle().fill(color).frame(width: 10, height: 10)
-                        Text(name).font(.caption)
-                    }
-                }
-            case .snr:
-                ForEach(legendSNR, id: \.0) { label, color in
-                    HStack(spacing: 8) {
-                        Circle().fill(color).frame(width: 10, height: 10)
-                        Text(label).font(.caption)
-                    }
-                }
+                .padding(.top, 2)
             }
         }
+        .padding(8)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var legendBands: [(String, Color)] {
@@ -504,7 +490,7 @@ struct ContactMapView: View {
     }
 
     private func snrColor(_ rst: String) -> Color {
-        guard rst.count >= 2, let s = Int(String(rst.prefix(1))) else { return .gray }
+        guard rst.count >= 2, let s = Int(String(rst.dropFirst().prefix(1))) else { return .gray }
         switch s {
         case 9: return .green
         case 7...8: return .yellow

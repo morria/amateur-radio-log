@@ -5,13 +5,8 @@ import SwiftData
 struct AmateurRadioLogApp: App {
     @State private var appState = AppState()
 
-    init() {
-        // Kick off iCloud key-value sync so settings are available on first launch
-        NSUbiquitousKeyValueStore.default.synchronize()
-    }
-
-    var container: ModelContainer {
-        let schema = Schema([QSO.self])
+    let container: ModelContainer = {
+        let schema = Schema([QSO.self, AppSettings.self])
         let config = ModelConfiguration(
             "AmateurRadioLog",
             schema: schema,
@@ -22,7 +17,7 @@ struct AmateurRadioLogApp: App {
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
-    }
+    }()
 
     var body: some Scene {
         WindowGroup {
@@ -61,6 +56,7 @@ struct AmateurRadioLogApp: App {
             SettingsView()
                 .environment(appState)
         }
+        .modelContainer(container)
         #endif
     }
 }

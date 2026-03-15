@@ -85,30 +85,31 @@ final class AppState {
     var mapColorBy: MapColorOption = .band
     var mapStyle: MapStyleOption = .imagery
 
-    // MARK: - Last-used QSO defaults (iCloud synced)
-    @ObservationIgnored
-    private var cloud: NSUbiquitousKeyValueStore { .default }
-
+    // MARK: - Last-used QSO defaults (synced via SwiftData/CloudKit)
     @ObservationIgnored
     var lastBand: Band? {
-        get { cloud.string(forKey: "lastBand").flatMap { Band(rawValue: $0) } }
-        set { cloud.set(newValue?.rawValue, forKey: "lastBand") }
+        get { settings?.lastBand.flatMap { Band(rawValue: $0) } }
+        set { settings?.lastBand = newValue?.rawValue }
     }
     @ObservationIgnored
     var lastMode: Mode? {
-        get { cloud.string(forKey: "lastMode").flatMap { Mode(rawValue: $0) } }
-        set { cloud.set(newValue?.rawValue, forKey: "lastMode") }
+        get { settings?.lastMode.flatMap { Mode(rawValue: $0) } }
+        set { settings?.lastMode = newValue?.rawValue }
     }
     @ObservationIgnored
     var lastFreq: Double? {
-        get { let v = cloud.double(forKey: "lastFreq"); return v == 0 ? nil : v }
-        set { cloud.set(newValue ?? 0, forKey: "lastFreq") }
+        get { settings?.lastFreq }
+        set { settings?.lastFreq = newValue }
     }
     @ObservationIgnored
     var lastPower: Double? {
-        get { let v = cloud.double(forKey: "lastPower"); return v == 0 ? nil : v }
-        set { cloud.set(newValue ?? 0, forKey: "lastPower") }
+        get { settings?.lastPower }
+        set { settings?.lastPower = newValue }
     }
+
+    /// The shared settings record, set once at launch from ContentView
+    @ObservationIgnored
+    var settings: AppSettings?
 
     // MARK: - Services
     let qrzService = QRZService()

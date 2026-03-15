@@ -4,6 +4,8 @@ struct QSODetailView: View {
     @Environment(AppState.self) private var appState
     let qso: QSO
     var onEdit: (QSO) -> Void
+    @State private var hasQRZ = false
+    @State private var hasHamQTH = false
 
     var body: some View {
         ScrollView {
@@ -19,7 +21,7 @@ struct QSODetailView: View {
                     .buttonStyle(.plain)
 
                     HStack(spacing: 8) {
-                        if !KeychainManager.loadCredentials(for: .qrz).isEmpty {
+                        if hasQRZ {
                             Link(destination: URL(string: "https://www.qrz.com/db/\(qso.call)")!) {
                                 Text("QRZ")
                                     .font(.caption)
@@ -29,7 +31,7 @@ struct QSODetailView: View {
                                     .clipShape(Capsule())
                             }
                         }
-                        if !KeychainManager.loadCredentials(for: .hamqth).isEmpty {
+                        if hasHamQTH {
                             Link(destination: URL(string: "https://www.hamqth.com/\(qso.call)")!) {
                                 Text("HamQTH")
                                     .font(.caption)
@@ -164,6 +166,10 @@ struct QSODetailView: View {
                 Spacer()
             }
             .padding()
+        }
+        .onAppear {
+            hasQRZ = !KeychainManager.loadCredentials(for: .qrz).isEmpty
+            hasHamQTH = !KeychainManager.loadCredentials(for: .hamqth).isEmpty
         }
     }
 

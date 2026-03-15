@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct SettingsView: View {
     var body: some View {
@@ -43,88 +44,59 @@ struct SettingsView: View {
 // MARK: - General Settings
 
 struct GeneralSettingsView: View {
-    @State private var stationCallsign: String = ""
-    @State private var myGridsquare: String = ""
+    @Query private var allSettings: [AppSettings]
     @State private var locationManager = LocationManager()
-    #if os(macOS)
-    @State private var defaultBand: String = "20m"
-    @State private var defaultMode: String = "SSB"
-    #endif
-
-    private let cloud = NSUbiquitousKeyValueStore.default
 
     var body: some View {
-        #if os(macOS)
-        Form {
-            Section("My Station") {
-                TextField("Station Callsign", text: $stationCallsign)
-                    .onChange(of: stationCallsign) { _, v in cloud.set(v, forKey: "stationCallsign") }
-                HStack {
-                    TextField("My Grid Square", text: $myGridsquare)
-                        .onChange(of: myGridsquare) { _, v in cloud.set(v, forKey: "myGridsquare") }
-                    gpsButton
-                }
-            }
-            Section("Defaults") {
-                Picker("Default Band", selection: $defaultBand) {
-                    ForEach(Band.hfBands) { band in
-                        Text(band.displayName).tag(band.rawValue)
+        if let settings = allSettings.first {
+            @Bindable var s = settings
+            #if os(macOS)
+            Form {
+                Section("My Station") {
+                    TextField("Station Callsign", text: $s.stationCallsign)
+                    HStack {
+                        TextField("My Grid Square", text: $s.myGridsquare)
+                        gpsButton(settings: settings)
                     }
                 }
-                .onChange(of: defaultBand) { _, v in cloud.set(v, forKey: "defaultBand") }
-                Picker("Default Mode", selection: $defaultMode) {
-                    ForEach(Mode.commonModes) { mode in
-                        Text(mode.displayName).tag(mode.rawValue)
+                Section("Defaults") {
+                    Picker("Default Band", selection: $s.defaultBand) {
+                        ForEach(Band.hfBands) { band in
+                            Text(band.displayName).tag(band.rawValue)
+                        }
+                    }
+                    Picker("Default Mode", selection: $s.defaultMode) {
+                        ForEach(Mode.commonModes) { mode in
+                            Text(mode.displayName).tag(mode.rawValue)
+                        }
                     }
                 }
-                .onChange(of: defaultMode) { _, v in cloud.set(v, forKey: "defaultMode") }
             }
-        }
-        .padding()
-        .onAppear { refreshFromCloud() }
-        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
-            refreshFromCloud()
-        }
-        #else
-        TextField("Station Callsign", text: $stationCallsign)
-            .textContentType(.username)
-            .autocorrectionDisabled()
-            .textInputAutocapitalization(.characters)
-            .onChange(of: stationCallsign) { _, v in cloud.set(v, forKey: "stationCallsign") }
-        HStack {
-            TextField("Grid Square", text: $myGridsquare)
+            .padding()
+            #else
+            TextField("Station Callsign", text: $s.stationCallsign)
+                .textContentType(.username)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)
-                .onChange(of: myGridsquare) { _, v in cloud.set(v, forKey: "myGridsquare") }
-            gpsButton
+            HStack {
+                TextField("Grid Square", text: $s.myGridsquare)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.characters)
+                gpsButton(settings: settings)
+            }
+            #endif
         }
-        .onAppear { refreshFromCloud() }
-        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
-            refreshFromCloud()
-        }
-        #endif
-    }
-
-    private func refreshFromCloud() {
-        let c = cloud
-        stationCallsign = c.string(forKey: "stationCallsign") ?? ""
-        myGridsquare = c.string(forKey: "myGridsquare") ?? ""
-        #if os(macOS)
-        defaultBand = c.string(forKey: "defaultBand") ?? "20m"
-        defaultMode = c.string(forKey: "defaultMode") ?? "SSB"
-        #endif
     }
 
     @ViewBuilder
-    private var gpsButton: some View {
+    private func gpsButton(settings: AppSettings) -> some View {
         if locationManager.isLocating {
             ProgressView().controlSize(.small)
         } else {
             Button(action: {
                 Task {
                     if let grid = await locationManager.locationToGrid() {
-                        myGridsquare = grid
-                        cloud.set(grid, forKey: "myGridsquare")
+                        settings.myGridsquare = grid
                     }
                 }
             }) {
@@ -133,47 +105,25 @@ struct GeneralSettingsView: View {
             .help("Set grid square from GPS")
         }
     }
-
-    init() {
-        let c = NSUbiquitousKeyValueStore.default
-        _stationCallsign = State(initialValue: c.string(forKey: "stationCallsign") ?? "")
-        _myGridsquare = State(initialValue: c.string(forKey: "myGridsquare") ?? "")
-        #if os(macOS)
-        _defaultBand = State(initialValue: c.string(forKey: "defaultBand") ?? "20m")
-        _defaultMode = State(initialValue: c.string(forKey: "defaultMode") ?? "SSB")
-        #endif
-    }
 }
 
 /// Separate view for default band/mode pickers on iOS (used in its own Form section)
 struct GeneralDefaultsView: View {
-    @State private var defaultBand: String
-    @State private var defaultMode: String
-
-    private let cloud = NSUbiquitousKeyValueStore.default
-
-    init() {
-        let c = NSUbiquitousKeyValueStore.default
-        _defaultBand = State(initialValue: c.string(forKey: "defaultBand") ?? "20m")
-        _defaultMode = State(initialValue: c.string(forKey: "defaultMode") ?? "SSB")
-    }
+    @Query private var allSettings: [AppSettings]
 
     var body: some View {
-        Picker("Default Band", selection: $defaultBand) {
-            ForEach(Band.hfBands) { band in
-                Text(band.displayName).tag(band.rawValue)
+        if let settings = allSettings.first {
+            @Bindable var s = settings
+            Picker("Default Band", selection: $s.defaultBand) {
+                ForEach(Band.hfBands) { band in
+                    Text(band.displayName).tag(band.rawValue)
+                }
             }
-        }
-        .onChange(of: defaultBand) { _, v in cloud.set(v, forKey: "defaultBand") }
-        Picker("Default Mode", selection: $defaultMode) {
-            ForEach(Mode.commonModes) { mode in
-                Text(mode.displayName).tag(mode.rawValue)
+            Picker("Default Mode", selection: $s.defaultMode) {
+                ForEach(Mode.commonModes) { mode in
+                    Text(mode.displayName).tag(mode.rawValue)
+                }
             }
-        }
-        .onChange(of: defaultMode) { _, v in cloud.set(v, forKey: "defaultMode") }
-        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { _ in
-            defaultBand = cloud.string(forKey: "defaultBand") ?? "20m"
-            defaultMode = cloud.string(forKey: "defaultMode") ?? "SSB"
         }
     }
 }
