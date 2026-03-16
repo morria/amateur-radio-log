@@ -9,8 +9,9 @@ actor LoTWService {
         urlStr += "login=\(username)"
         urlStr += "&password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password)"
         urlStr += "&qso_query=1"
-        urlStr += "&qso_qsl=yes"
+        urlStr += "&qso_qsl=no"
         urlStr += "&qso_qsldetail=yes"
+        urlStr += "&qso_mydetail=yes"
 
         if let since = qsoQDateSince {
             urlStr += "&qso_qDateSince=\(since)"

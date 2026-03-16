@@ -117,25 +117,8 @@ actor HamQTHService {
         return uploaded
     }
 
-    // MARK: - Logbook Download
-
-    func downloadQSOs(username: String, password: String) async throws -> [QSO] {
-        let encodedUser = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
-        let encodedPass = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
-        let urlStr = "https://www.hamqth.com/adif.php?u=\(encodedUser)&p=\(encodedPass)&prg=AmateurRadioLog"
-        guard let url = URL(string: urlStr) else {
-            throw ServiceError.networkError("Invalid URL")
-        }
-
-        let (data, _) = try await URLSession.shared.data(from: url)
-        guard let adifStr = String(data: data, encoding: .utf8), !adifStr.isEmpty else {
-            return []
-        }
-
-        let parser = ADIFParser()
-        let file = try parser.parse(string: adifStr)
-        return parser.recordsToQSOs(file.records)
-    }
+    // Note: HamQTH does not provide a logbook download API.
+    // Only upload (insert/update/delete) is supported via qso_realtime.php.
 
     func logout() {
         sessionId = nil

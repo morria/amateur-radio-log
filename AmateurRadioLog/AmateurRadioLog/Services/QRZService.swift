@@ -76,6 +76,22 @@ actor QRZService {
         )
     }
 
+    // MARK: - Logbook Response Helpers
+
+    private func extractReason(from response: String, default defaultReason: String = "Unknown") -> String {
+        if let range = response.range(of: "REASON=") {
+            return String(response[range.upperBound...])
+                .components(separatedBy: "&").first ?? defaultReason
+        }
+        return defaultReason
+    }
+
+    private func checkAuthError(in response: String) throws {
+        if response.contains("RESULT=AUTH") {
+            throw ServiceError.authenticationFailed("QRZ: \(extractReason(from: response, default: "Invalid API key"))")
+        }
+    }
+
     // MARK: - Logbook Upload
 
     func uploadQSOs(_ qsos: [QSO], apiKey: String) async throws -> Int {
@@ -102,14 +118,12 @@ actor QRZService {
             let (data, _) = try await URLSession.shared.data(for: request)
             let responseStr = String(data: data, encoding: .utf8) ?? ""
 
+            try checkAuthError(in: responseStr)
+
             if responseStr.contains("RESULT=OK") || responseStr.contains("RESULT=REPLACE") {
                 uploaded += 1
             } else if responseStr.contains("RESULT=FAIL") {
-                // Extract reason
-                if let range = responseStr.range(of: "REASON=") {
-                    lastError = String(responseStr[range.upperBound...])
-                        .components(separatedBy: "&").first
-                }
+                lastError = extractReason(from: responseStr)
             }
         }
 
@@ -130,8 +144,9 @@ actor QRZService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 120
 
-        let body = "KEY=\(apiKey)&ACTION=FETCH&OPTION=ALL"
+        let body = "KEY=\(apiKey)&ACTION=FETCH&OPTION=ALL,TYPE:ADIF"
         request.httpBody = body.data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -142,33 +157,38 @@ actor QRZService {
             throw ServiceError.parseError("Unable to decode \(data.count) byte response (HTTP \(statusCode))")
         }
 
+        try checkAuthError(in: responseStr)
+
         if responseStr.contains("RESULT=FAIL") {
-            // Extract reason
-            if let range = responseStr.range(of: "REASON=") {
-                let reason = String(responseStr[range.upperBound...])
-                    .components(separatedBy: "&").first ?? "Unknown"
-                throw ServiceError.serverError("QRZ: \(reason)")
-            }
-            throw ServiceError.serverError("QRZ download failed: \(responseStr.prefix(200))")
+            throw ServiceError.serverError("QRZ: \(extractReason(from: responseStr))")
         }
 
-        // Response contains ADIF data after ADIF= tag
-        if let adifRange = responseStr.range(of: "ADIF=") {
-            let adifStr = String(responseStr[adifRange.upperBound...])
-            if adifStr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return []
+        // Find the ADIF field (case-insensitive) in the response
+        let adifRange = responseStr.range(of: "ADIF=", options: .caseInsensitive)
+            ?? responseStr.range(of: "&ADIF=", options: .caseInsensitive).map {
+                responseStr.index($0.lowerBound, offsetBy: 1)..<$0.upperBound
             }
-            let parser = ADIFParser()
-            let file = try parser.parse(string: adifStr)
-            return parser.recordsToQSOs(file.records)
+
+        if let adifRange {
+            let rawAdif = String(responseStr[adifRange.upperBound...])
+            // QRZ returns ADIF with HTML-encoded angle brackets
+            let adifStr = rawAdif
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&amp;", with: "&")
+            if !adifStr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let parser = ADIFParser()
+                let file = try parser.parse(string: adifStr)
+                return parser.recordsToQSOs(file.records)
+            }
+            return []
         }
 
-        // No ADIF data and no error — empty logbook
         if responseStr.contains("RESULT=OK") {
             return []
         }
 
-        throw ServiceError.parseError("Unexpected QRZ response: \(responseStr.prefix(200))")
+        throw ServiceError.parseError("Unexpected QRZ response: \(responseStr.prefix(300))")
     }
 
     func logout() {

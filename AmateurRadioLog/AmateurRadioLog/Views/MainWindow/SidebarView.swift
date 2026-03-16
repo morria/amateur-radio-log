@@ -33,7 +33,7 @@ struct SidebarView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button(action: { showHamQTHSync = true }) {
-                    Label("Sync HamQTH", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Upload to HamQTH", systemImage: "arrow.up.circle")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -67,8 +67,8 @@ struct SidebarView: View {
             }
         }
         .sheet(isPresented: $showHamQTHSync) {
-            SyncConfigSheet(provider: "HamQTH") { direction in
-                Task { await appState.syncHamQTH(context: modelContext, direction: direction) }
+            HamQTHUploadSheet {
+                Task { await appState.syncHamQTH(context: modelContext) }
             }
         }
         .sheet(isPresented: $showPOTAExport) {
@@ -210,6 +210,55 @@ struct LoTWDownloadSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Download") { onDownload() }
+                        .disabled(appState.isLoading)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - HamQTH Upload Sheet
+
+struct HamQTHUploadSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    let onUpload: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Upload new QSOs to your HamQTH logbook.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("HamQTH does not support logbook download. To import QSOs from HamQTH, export an ADIF file from their website and import it here.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                Section {
+                    if appState.isLoading {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(.linear)
+                            Text(appState.statusMessage ?? "Uploading...")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if let status = appState.statusMessage, !status.isEmpty {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+            .navigationTitle("Upload to HamQTH")
+            #if os(macOS)
+            .frame(width: 400, height: 280)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Upload") { onUpload() }
                         .disabled(appState.isLoading)
                 }
             }

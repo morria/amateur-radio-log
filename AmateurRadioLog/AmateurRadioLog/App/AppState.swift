@@ -366,31 +366,38 @@ final class AppState {
         statusMessage = String(localized: "Downloading from LoTW...")
 
         do {
-            let qsls = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
+            let remoteQSOs = try await lotwService.downloadQSLs(username: creds.username, password: creds.password)
             let allQSOs = try context.fetch(FetchDescriptor<QSO>())
             var confirmed = 0
             var added = 0
-            for qsl in qsls {
-                if let local = findLocalMatch(for: qsl, in: allQSOs) {
-                    if local.lotwQslRcvd != "Y" {
+            for remote in remoteQSOs {
+                let isConfirmed = remote.lotwQslRcvd == "Y"
+                if let local = findLocalMatch(for: remote, in: allQSOs) {
+                    // Update confirmation status if newly confirmed
+                    if isConfirmed && local.lotwQslRcvd != "Y" {
                         local.lotwQslRcvd = "Y"
                         local.lotwStatus = "confirmed"
                         confirmed += 1
                     }
+                    // Mark as uploaded to LoTW
+                    if local.lotwQslSent != "Y" {
+                        local.lotwQslSent = "Y"
+                    }
                 } else {
-                    qsl.lotwQslRcvd = "Y"
-                    qsl.lotwQslSent = "Y"
-                    qsl.lotwStatus = "confirmed"
-                    context.insert(qsl)
+                    remote.lotwQslSent = "Y"
+                    if isConfirmed {
+                        remote.lotwStatus = "confirmed"
+                    }
+                    context.insert(remote)
                     added += 1
                 }
             }
             try context.save()
 
             var messages: [String] = []
-            if confirmed > 0 { messages.append(String(localized: "\(confirmed) new confirmations")) }
             if added > 0 { messages.append(String(localized: "\(added) new QSOs from LoTW")) }
-            if messages.isEmpty { messages.append(String(localized: "No new confirmations")) }
+            if confirmed > 0 { messages.append(String(localized: "\(confirmed) new confirmations")) }
+            if messages.isEmpty { messages.append(String(localized: "Already up to date")) }
 
             isLoading = false
             statusMessage = messages.joined(separator: ", ")
@@ -402,7 +409,7 @@ final class AppState {
 
     // MARK: - HamQTH Sync
 
-    func syncHamQTH(context: ModelContext, direction: SyncDirection = .both) async {
+    func syncHamQTH(context: ModelContext) async {
         let creds = KeychainManager.loadCredentials(for: .hamqth)
         guard !creds.isEmpty else {
             errorMessage = String(localized: "HamQTH credentials not configured")
@@ -410,58 +417,24 @@ final class AppState {
         }
 
         isLoading = true
-        statusMessage = String(localized: "Syncing with HamQTH...")
-        var messages: [String] = []
+        statusMessage = String(localized: "Uploading to HamQTH...")
 
         do {
-            var localQSOs = try context.fetch(FetchDescriptor<QSO>())
+            let localQSOs = try context.fetch(FetchDescriptor<QSO>())
+            let toUpload = localQSOs.filter { !$0.hamqthSynced }
 
-            // Step 1: Download from HamQTH
-            statusMessage = String(localized: "Downloading from HamQTH...")
-            let remoteQSOs = try await hamQTHService.downloadQSOs(
-                username: creds.username, password: creds.password)
-
-            // Mark local QSOs that already exist on HamQTH
-            for local in localQSOs {
-                if !local.hamqthSynced && findLocalMatch(for: local, in: remoteQSOs) != nil {
-                    local.hamqthSynced = true
-                }
+            if !toUpload.isEmpty {
+                statusMessage = String(localized: "Uploading \(toUpload.count) QSOs to HamQTH...")
+                let count = try await hamQTHService.uploadQSOs(
+                    toUpload, username: creds.username, password: creds.password)
+                for qso in toUpload { qso.hamqthSynced = true }
+                try context.save()
+                isLoading = false
+                statusMessage = String(localized: "Uploaded \(count) to HamQTH")
+            } else {
+                isLoading = false
+                statusMessage = String(localized: "Nothing new to upload")
             }
-
-            var added = 0
-
-            if direction == .download || direction == .both {
-                for remote in remoteQSOs {
-                    if findLocalMatch(for: remote, in: localQSOs) == nil {
-                        remote.hamqthSynced = true
-                        context.insert(remote)
-                        localQSOs.append(remote)
-                        added += 1
-                    }
-                }
-                if added > 0 { try context.save() }
-                messages.append(String(localized: "\(added) new from HamQTH"))
-            }
-
-            // Step 2: Upload any local QSOs not on HamQTH
-            if direction == .upload || direction == .both {
-                let toUpload = localQSOs.filter { !$0.hamqthSynced }
-
-                if !toUpload.isEmpty {
-                    statusMessage = String(localized: "Uploading \(toUpload.count) QSOs to HamQTH...")
-                    let count = try await hamQTHService.uploadQSOs(
-                        toUpload, username: creds.username, password: creds.password)
-                    // Mark uploaded QSOs as synced
-                    for qso in toUpload { qso.hamqthSynced = true }
-                    try context.save()
-                    messages.append(String(localized: "Uploaded \(count) to HamQTH"))
-                } else {
-                    messages.append(String(localized: "Nothing new to upload"))
-                }
-            }
-
-            isLoading = false
-            statusMessage = messages.joined(separator: ", ")
         } catch {
             isLoading = false
             errorMessage = String(localized: "HamQTH sync failed: \(error.localizedDescription)")
