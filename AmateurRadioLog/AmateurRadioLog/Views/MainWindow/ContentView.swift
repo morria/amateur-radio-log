@@ -264,45 +264,52 @@ struct QSOLogView: View {
 
     @State private var showDetailPanel = false
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var usesSidePanel: Bool { horizontalSizeClass == .regular }
+    #else
+    private var usesSidePanel: Bool { true }
+    #endif
+
     var body: some View {
         VStack(spacing: 0) {
             SearchBarView()
             Divider()
-            #if os(macOS)
             HStack(spacing: 0) {
                 QSOListView(
                     selectedQSO: $selectedQSO,
+                    showsNavigationLinks: !usesSidePanel,
                     onEdit: onEdit, onDelete: onDelete)
+                    #if os(macOS)
                     .frame(minWidth: 300)
+                    #endif
                     .layoutPriority(1)
-                if showDetailPanel {
+                if usesSidePanel && showDetailPanel {
                     Divider()
                     detailPane
                         .frame(width: 280)
                 }
             }
             .onChange(of: selectedQSO) { _, newValue in
-                if newValue != nil && !showDetailPanel {
+                if usesSidePanel && newValue != nil && !showDetailPanel {
                     withAnimation { showDetailPanel = true }
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button(action: { withAnimation { showDetailPanel.toggle() } }) {
-                        Label("Inspector", systemImage: "sidebar.trailing")
+                if usesSidePanel {
+                    ToolbarItem(placement: .automatic) {
+                        Button(action: { withAnimation { showDetailPanel.toggle() } }) {
+                            Label("Inspector", systemImage: "sidebar.trailing")
+                        }
+                        #if os(macOS)
+                        .help(showDetailPanel ? "Hide Detail Panel" : "Show Detail Panel")
+                        #endif
                     }
-                    .help(showDetailPanel ? "Hide Detail Panel" : "Show Detail Panel")
                 }
             }
-            #else
-            QSOListView(
-                selectedQSO: $selectedQSO,
-                onEdit: onEdit, onDelete: onDelete)
-            #endif
         }
     }
 
-    #if os(macOS)
     @ViewBuilder
     private var detailPane: some View {
         VStack(spacing: 0) {
@@ -314,7 +321,9 @@ struct QSOLogView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                #if os(macOS)
                 .help("Close Detail Panel")
+                #endif
             }
             .padding(.horizontal, 8)
             .padding(.top, 6)
@@ -326,7 +335,6 @@ struct QSOLogView: View {
             }
         }
     }
-    #endif
 }
 
 // MARK: - ADIF Document

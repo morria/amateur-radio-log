@@ -4,6 +4,7 @@ import SwiftData
 struct QSOListView: View {
     @Environment(AppState.self) private var appState
     @Binding var selectedQSO: QSO?
+    var showsNavigationLinks: Bool = false
     var onEdit: (QSO) -> Void
     var onDelete: (QSO) -> Void
 
@@ -139,49 +140,12 @@ struct QSOListView: View {
             get: { selectedQSO?.persistentModelID },
             set: { id in selectedQSO = id.flatMap { pid in data.first { $0.persistentModelID == pid } } }
         )) { qso in
-            NavigationLink(value: qso.persistentModelID) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(qso.call)
-                            .font(.headline.monospaced())
-                        Spacer()
-                        Text(qso.band?.displayName ?? "")
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.blue.opacity(0.15))
-                            .clipShape(Capsule())
-                        if let mode = qso.mode {
-                            Text(mode.displayName)
-                                .font(.caption)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.green.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                    }
-                    HStack {
-                        Text(ADIFDateFormatter.displayDate(qso.qsoDate))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if let name = qso.name {
-                            Text(name).font(.caption).foregroundStyle(.secondary)
-                        }
-                        if let country = qso.country {
-                            Text(country).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
+            if showsNavigationLinks {
+                NavigationLink(value: qso.persistentModelID) {
+                    qsoRow(qso)
                 }
-            }
-            .swipeActions(edge: .trailing) {
-                Button(role: .destructive) { onDelete(qso) } label: { Label("Delete", systemImage: "trash") }
-                Button { onEdit(qso) } label: { Label("Edit", systemImage: "pencil") }
-                    .tint(.blue)
-            }
-            .swipeActions(edge: .leading) {
-                Button { appState.showOnMap(qso: qso) } label: { Label("Map", systemImage: "map") }
-                    .tint(.green)
+            } else {
+                qsoRow(qso)
             }
         }
         .listStyle(.plain)
@@ -189,6 +153,51 @@ struct QSOListView: View {
             if let qso = data.first(where: { $0.persistentModelID == id }) {
                 QSODetailView(qso: qso, onEdit: onEdit)
             }
+        }
+    }
+
+    private func qsoRow(_ qso: QSO) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(qso.call)
+                    .font(.headline.monospaced())
+                Spacer()
+                Text(qso.band?.displayName ?? "")
+                    .font(.caption)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.blue.opacity(0.15))
+                    .clipShape(Capsule())
+                if let mode = qso.mode {
+                    Text(mode.displayName)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.green.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            HStack {
+                Text(ADIFDateFormatter.displayDate(qso.qsoDate))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let name = qso.name {
+                    Text(name).font(.caption).foregroundStyle(.secondary)
+                }
+                if let country = qso.country {
+                    Text(country).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { onDelete(qso) } label: { Label("Delete", systemImage: "trash") }
+            Button { onEdit(qso) } label: { Label("Edit", systemImage: "pencil") }
+                .tint(.blue)
+        }
+        .swipeActions(edge: .leading) {
+            Button { appState.showOnMap(qso: qso) } label: { Label("Map", systemImage: "map") }
+                .tint(.green)
         }
     }
     #endif
