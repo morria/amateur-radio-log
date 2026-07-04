@@ -3,14 +3,17 @@ import SwiftData
 
 struct QSOListView: View {
     @Environment(AppState.self) private var appState
+    let allQSOs: [QSO]
     @Binding var selectedQSO: QSO?
     var showsNavigationLinks: Bool = false
     var onEdit: (QSO) -> Void
     var onDelete: (QSO) -> Void
 
-    @Query(sort: \QSO.qsoDate, order: .reverse) private var allQSOs: [QSO]
     #if os(macOS)
     @State private var sortOrder = [KeyPathComparator(\QSO.qsoDate, order: .reverse)]
+    // Cached filter+sort result: recomputed only when the filters, sort
+    // order, or the underlying query result change — not on every body pass.
+    @State private var visibleQSOs: [QSO] = []
     #endif
 
     var body: some View {
@@ -22,9 +25,52 @@ struct QSOListView: View {
     }
 
     #if os(macOS)
+    /// Everything the cached filter+sort result depends on, in one Hashable
+    /// value so a single .onChange can watch it.
+    private struct FilterSignature: Hashable {
+        var searchText: String
+        var band: Band?
+        var mode: Mode?
+        var timeRange: MapTimeRange
+        var callsign: String?
+        var country: String?
+        var state: String?
+        var grid: String?
+        var gridPrefix: String
+        var cqZone: Int?
+        var ituZone: Int?
+        var continent: String?
+        var county: String?
+        var sortOrder: [KeyPathComparator<QSO>]
+    }
+
+    private var filterSignature: FilterSignature {
+        FilterSignature(
+            searchText: appState.searchText,
+            band: appState.filterBand,
+            mode: appState.filterMode,
+            timeRange: appState.filterTimeRange,
+            callsign: appState.filterCallsign,
+            country: appState.filterCountry,
+            state: appState.filterState,
+            grid: appState.filterGrid,
+            gridPrefix: appState.filterGridPrefix,
+            cqZone: appState.filterCQZone,
+            ituZone: appState.filterITUZone,
+            continent: appState.filterContinent,
+            county: appState.filterCounty,
+            sortOrder: sortOrder
+        )
+    }
+
+    private func refreshVisibleQSOs() {
+        visibleQSOs = appState.filteredQSOs(from: allQSOs).sorted(using: sortOrder)
+        appState.visibleQSOCount = visibleQSOs.count
+        appState.totalQSOCount = allQSOs.count
+    }
+
     private var macOSList: some View {
-        // Compute filtered+sorted data ONCE, then reuse in Table and bindings
-        let data = appState.filteredQSOs(from: allQSOs).sorted(using: sortOrder)
+        let data = visibleQSOs
         return Table(data, selection: Binding(
             get: { selectedQSO?.persistentModelID },
             set: { id in selectedQSO = id.flatMap { pid in data.first { $0.persistentModelID == pid } } }
@@ -126,10 +172,20 @@ struct QSOListView: View {
                 Button("Delete QSO", role: .destructive) { onDelete(qso) }
             }
         } primaryAction: { ids in
+            // Double-click / Return opens the editor (macOS table convention);
+            // "Show on Map" stays available in the context menu and Cmd-Shift-M.
             if let id = ids.first, let qso = data.first(where: { $0.persistentModelID == id }) {
+                onEdit(qso)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showQSOOnMap)) { _ in
+            if let qso = selectedQSO {
                 appState.showOnMap(qso: qso)
             }
         }
+        .onAppear { refreshVisibleQSOs() }
+        .onChange(of: filterSignature) { _, _ in refreshVisibleQSOs() }
+        .onChange(of: allQSOs) { _, _ in refreshVisibleQSOs() }
     }
     #endif
 
@@ -201,4 +257,9 @@ struct QSOListView: View {
         }
     }
     #endif
+}
+
+extension Notification.Name {
+    /// Posted by the "Show Selected on Map" menu command (Cmd-Shift-M).
+    static let showQSOOnMap = Notification.Name("showQSOOnMap")
 }

@@ -2,12 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Your location is used to calculate your Maidenhead grid square.</string>
 	<key>NSLocationUsageDescription</key>
 	<string>Your location is used to calculate your Maidenhead grid square.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Receives logged contacts and rig status from WSJT-X, and shares the log with other operators during multi-operator Field Day sessions on your local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_amateurradiolog._tcp</string>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

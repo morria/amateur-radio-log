@@ -42,10 +42,11 @@ final class ADIFParser {
         }
 
         // Parse records
-        let recordsStr = String(content[index...])
-        let recordChunks = splitOnEOR(recordsStr)
+        let recordChunks = splitOnEOR(content[index...])
 
         for chunk in recordChunks {
+            // Trimming tolerates over-declared lengths on a record's last
+            // field (each chunk is copied once — still O(n) overall).
             let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             let fields = parseFields(trimmed)
@@ -67,22 +68,34 @@ final class ADIFParser {
     }
 
     func recordsToQSOs(_ records: [ADIFRecord]) -> [QSO] {
-        records.compactMap { recordToQSO($0) }
+        records.compactMap { recordToQSORecord($0)?.makeQSO() }
+    }
+
+    /// Sendable DTO variant used by service actors and the background store.
+    func recordsToQSORecords(_ records: [ADIFRecord]) -> [QSORecord] {
+        records.compactMap { recordToQSORecord($0) }
     }
 
     // MARK: - Private
 
-    private func splitOnEOR(_ str: String) -> [String] {
-        var chunks: [String] = []
-        var remaining = str
-        while let range = remaining.range(of: "<EOR>", options: .caseInsensitive) {
-            chunks.append(String(remaining[remaining.startIndex..<range.lowerBound]))
-            remaining = String(remaining[range.upperBound...])
+    /// Single forward scan: finds each <EOR> case-insensitively from the
+    /// current index and slices — never re-materializes the remainder, so a
+    /// file with n records is O(n) instead of O(n²) tail copies.
+    private func splitOnEOR(_ str: Substring) -> [Substring] {
+        var chunks: [Substring] = []
+        var index = str.startIndex
+        while index < str.endIndex,
+              let range = str.range(of: "<EOR>", options: .caseInsensitive,
+                                    range: index..<str.endIndex) {
+            chunks.append(str[index..<range.lowerBound])
+            index = range.upperBound
         }
-        // Anything left after last <EOR>
-        let leftover = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !leftover.isEmpty && leftover.contains("<") {
-            chunks.append(leftover)
+        // Anything left after the last <EOR>
+        if index < str.endIndex {
+            let leftover = str[index...]
+            if leftover.contains("<") {
+                chunks.append(leftover)
+            }
         }
         return chunks
     }
@@ -114,10 +127,21 @@ final class ADIFParser {
 
             if parts.count >= 2, let length = Int(parts[1]) {
                 let dataStart = str.index(after: tagEnd)
-                let dataEnd = str.index(dataStart, offsetBy: min(length, str.distance(from: dataStart, to: str.endIndex)))
-                let value = String(str[dataStart..<dataEnd])
+                // ADIF field lengths are counted in bytes (UTF-8), not characters
+                let utf8 = str.utf8
+                let bytesRemaining = utf8.distance(from: dataStart, to: utf8.endIndex)
+                var utf8End = utf8.index(dataStart, offsetBy: min(length, bytesRemaining))
+                var dataEnd = utf8End.samePosition(in: str)
+                // If the length lands mid-scalar/mid-character (e.g. a legacy
+                // char-counted file), round forward to the next boundary.
+                while dataEnd == nil && utf8End < utf8.endIndex {
+                    utf8.formIndex(after: &utf8End)
+                    dataEnd = utf8End.samePosition(in: str)
+                }
+                let end = dataEnd ?? str.endIndex
+                let value = String(str[dataStart..<end])
                 fields[name] = value
-                i = dataEnd
+                i = end
             } else {
                 i = str.index(after: tagEnd)
             }
@@ -126,7 +150,7 @@ final class ADIFParser {
         return fields
     }
 
-    private func recordToQSO(_ record: ADIFRecord) -> QSO? {
+    private func recordToQSORecord(_ record: ADIFRecord) -> QSORecord? {
         let f = record.fields
         guard let call = f["CALL"], !call.isEmpty,
               let date = f["QSO_DATE"],
@@ -134,14 +158,14 @@ final class ADIFParser {
             return nil
         }
 
-        let qso = QSO(call: call.uppercased(), qsoDate: date, timeOn: time)
+        var qso = QSORecord(call: call.uppercased(), qsoDate: date, timeOn: time)
         qso.timeOff = f["TIME_OFF"]
         qso.freq = f["FREQ"].flatMap { Double($0) }
         qso.freqRx = f["FREQ_RX"].flatMap { Double($0) }
-        qso.band = f["BAND"].flatMap { Band(rawValue: $0.lowercased()) }
-            ?? qso.freq.flatMap { Band.from(frequencyMHz: $0) }
-        qso.bandRx = f["BAND_RX"].flatMap { Band(rawValue: $0.lowercased()) }
-        qso.mode = f["MODE"].flatMap { Mode(rawValue: $0.uppercased()) }
+        qso.bandRaw = (f["BAND"].flatMap { Band(rawValue: $0.lowercased()) }
+            ?? qso.freq.flatMap { Band.from(frequencyMHz: $0) })?.rawValue
+        qso.bandRxRaw = f["BAND_RX"].flatMap { Band(rawValue: $0.lowercased()) }?.rawValue
+        qso.modeRaw = f["MODE"].flatMap { Mode(rawValue: $0.uppercased()) }?.rawValue
         qso.submode = f["SUBMODE"]
         qso.rstSent = f["RST_SENT"]
         qso.rstRcvd = f["RST_RCVD"]
@@ -169,6 +193,12 @@ final class ADIFParser {
         qso.eqslQslSent = f["EQSL_QSL_SENT"]
         qso.eqslQslRcvd = f["EQSL_QSL_RCVD"]
         qso.stationCallsign = f["STATION_CALLSIGN"]
+        qso.operatorCallsign = f["OPERATOR"]
+        // Stable identity written by this app's exporter; restoring it lets
+        // re-imports of our own exports dedupe exactly (QSOMatcher tier 1).
+        if let uuid = f["APP_AMATEURRADIOLOG_UUID"].flatMap({ UUID(uuidString: $0) }) {
+            qso.uuid = uuid
+        }
         qso.myGridsquare = f["MY_GRIDSQUARE"]
         qso.myCity = f["MY_CITY"]
         qso.myState = f["MY_STATE"]
@@ -183,6 +213,8 @@ final class ADIFParser {
         qso.wwffRef = f["WWFF_REF"]
         qso.sig = f["SIG"]
         qso.sigInfo = f["SIG_INFO"]
+        qso.mySig = f["MY_SIG"]
+        qso.mySigInfo = f["MY_SIG_INFO"]
         qso.contestId = f["CONTEST_ID"]
         qso.srx = f["SRX"].flatMap { Int($0) }
         qso.stx = f["STX"].flatMap { Int($0) }
@@ -209,17 +241,23 @@ final class ADIFParser {
             "TX_PWR", "RX_PWR", "ANT_AZ", "ANT_EL",
             "QSL_SENT", "QSL_SENT_VIA", "QSL_RCVD", "QSL_RCVD_VIA",
             "LOTW_QSL_SENT", "LOTW_QSL_RCVD", "EQSL_QSL_SENT", "EQSL_QSL_RCVD",
-            "STATION_CALLSIGN", "MY_GRIDSQUARE", "MY_CITY", "MY_STATE", "MY_COUNTRY",
+            "STATION_CALLSIGN", "OPERATOR", "APP_AMATEURRADIOLOG_UUID",
+            "MY_GRIDSQUARE", "MY_CITY", "MY_STATE", "MY_COUNTRY",
             "MY_CQ_ZONE", "MY_ITU_ZONE",
             "SAT_NAME", "SAT_MODE", "PROP_MODE",
             "SOTA_REF", "POTA_REF", "WWFF_REF", "SIG", "SIG_INFO",
+            "MY_SIG", "MY_SIG_INFO",
             "CONTEST_ID", "SRX", "STX", "SRX_STRING", "STX_STRING",
             "COMMENT", "NOTES", "LAT", "LON"
         ]
 
+        // Accumulate unknown fields locally and assign the dictionary once;
+        // (on the QSO model, per-subscript writes JSON-round-trip the dict).
+        var extras: [String: String] = [:]
         for (key, value) in f where !knownFields.contains(key) {
-            qso.extraFields[key] = value
+            extras[key] = value
         }
+        qso.extraFields = extras
 
         return qso
     }

@@ -118,6 +118,54 @@ final class ADIFParserTests: XCTestCase {
         XCTAssertEqual(qsos.count, 1)
         XCTAssertEqual(qsos[0].call, "OK1X")
     }
+
+    // MARK: UTF-8 byte-counted field lengths
+
+    func testByteCountedLatinAccents() throws {
+        // "José" is 4 characters but 5 UTF-8 bytes; length must be read as bytes
+        let adif = "<EOH>\n<CALL:4>EA1X <QSO_DATE:8>20260101 <TIME_ON:4>1200 <NAME:5>José <QTH:6>Madrid <EOR>"
+        let file = try parser.parse(string: adif)
+        XCTAssertEqual(file.records.count, 1)
+        XCTAssertEqual(file.records[0].fields["NAME"], "José")
+        XCTAssertEqual(file.records[0].fields["QTH"], "Madrid")
+    }
+
+    func testByteCountedGermanUmlauts() throws {
+        // "Jürgen" = 7 bytes, "Nürnberg" = 9 bytes
+        let adif = "<EOH>\n<CALL:4>DL1X <QSO_DATE:8>20260101 <TIME_ON:4>1200 <NAME:7>Jürgen <QTH:9>Nürnberg <EOR>"
+        let file = try parser.parse(string: adif)
+        XCTAssertEqual(file.records[0].fields["NAME"], "Jürgen")
+        XCTAssertEqual(file.records[0].fields["QTH"], "Nürnberg")
+    }
+
+    func testByteCountedCyrillic() throws {
+        // "Иван" = 8 bytes, "Москва" = 12 bytes; the field after must not bleed
+        let adif = "<EOH>\n<CALL:4>UA3X <QSO_DATE:8>20260101 <TIME_ON:4>1200 <NAME:8>Иван <QTH:12>Москва <COMMENT:5>73 GL <EOR>"
+        let file = try parser.parse(string: adif)
+        XCTAssertEqual(file.records[0].fields["NAME"], "Иван")
+        XCTAssertEqual(file.records[0].fields["QTH"], "Москва")
+        XCTAssertEqual(file.records[0].fields["COMMENT"], "73 GL")
+    }
+
+    func testLegacyCharCountedFileDegradesGracefully() throws {
+        // Legacy files from char-counting writers use <NAME:4>José (4 chars, 5 bytes).
+        // Reading 4 bytes lands mid-'é'; the parser must round forward to the next
+        // scalar boundary and keep subsequent fields intact.
+        let adif = "<EOH>\n<CALL:4>EA1X <QSO_DATE:8>20260101 <TIME_ON:4>1200 <NAME:4>José <QTH:6>Madrid <EOR>"
+        let file = try parser.parse(string: adif)
+        XCTAssertEqual(file.records[0].fields["NAME"], "José")
+        XCTAssertEqual(file.records[0].fields["QTH"], "Madrid")
+    }
+
+    func testLegacyCharCountedTruncationDoesNotBreakNextField() throws {
+        // "Jürgen" char-counted as 6 covers only 6 bytes ("Jürge"); the missing
+        // trailing byte must not corrupt the following field.
+        let adif = "<EOH>\n<CALL:4>DL1X <QSO_DATE:8>20260101 <TIME_ON:4>1200 <NAME:6>Jürgen <QTH:6>Berlin <EOR>"
+        let file = try parser.parse(string: adif)
+        let name = file.records[0].fields["NAME"] ?? ""
+        XCTAssertTrue("Jürgen".hasPrefix(name), "Unexpected NAME value: \(name)")
+        XCTAssertEqual(file.records[0].fields["QTH"], "Berlin")
+    }
 }
 
 // MARK: - ADIF Writer Tests
@@ -161,6 +209,35 @@ final class ADIFWriterTests: XCTestCase {
         let output = writer.write(qsos: [qso])
         XCTAssertTrue(output.contains("<CALL:6>VK2ABC"))
         XCTAssertTrue(output.contains("<COUNTRY:9>Australia"))
+    }
+
+    func testFieldLengthsAreUTF8Bytes() {
+        // "José" is 4 characters but 5 UTF-8 bytes; ADIF lengths are bytes
+        let qso = QSO(call: "EA1ABC", qsoDate: "20260308", timeOn: "143000")
+        qso.name = "José"
+        qso.qth = "Zürich"
+        qso.comment = "Москва"
+        let output = writer.write(qsos: [qso])
+        XCTAssertTrue(output.contains("<NAME:5>José"))
+        XCTAssertTrue(output.contains("<QTH:7>Zürich"))
+        XCTAssertTrue(output.contains("<COMMENT:12>Москва"))
+    }
+
+    func testRoundTripNonASCII() throws {
+        let qso = QSO(call: "EA1ABC", qsoDate: "20260301", timeOn: "120000")
+        qso.mode = .ssb
+        qso.name = "José"
+        qso.qth = "São Paulo"
+        qso.comment = "Спасибо — 73!"
+        qso.country = "España"
+
+        let parsed = ADIFParser().recordsToQSOs(try ADIFParser().parse(string: writer.write(qsos: [qso])).records)
+        XCTAssertEqual(parsed.count, 1)
+        XCTAssertEqual(parsed[0].call, "EA1ABC")
+        XCTAssertEqual(parsed[0].name, "José")
+        XCTAssertEqual(parsed[0].qth, "São Paulo")
+        XCTAssertEqual(parsed[0].comment, "Спасибо — 73!")
+        XCTAssertEqual(parsed[0].country, "España")
     }
 }
 

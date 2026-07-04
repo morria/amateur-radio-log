@@ -5,16 +5,9 @@ import SwiftData
 // MARK: - Deduplication Tests
 
 final class DeduplicationTests: XCTestCase {
-    /// Mirror of AppState.findLocalMatch — tests the matching logic without needing AppState
+    /// Tests the real matcher used by all sync paths and import
     private func findMatch(for qso: QSO, in existing: [QSO]) -> QSO? {
-        let timePrefix = String(qso.timeOn.prefix(4))
-        let band = qso.bandRaw ?? ""
-        return existing.first { e in
-            e.call == qso.call
-                && e.qsoDate == qso.qsoDate
-                && String(e.timeOn.prefix(4)) == timePrefix
-                && (e.bandRaw ?? "") == band
-        }
+        QSOMatcher.findMatch(for: qso, in: existing)
     }
 
     func testExactMatch() {
@@ -91,6 +84,171 @@ final class DeduplicationTests: XCTestCase {
         let newQSOs = incoming.filter { findMatch(for: $0, in: existing) == nil }
         XCTAssertEqual(newQSOs.count, 1)
         XCTAssertEqual(newQSOs[0].call, "VK2XYZ")
+    }
+}
+
+// MARK: - Tiered Matcher Tests
+
+final class TieredMatcherTests: XCTestCase {
+    func testUUIDMatchBeatsComposite() {
+        let shared = UUID()
+
+        // Candidate A: same composite key but a different uuid
+        let compositeTwin = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        compositeTwin.bandRaw = "20m"
+
+        // Candidate B: different composite key but the same uuid
+        let uuidTwin = QSO(call: "G3ABC", qsoDate: "20260101", timeOn: "010100")
+        uuidTwin.bandRaw = "40m"
+        uuidTwin.uuid = shared
+
+        let probe = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        probe.bandRaw = "20m"
+        probe.uuid = shared
+
+        let match = QSOMatcher.findMatch(for: probe, in: [compositeTwin, uuidTwin])
+        XCTAssertTrue(match === uuidTwin, "uuid identity must beat composite-key similarity")
+    }
+
+    func testQRZLogIdTierBeatsComposite() {
+        let compositeTwin = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        compositeTwin.bandRaw = "20m"
+
+        let logIdTwin = QSO(call: "G3ABC", qsoDate: "20260101", timeOn: "010100")
+        logIdTwin.bandRaw = "40m"
+        logIdTwin.qrzLogId = "12345"
+
+        let probe = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        probe.bandRaw = "20m"
+        probe.qrzLogId = "12345"
+
+        let match = QSOMatcher.findMatch(for: probe, in: [compositeTwin, logIdTwin])
+        XCTAssertTrue(match === logIdTwin, "qrzLogId identity must beat composite-key similarity")
+    }
+
+    func testUnmatchedUUIDFallsThroughToComposite() {
+        // Local record has its own uuid; probe has a different (fresh) uuid.
+        // The matcher must still find the composite match.
+        let local = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        local.bandRaw = "20m"
+
+        let probe = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143059")
+        probe.bandRaw = "20m"
+
+        XCTAssertNotEqual(local.uuid, probe.uuid)
+        XCTAssertNotNil(QSOMatcher.findMatch(for: probe, in: [local]))
+    }
+
+    func testUnmatchedQRZLogIdFallsThroughToComposite() {
+        let local = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        local.bandRaw = "20m"
+        local.qrzLogId = "111"
+
+        let probe = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        probe.bandRaw = "20m"
+        probe.qrzLogId = "222"
+
+        XCTAssertNotNil(QSOMatcher.findMatch(for: probe, in: [local]),
+                        "Different qrzLogIds should not block a composite match")
+    }
+}
+
+// MARK: - UUID Backfill Tests
+
+final class QSOIdentityBackfillTests: XCTestCase {
+    var container: ModelContainer!
+    var context: ModelContext!
+
+    override func setUp() {
+        super.setUp()
+        container = try! ModelContainer(for: QSO.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        context = ModelContext(container)
+    }
+
+    override func tearDown() {
+        container = nil; context = nil; super.tearDown()
+    }
+
+    private func insertLegacyQSO(call: String, date: String, time: String,
+                                 band: String? = "20m", createdAt: Date = Date()) -> QSO {
+        let qso = QSO(call: call, qsoDate: date, timeOn: time)
+        qso.bandRaw = band
+        qso.uuid = nil // simulate a record that predates the uuid field
+        qso.createdAt = createdAt
+        context.insert(qso)
+        return qso
+    }
+
+    func testAssignsUUIDsWhereMissing() throws {
+        _ = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000")
+        _ = insertLegacyQSO(call: "G3ABC", date: "20260307", time: "201500", band: "40m")
+        try context.save()
+
+        let result = try QSOIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.assigned, 2)
+
+        let all = try context.fetch(FetchDescriptor<QSO>())
+        XCTAssertTrue(all.allSatisfy { $0.uuid != nil })
+        XCTAssertEqual(Set(all.compactMap(\.uuid)).count, 2, "Assigned uuids must be distinct")
+    }
+
+    func testBackfillIsIdempotent() throws {
+        _ = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000")
+        try context.save()
+
+        _ = try QSOIdentityBackfill.backfill(context: context)
+        let uuidsAfterFirst = try context.fetch(FetchDescriptor<QSO>()).compactMap(\.uuid)
+
+        let second = try QSOIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(second.assigned, 0)
+        XCTAssertEqual(second.repaired, 0)
+        XCTAssertEqual(second.deleted, 0)
+
+        let uuidsAfterSecond = try context.fetch(FetchDescriptor<QSO>()).compactMap(\.uuid)
+        XCTAssertEqual(Set(uuidsAfterFirst), Set(uuidsAfterSecond),
+                       "Second run must not change any uuid")
+    }
+
+    func testRepairDeletesTrueDuplicateKeepingOldest() throws {
+        let shared = UUID()
+        let older = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000",
+                                    createdAt: Date(timeIntervalSinceNow: -3600))
+        older.uuid = shared
+        let newer = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000",
+                                    createdAt: Date())
+        newer.uuid = shared
+        try context.save()
+
+        let result = try QSOIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.deleted, 1)
+
+        let all = try context.fetch(FetchDescriptor<QSO>())
+        XCTAssertEqual(all.count, 1)
+        XCTAssertEqual(all[0].uuid, shared)
+        XCTAssertEqual(all[0].createdAt, older.createdAt, "The oldest record must survive")
+    }
+
+    func testRepairRemintsDistinctQSOWithCollidingUUID() throws {
+        let shared = UUID()
+        let older = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000",
+                                    createdAt: Date(timeIntervalSinceNow: -3600))
+        older.uuid = shared
+        // Different composite key — a genuine collision, not a duplicate row
+        let other = insertLegacyQSO(call: "G3ABC", date: "20260101", time: "010100",
+                                    band: "40m", createdAt: Date())
+        other.uuid = shared
+        try context.save()
+
+        let result = try QSOIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.repaired, 1)
+        XCTAssertEqual(result.deleted, 0)
+
+        let all = try context.fetch(FetchDescriptor<QSO>())
+        XCTAssertEqual(all.count, 2, "Distinct QSOs must not be deleted")
+        XCTAssertEqual(Set(all.compactMap(\.uuid)).count, 2)
+        let keeper = all.first { $0.call == "W1AW" }
+        XCTAssertEqual(keeper?.uuid, shared, "Oldest record keeps the original uuid")
     }
 }
 
@@ -385,6 +543,35 @@ final class ADIFRoundTripTests: XCTestCase {
         XCTAssertEqual(p.notes, "QRP station")
     }
 
+    func testUUIDAndOperatorRoundTrip() throws {
+        let q = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        q.band = .band20m
+        q.operatorCallsign = "W2ASM"
+        let uuid = q.uuid
+        XCTAssertNotNil(uuid, "New QSOs should be minted with a uuid")
+
+        let adif = ADIFWriter().write(qsos: [q])
+        XCTAssertTrue(adif.contains("APP_AMATEURRADIOLOG_UUID"))
+        XCTAssertTrue(adif.contains("<OPERATOR:5>W2ASM"))
+
+        let parsed = ADIFParser().recordsToQSOs(try ADIFParser().parse(string: adif).records)
+        XCTAssertEqual(parsed.count, 1)
+        XCTAssertEqual(parsed[0].uuid, uuid, "uuid must survive a write→parse cycle")
+        XCTAssertEqual(parsed[0].operatorCallsign, "W2ASM")
+
+        // Re-import of our own export must dedupe exactly via uuid (tier 1)
+        XCTAssertTrue(QSOMatcher.findMatch(for: parsed[0], in: [q]) === q)
+    }
+
+    func testUUIDNotStoredInExtraFields() throws {
+        let q = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        let adif = ADIFWriter().write(qsos: [q])
+        let parsed = ADIFParser().recordsToQSOs(try ADIFParser().parse(string: adif).records)
+        XCTAssertNil(parsed[0].extraFields["APP_AMATEURRADIOLOG_UUID"],
+                     "Identity field must map to uuid, not linger in extraFields")
+        XCTAssertNil(parsed[0].extraFields["OPERATOR"])
+    }
+
     func testExtraFieldsSurviveRoundTrip() throws {
         let q = QSO(call: "TEST", qsoDate: "20260101", timeOn: "120000")
         q.extraFields = ["APP_MYAPP_CUSTOM": "value123", "MY_FIELD": "data"]
@@ -487,6 +674,7 @@ final class LoTWMergeTests: XCTestCase {
 
 // MARK: - Filter Logic Tests
 
+@MainActor
 final class FilterLogicTests: XCTestCase {
     private func makeAppState() -> AppState {
         AppState()
@@ -601,7 +789,9 @@ final class MapTimeRangeTests: XCTestCase {
         guard let start = MapTimeRange.yearToDate.startDate else {
             XCTFail("YTD should have a start date"); return
         }
-        let cal = Calendar.current
+        // QSO timestamps are UTC, so YTD starts at Jan 1 00:00 UTC
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
         XCTAssertEqual(cal.component(.month, from: start), 1)
         XCTAssertEqual(cal.component(.day, from: start), 1)
         XCTAssertEqual(cal.component(.year, from: start), cal.component(.year, from: Date()))

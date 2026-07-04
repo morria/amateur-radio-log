@@ -28,6 +28,9 @@ struct QSOEditData: Identifiable {
     var iota: String?
     var txPower: Double?
     var stationCallsign: String?
+    var operatorCallsign: String?
+    var stationId: String?
+    var operationId: UUID?
     var myGridsquare: String?
     var comment: String?
     var notes: String?
@@ -49,6 +52,11 @@ struct QSOEditData: Identifiable {
         qsoDate = f.string(from: now)
         f.dateFormat = "HHmmss"
         timeOn = f.string(from: now)
+        // While a Field Day / multi-op session is active, every new QSO is
+        // stamped with the active operation. All entry paths (editor sheet,
+        // quick-entry bar, spot logging, activation view) build new QSOs
+        // through this init.
+        operationId = ActiveOperationContext.operationId
     }
 
     init(from qso: QSO) {
@@ -78,6 +86,9 @@ struct QSOEditData: Identifiable {
         self.iota = qso.iota
         self.txPower = qso.txPower
         self.stationCallsign = qso.stationCallsign
+        self.operatorCallsign = qso.operatorCallsign
+        self.stationId = qso.stationId
+        self.operationId = qso.operationId
         self.myGridsquare = qso.myGridsquare
         self.comment = qso.comment
         self.notes = qso.notes
@@ -88,6 +99,35 @@ struct QSOEditData: Identifiable {
         self.satMode = qso.satMode
         self.sotaRef = qso.sotaRef
         self.potaRef = qso.potaRef
+    }
+
+    /// Prefill from a live spot: callsign, frequency, band, mode and the
+    /// POTA/SOTA program reference (plus grid/coordinates when the source
+    /// carries them). `defaults` supplies last-used values for fields the
+    /// spot doesn't provide (mode fallback, TX power).
+    init(from spot: Spot, defaults: QuickEntryDefaults) {
+        self.init() // stamps current UTC qsoDate/timeOn
+        call = spot.activatorCall.uppercased()
+        freq = spot.frequencyMHz
+        band = spot.band
+        mode = spot.mode.flatMap { Mode(rawValue: $0) } ?? defaults.mode
+        switch spot.source {
+        case .pota:
+            potaRef = spot.reference
+        case .sota:
+            sotaRef = spot.reference
+        case .cluster, .rbn:
+            break
+        }
+        if let name = spot.referenceName, !name.isEmpty {
+            comment = name
+        }
+        if let grid = spot.grid, !grid.isEmpty {
+            gridsquare = grid
+        }
+        latitude = spot.latitude
+        longitude = spot.longitude
+        txPower = defaults.power
     }
 
     func apply(to qso: QSO) {
@@ -116,6 +156,10 @@ struct QSOEditData: Identifiable {
         qso.iota = iota
         qso.txPower = txPower
         qso.stationCallsign = stationCallsign
+        qso.operatorCallsign = operatorCallsign
+        if let stationId { qso.stationId = stationId }
+        qso.operationId = operationId
+        if qso.uuid == nil { qso.uuid = UUID() }
         qso.myGridsquare = myGridsquare
         qso.comment = comment
         qso.notes = notes

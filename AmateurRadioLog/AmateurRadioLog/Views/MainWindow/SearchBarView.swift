@@ -7,6 +7,13 @@ struct SearchBarView: View {
     #endif
     @State private var showFilters = false
 
+    // Debounced search: the TextField edits a local draft that is committed
+    // to appState.searchText after a short pause, so the whole window isn't
+    // re-filtered on every keystroke.
+    @State private var draftSearch = ""
+    @State private var searchDebounceTask: Task<Void, Never>?
+    @FocusState private var searchFieldFocused: Bool
+
     var body: some View {
         @Bindable var appState = appState
         VStack(spacing: 6) {
@@ -21,10 +28,15 @@ struct SearchBarView: View {
                 #endif
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Search callsign, name, location...", text: $appState.searchText)
+                    TextField("Search callsign, name, location...", text: $draftSearch)
                         .textFieldStyle(.plain)
-                    if !appState.searchText.isEmpty {
-                        Button(action: { appState.searchText = "" }) {
+                        .focused($searchFieldFocused)
+                    if !draftSearch.isEmpty {
+                        Button(action: {
+                            searchDebounceTask?.cancel()
+                            draftSearch = ""
+                            appState.searchText = ""
+                        }) {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -37,6 +49,15 @@ struct SearchBarView: View {
                 #endif
                 .background(.quaternary)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                #if os(macOS)
+                if let visible = appState.visibleQSOCount, appState.totalQSOCount > 0 {
+                    Text("\(visible) of \(appState.totalQSOCount) QSOs")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                }
+                #endif
 
                 #if os(macOS)
                 Button(action: { showFilters.toggle() }) {
@@ -109,6 +130,29 @@ struct SearchBarView: View {
                 }
             }
         }
+        .onAppear { draftSearch = appState.searchText }
+        .onChange(of: draftSearch) { _, newValue in
+            guard newValue != appState.searchText else { return }
+            searchDebounceTask?.cancel()
+            searchDebounceTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                appState.searchText = newValue
+            }
+        }
+        .onChange(of: appState.searchText) { _, newValue in
+            // Programmatic writes (clearFilters, detail-view taps, map taps)
+            // must be reflected in the draft without a debounce round-trip
+            if draftSearch != newValue {
+                searchDebounceTask?.cancel()
+                draftSearch = newValue
+            }
+        }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .findQSO)) { _ in
+            searchFieldFocused = true
+        }
+        #endif
     }
 
     private var filterContent: some View {

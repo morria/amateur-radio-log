@@ -3,19 +3,28 @@ import Foundation
 actor HamQTHService {
     private var sessionId: String?
     private let xmlParser = XMLResponseParser()
+    private let session: URLSession
+    private let retryDelay: TimeInterval
+
+    /// - Parameters:
+    ///   - session: transport, injectable for URLProtocol-stub tests.
+    ///   - retryDelay: backoff before the single upload retry (tests use ~0).
+    init(session: URLSession = .shared, retryDelay: TimeInterval = 2.0) {
+        self.session = session
+        self.retryDelay = retryDelay
+    }
 
     var isAuthenticated: Bool { sessionId != nil }
 
     // MARK: - Authentication
 
     func authenticate(username: String, password: String) async throws {
-        let encoded = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
-        let urlStr = "https://www.hamqth.com/xml.php?u=\(username)&p=\(encoded)"
+        let urlStr = "https://www.hamqth.com/xml.php?u=\(username.formURLEncoded)&p=\(password.formURLEncoded)"
         guard let url = URL(string: urlStr) else {
             throw ServiceError.networkError("Invalid URL")
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await session.data(from: url)
         let result = xmlParser.parse(data: data)
 
         if let sid = result["session_id"], !sid.isEmpty {
@@ -37,7 +46,7 @@ actor HamQTHService {
             throw ServiceError.networkError("Invalid URL")
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await session.data(from: url)
         let result = xmlParser.parse(data: data)
 
         if let error = result["error"] {
@@ -78,43 +87,125 @@ actor HamQTHService {
 
     // MARK: - Logbook Upload
 
-    func uploadQSOs(_ qsos: [QSO], username: String, password: String) async throws -> Int {
-        guard let url = URL(string: "https://www.hamqth.com/qso_realtime.php") else {
-            throw ServiceError.networkError("Invalid URL")
+    /// Outcome of a single HamQTH qso_realtime.php insert.
+    enum UploadOutcome: Equatable {
+        case success
+        case duplicate
+        case failure(reason: String)
+    }
+
+    /// Classifies a qso_realtime.php response. HamQTH returns errors in the
+    /// response body with HTTP status 200, so a 200 alone does not mean success.
+    ///
+    /// Known response markers (not fully verified against the live API, so
+    /// unknown bodies are conservatively treated as failures rather than
+    /// falsely marking records as synced):
+    ///   success:   "OK", "QSO saved", "inserted"
+    ///   duplicate: "dupe", "duplicate", "already exist"
+    static func classifyUploadResponse(_ body: String, statusCode: Int) -> UploadOutcome {
+        guard statusCode == 200 else {
+            return .failure(reason: "HTTP \(statusCode)")
+        }
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        if lower == "ok" || lower.hasPrefix("ok:") || lower.hasPrefix("ok ")
+            || lower.contains("qso saved") || lower.contains("inserted") {
+            return .success
+        }
+        if lower.contains("dupe") || lower.contains("duplicate") || lower.contains("already exist") {
+            return .duplicate
+        }
+        return .failure(reason: trimmed.isEmpty ? "Empty response from HamQTH" : String(trimmed.prefix(200)))
+    }
+
+    /// Maximum in-flight insert requests during a batch upload.
+    static let maxConcurrentUploads = 3
+
+    /// Uploads QSOs with bounded parallelism (one qso_realtime.php insert per
+    /// record). Transient failures (URLError / HTTP 5xx) are retried once
+    /// with a short backoff; other per-record problems become `failures`.
+    func uploadQSOs(_ qsos: [QSORecord], username: String, password: String,
+                    progress: SyncProgressHandler? = nil) async throws -> UploadResult {
+        // Serialize on the actor so child tasks capture only Sendable values.
+        // Upload candidates always carry a uuid (QSOStore mints one before
+        // handing records out); the fallback never matches back.
+        let writer = ADIFWriter()
+        let jobs: [(id: UUID, call: String, record: String)] = qsos.map {
+            (id: $0.uuid ?? UUID(), call: $0.call, record: writer.writeSingleRecord($0))
         }
 
-        let writer = ADIFWriter()
-        var uploaded = 0
-        var lastError: String?
+        let session = self.session
+        let delay = self.retryDelay
+        let total = jobs.count
+        var result = UploadResult()
+        var completed = 0
 
-        for qso in qsos {
-            let record = writer.writeSingleRecord(qso)
+        try await withThrowingTaskGroup(of: (UUID, String, UploadOutcome).self) { group in
+            var next = 0
+            func addNextJob() {
+                guard next < jobs.count else { return }
+                let job = jobs[next]
+                next += 1
+                group.addTask {
+                    try Task.checkCancellation()
+                    let outcome = try await Self.performInsert(
+                        record: job.record, username: username, password: password,
+                        session: session, retryDelay: delay)
+                    return (job.id, job.call, outcome)
+                }
+            }
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            for _ in 0..<Self.maxConcurrentUploads { addNextJob() }
 
-            let encodedRecord = record.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? record
-            let encodedUser = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
-            let encodedPass = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
-            let body = "u=\(encodedUser)&p=\(encodedPass)&cmd=insert&prg=AmateurRadioLog&adif=\(encodedRecord)"
-            request.httpBody = body.data(using: .utf8)
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-
-            if statusCode == 200 {
-                uploaded += 1
-            } else {
-                lastError = String(data: data, encoding: .utf8) ?? "HTTP \(statusCode)"
+            // A thrown child error (cancellation) exits this loop and
+            // implicitly cancels every remaining task in the group.
+            while let (id, call, outcome) = try await group.next() {
+                completed += 1
+                switch outcome {
+                case .success:
+                    result.succeeded.append(id)
+                case .duplicate:
+                    result.duplicates.append(id)
+                case .failure(let reason):
+                    result.failures.append(SyncFailure(id: id, call: call, reason: reason))
+                }
+                if let progress { await progress(completed, total) }
+                addNextJob()
             }
         }
 
-        if uploaded == 0 && !qsos.isEmpty {
-            throw ServiceError.serverError(lastError ?? "Upload failed for all QSOs")
+        if result.succeeded.isEmpty && result.duplicates.isEmpty && !qsos.isEmpty {
+            throw ServiceError.serverError(result.failures.first?.reason ?? "Upload failed for all QSOs")
         }
 
-        return uploaded
+        return result
+    }
+
+    /// One insert request, retried once on transient errors. Cancellation
+    /// propagates; anything else becomes a per-record failure.
+    private static func performInsert(record: String, username: String, password: String,
+                                      session: URLSession,
+                                      retryDelay: TimeInterval) async throws -> UploadOutcome {
+        guard let url = URL(string: "https://www.hamqth.com/qso_realtime.php") else {
+            throw ServiceError.networkError("Invalid URL")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = "u=\(username.formURLEncoded)&p=\(password.formURLEncoded)&cmd=insert&prg=AmateurRadioLog&adif=\(record.formURLEncoded)"
+            .data(using: .utf8)
+
+        do {
+            let (body, statusCode) = try await SyncTransport.sendWithRetry(
+                request, session: session, retryDelay: retryDelay)
+            return classifyUploadResponse(body, statusCode: statusCode)
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return .failure(reason: error.localizedDescription)
+        }
     }
 
     // Note: HamQTH does not provide a logbook download API.

@@ -64,11 +64,17 @@ final class QSO {
     var propMode: String?
 
     // Awards
+    // sotaRef/potaRef/sig/sigInfo describe the CONTACTED station's program
+    // reference (ADIF SOTA_REF/POTA_REF/SIG/SIG_INFO). The activator's own
+    // park/summit is mySig/mySigInfo (ADIF MY_SIG/MY_SIG_INFO) — POTA logs
+    // require the latter. Optionals so the CloudKit migration is safe.
     var sotaRef: String?
     var potaRef: String?
     var wwffRef: String?
     var sig: String?
     var sigInfo: String?
+    var mySig: String?
+    var mySigInfo: String?
 
     // Contest
     var contestId: String?
@@ -84,6 +90,23 @@ final class QSO {
     // Location
     var latitude: Double?
     var longitude: Double?
+
+    // Identity (CloudKit-safe optionals; uuid is backfilled at launch for
+    // records that predate the field — do NOT default to UUID(), or a
+    // lightweight migration would stamp one constant UUID on every row)
+    var uuid: UUID?
+    var operatorCallsign: String?
+    var stationId: String?
+
+    // Multi-operator Field Day: the Operation this QSO was logged under
+    // (nil for regular logging). CloudKit-safe optional.
+    var operationId: UUID?
+
+    // Tombstone: set instead of hard-deleting while an Operation is active,
+    // so the deletion replicates to peers. Tombstoned QSOs are excluded from
+    // all views via AppState.filteredQSOs / StatsSummary. CloudKit-safe
+    // optional.
+    var deletedAt: Date?
 
     // Sync metadata
     var qrzLogId: String?
@@ -104,6 +127,7 @@ final class QSO {
         self.call = call
         self.qsoDate = qsoDate
         self.timeOn = timeOn
+        self.uuid = UUID()
         self.createdAt = Date()
         self.updatedAt = Date()
     }

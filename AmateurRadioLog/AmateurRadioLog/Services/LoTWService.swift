@@ -1,27 +1,67 @@
 import Foundation
 
 actor LoTWService {
+    private let session: URLSession
 
-    // MARK: - Download QSL confirmations
+    /// - Parameter session: transport, injectable for URLProtocol-stub tests.
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
 
-    func downloadQSLs(username: String, password: String, qsoQDateSince: String? = nil) async throws -> [QSO] {
+    // MARK: - Incremental sync cursors
+
+    /// Formats a `yyyy-MM-dd` (UTC) cursor date from a sync start date, backed
+    /// off by `overlapDays` so records that arrive during a sync are not missed.
+    static func cursorDate(from date: Date, overlapDays: Int = 1) -> String {
+        let adjusted = date.addingTimeInterval(-Double(overlapDays) * 86400)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: adjusted)
+    }
+
+    // MARK: - Download QSOs and QSL confirmations
+
+    /// Downloads QSO records LoTW has received from this station (qso_qsl=no).
+    /// When `since` (yyyy-MM-dd) is set, only QSOs received by LoTW on or after
+    /// that date are returned (`qso_qsorxsince`); nil fetches the full log.
+    func downloadQSOs(username: String, password: String, since: String? = nil) async throws -> [QSORecord] {
+        var query: [(String, String)] = [("qso_qsl", "no")]
+        if let since {
+            query.append(("qso_qsorxsince", since))
+        }
+        return try await fetchReport(username: username, password: password, query: query)
+    }
+
+    /// Downloads QSL confirmations (qso_qsl=yes). When `since` (yyyy-MM-dd) is
+    /// set, only QSLs issued on or after that date are returned (`qso_qslsince`);
+    /// nil fetches all confirmations.
+    func downloadConfirmations(username: String, password: String, since: String? = nil) async throws -> [QSORecord] {
+        var query: [(String, String)] = [("qso_qsl", "yes")]
+        if let since {
+            query.append(("qso_qslsince", since))
+        }
+        return try await fetchReport(username: username, password: password, query: query)
+    }
+
+    private func fetchReport(username: String, password: String, query: [(String, String)]) async throws -> [QSORecord] {
         var urlStr = "https://lotw.arrl.org/lotwuser/lotwreport.adi?"
-        urlStr += "login=\(username)"
-        urlStr += "&password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password)"
+        urlStr += "login=\(username.formURLEncoded)"
+        urlStr += "&password=\(password.formURLEncoded)"
         urlStr += "&qso_query=1"
-        urlStr += "&qso_qsl=no"
         urlStr += "&qso_qsldetail=yes"
         urlStr += "&qso_mydetail=yes"
 
-        if let since = qsoQDateSince {
-            urlStr += "&qso_qDateSince=\(since)"
+        for (key, value) in query {
+            urlStr += "&\(key)=\(value.formURLEncoded)"
         }
 
         guard let url = URL(string: urlStr) else {
             throw ServiceError.networkError("Invalid URL")
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await session.data(from: url)
 
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
@@ -44,63 +84,29 @@ actor LoTWService {
 
         let parser = ADIFParser()
         let file = try parser.parse(string: content)
-        return parser.recordsToQSOs(file.records)
+        return parser.recordsToQSORecords(file.records)
     }
 
-    // MARK: - Upload QSOs (ADIF)
-    // Note: LoTW normally requires digitally signed ADIF via tqsl.
-    // This provides a basic ADIF upload for stations that have configured tqsl cert on the server side.
-    // For full LoTW integration, users should use tqsl to sign their ADIF files.
-
-    func uploadADIF(username: String, password: String, adifContent: String) async throws -> String {
-        guard let url = URL(string: "https://lotw.arrl.org/lotwuser/upload") else {
-            throw ServiceError.networkError("Invalid URL")
-        }
-
-        let boundary = UUID().uuidString
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"login\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(username)\r\n".data(using: .utf8)!)
-
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"password\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(password)\r\n".data(using: .utf8)!)
-
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"upfile\"; filename=\"hamlog_upload.adi\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
-        body.append(adifContent.data(using: .utf8)!)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-
-        request.httpBody = body
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-            throw ServiceError.serverError("HTTP \(httpResponse.statusCode)")
-        }
-
-        return String(data: data, encoding: .utf8) ?? "Upload completed"
-    }
+    // MARK: - Upload
+    // LoTW only accepts digitally signed logs. Upload therefore goes through
+    // TQSL (see TQSLLauncher on macOS / export-for-TQSL on both platforms),
+    // never through a raw HTTP upload from here.
 
     // MARK: - Verify credentials
 
     func verifyCredentials(username: String, password: String) async throws -> Bool {
+        // Use a far-future qso_qslsince so a valid login returns an
+        // essentially empty report instead of the full log.
         var urlStr = "https://lotw.arrl.org/lotwuser/lotwreport.adi?"
-        urlStr += "login=\(username)"
-        urlStr += "&password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password)"
-        urlStr += "&qso_query=1&qso_qDateSince=29990101"
+        urlStr += "login=\(username.formURLEncoded)"
+        urlStr += "&password=\(password.formURLEncoded)"
+        urlStr += "&qso_query=1&qso_qsl=yes&qso_qslsince=2999-12-31"
 
         guard let url = URL(string: urlStr) else {
             throw ServiceError.networkError("Invalid URL")
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await session.data(from: url)
         guard let content = String(data: data, encoding: .utf8) else {
             throw ServiceError.parseError("Unable to decode response")
         }

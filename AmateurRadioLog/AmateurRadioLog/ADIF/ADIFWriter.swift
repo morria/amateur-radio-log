@@ -2,6 +2,10 @@ import Foundation
 
 final class ADIFWriter {
     func write(qsos: [QSO], stationCallsign: String? = nil) -> String {
+        write(records: qsos.map(QSORecord.init), stationCallsign: stationCallsign)
+    }
+
+    func write(records: [QSORecord], stationCallsign: String? = nil) -> String {
         var output = ""
 
         // Header
@@ -13,8 +17,8 @@ final class ADIFWriter {
         output += "\n<EOH>\n\n"
 
         // Records
-        for qso in qsos {
-            output += writeRecord(qso)
+        for record in records {
+            output += writeRecord(record)
             output += "\n"
         }
 
@@ -28,12 +32,17 @@ final class ADIFWriter {
 
     /// Write a single QSO record without ADIF file header (for API uploads)
     func writeSingleRecord(_ q: QSO) -> String {
-        writeRecord(q)
+        writeRecord(QSORecord(from: q))
+    }
+
+    /// Write a single record without ADIF file header (for API uploads)
+    func writeSingleRecord(_ r: QSORecord) -> String {
+        writeRecord(r)
     }
 
     // MARK: - Private
 
-    private func writeRecord(_ q: QSO) -> String {
+    private func writeRecord(_ q: QSORecord) -> String {
         var fields = ""
 
         fields += adifField("CALL", q.call)
@@ -42,9 +51,9 @@ final class ADIFWriter {
         fields += optField("TIME_OFF", q.timeOff)
         fields += optField("FREQ", q.freq.map { String($0) })
         fields += optField("FREQ_RX", q.freqRx.map { String($0) })
-        fields += optField("BAND", q.band?.rawValue)
-        fields += optField("BAND_RX", q.bandRx?.rawValue)
-        fields += optField("MODE", q.mode?.rawValue)
+        fields += optField("BAND", q.bandRaw)
+        fields += optField("BAND_RX", q.bandRxRaw)
+        fields += optField("MODE", q.modeRaw)
         fields += optField("SUBMODE", q.submode)
         fields += optField("RST_SENT", q.rstSent)
         fields += optField("RST_RCVD", q.rstRcvd)
@@ -72,6 +81,7 @@ final class ADIFWriter {
         fields += optField("EQSL_QSL_SENT", q.eqslQslSent)
         fields += optField("EQSL_QSL_RCVD", q.eqslQslRcvd)
         fields += optField("STATION_CALLSIGN", q.stationCallsign)
+        fields += optField("OPERATOR", q.operatorCallsign)
         fields += optField("MY_GRIDSQUARE", q.myGridsquare)
         fields += optField("MY_CITY", q.myCity)
         fields += optField("MY_STATE", q.myState)
@@ -86,6 +96,8 @@ final class ADIFWriter {
         fields += optField("WWFF_REF", q.wwffRef)
         fields += optField("SIG", q.sig)
         fields += optField("SIG_INFO", q.sigInfo)
+        fields += optField("MY_SIG", q.mySig)
+        fields += optField("MY_SIG_INFO", q.mySigInfo)
         fields += optField("CONTEST_ID", q.contestId)
         fields += optField("SRX", q.srx.map { String($0) })
         fields += optField("STX", q.stx.map { String($0) })
@@ -93,6 +105,9 @@ final class ADIFWriter {
         fields += optField("STX_STRING", q.stxString)
         fields += optField("COMMENT", q.comment)
         fields += optField("NOTES", q.notes)
+
+        // Stable identity so re-imports of our own exports dedupe exactly
+        fields += optField("APP_AMATEURRADIOLOG_UUID", q.uuid?.uuidString)
 
         // Extra fields
         for (key, value) in q.extraFields {
@@ -104,7 +119,8 @@ final class ADIFWriter {
     }
 
     private func adifField(_ name: String, _ value: String) -> String {
-        "<\(name):\(value.count)>\(value) "
+        // ADIF field lengths are counted in bytes (UTF-8), not characters
+        "<\(name):\(value.utf8.count)>\(value) "
     }
 
     private func optField(_ name: String, _ value: String?) -> String {

@@ -6,7 +6,7 @@ struct AmateurRadioLogApp: App {
     @State private var appState = AppState()
 
     let container: ModelContainer = {
-        let schema = Schema([QSO.self, AppSettings.self])
+        let schema = Schema([QSO.self, AppSettings.self, Operation.self, ReplicationEntry.self])
         let config = ModelConfiguration(
             "AmateurRadioLog",
             schema: schema,
@@ -18,6 +18,12 @@ struct AmateurRadioLogApp: App {
             fatalError("Failed to create ModelContainer: \(error)")
         }
     }()
+
+    init() {
+        // Idempotent identity backfill (assign missing uuids, repair
+        // duplicates) on a background context at every launch
+        QSOIdentityBackfill.run(container: container)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -48,6 +54,35 @@ struct AmateurRadioLogApp: App {
                 }
                 .keyboardShortcut("e")
             }
+
+            CommandGroup(after: .textEditing) {
+                Button("Find QSO") {
+                    appState.selectedTab = .log
+                    // Post async so the log tab (and its search field) is
+                    // mounted before the focus request arrives
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .findQSO, object: nil)
+                    }
+                }
+                .keyboardShortcut("f")
+
+                Button("Quick Entry") {
+                    appState.selectedTab = .log
+                    // Post async so the log tab (and the quick-entry bar) is
+                    // mounted before the focus request arrives
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .quickEntryFocus, object: nil)
+                    }
+                }
+                .keyboardShortcut("l")
+            }
+
+            CommandGroup(after: .sidebar) {
+                Button("Show Selected on Map") {
+                    NotificationCenter.default.post(name: .showQSOOnMap, object: nil)
+                }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+            }
         }
         #endif
 
@@ -65,4 +100,6 @@ extension Notification.Name {
     static let newQSO = Notification.Name("newQSO")
     static let importADIF = Notification.Name("importADIF")
     static let exportADIF = Notification.Name("exportADIF")
+    static let findQSO = Notification.Name("findQSO")
+    static let quickEntryFocus = Notification.Name("quickEntryFocus")
 }

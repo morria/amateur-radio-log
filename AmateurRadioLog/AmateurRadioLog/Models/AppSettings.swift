@@ -12,7 +12,61 @@ final class AppSettings {
     var lastFreq: Double?
     var lastPower: Double?
 
+    /// LoTW incremental-sync cursors (yyyy-MM-dd, UTC). nil = full sync.
+    /// Optional so the CloudKit schema migration is safe.
+    var lotwQSORxSince: String?
+    var lotwQSLSince: String?
+
+    /// Last successful sync per provider, shown in the sidebar. Optional so
+    /// the CloudKit schema migration is safe.
+    var lastQRZSync: Date?
+    var lastLoTWSync: Date?
+    var lastHamQTHSync: Date?
+
+    /// DX cluster / RBN telnet spot sources. Non-optional with defaults so
+    /// the CloudKit schema addition is safe (the cluster login identity is
+    /// `stationCallsign`, which is not a secret).
+    var clusterEnabled: Bool = false
+    var clusterHost: String = "dxc.ve7cc.net"
+    var clusterPort: Int = 23
+    var rbnEnabled: Bool = false
+    var rbnMinSNRdB: Int = 10
+    var rbnCQOnly: Bool = true
+
+    /// First-run onboarding finished (or explicitly skipped). Defaulted so
+    /// the CloudKit schema addition is safe; upgraders with a configured
+    /// station callsign are marked complete retroactively on launch.
+    var hasCompletedOnboarding: Bool = false
+
+    /// Active POTA activation session, mirrored here for crash recovery
+    /// (AppState.activationSession is the live copy). All fields nil when
+    /// no activation is in progress. Optionals so the CloudKit schema
+    /// migration is safe.
+    var activationParkRef: String?
+    var activationParkName: String?
+    var activationGrid: String?
+    var activationCallsign: String?
+    var activationStartedAt: Date?
+
     init() {}
+
+    /// Per-install station identifier (UUID string), created on first access.
+    /// Backed by UserDefaults rather than a persisted model field: AppSettings
+    /// syncs via CloudKit, and stationId must stay distinct per device/install
+    /// (it identifies which station logged a QSO, e.g. Field Day multi-op).
+    var stationId: String {
+        AppSettings.installStationId
+    }
+
+    static var installStationId: String {
+        let key = "stationId"
+        if let existing = UserDefaults.standard.string(forKey: key), !existing.isEmpty {
+            return existing
+        }
+        let id = UUID().uuidString
+        UserDefaults.standard.set(id, forKey: key)
+        return id
+    }
 
     /// Fetch the singleton settings record, creating one if needed.
     /// Migrates values from NSUbiquitousKeyValueStore on first creation.

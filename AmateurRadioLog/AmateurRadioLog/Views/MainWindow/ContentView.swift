@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 enum NavigationTab: String, CaseIterable, Identifiable {
     case log = "Log"
     case map = "Map"
+    case spots = "Spots"
     case stats = "Statistics"
 
     var id: String { rawValue }
@@ -13,6 +14,7 @@ enum NavigationTab: String, CaseIterable, Identifiable {
         switch self {
         case .log: return "list.bullet.rectangle"
         case .map: return "map"
+        case .spots: return "dot.radiowaves.left.and.right"
         case .stats: return "chart.bar"
         }
     }
@@ -28,8 +30,22 @@ struct ContentView: View {
     @State private var showingNewQSO = false
     @State private var showingImporter = false
     @State private var showingExportSheet = false
-    @State private var showingSetup = false
+    @State private var showingOnboarding = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+
+    #if os(macOS)
+    // Window undo stack, wired into modelContext so SwiftData registers
+    // deletions/edits with the Edit menu (Cmd-Z).
+    @Environment(\.undoManager) private var undoManager
+    // Delete confirmation (context menu / Delete key): set instead of
+    // deleting immediately; the confirmation dialog below commits it.
+    @State private var pendingDelete: QSO?
+    #else
+    // Swipe-to-delete undo snackbar: snapshot of the just-deleted QSO plus
+    // its auto-dismiss timer.
+    @State private var deletedSnapshot: QSOEditData?
+    @State private var undoDismissTask: Task<Void, Never>?
+    #endif
 
     var body: some View {
         @Bindable var appState = appState
@@ -43,16 +59,13 @@ struct ContentView: View {
             iOSDetailView
                 .toolbar(.hidden, for: .navigationBar)
             #else
-            ZStack {
-                logView
-                    .opacity(appState.selectedTab == .log ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .log)
-                ContactMapView(qsos: allQSOs)
-                    .opacity(appState.selectedTab == .map ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .map)
-                StatsView(qsos: allQSOs)
-                    .opacity(appState.selectedTab == .stats ? 1 : 0)
-                    .allowsHitTesting(appState.selectedTab == .stats)
+            // Only mount the active tab: invisible Map/Stats views would
+            // otherwise recompute on every filter change and @Query update.
+            switch appState.selectedTab {
+            case .log: logView
+            case .map: ContactMapView(qsos: allQSOs)
+            case .spots: SpotListView(allQSOs: allQSOs)
+            case .stats: StatsView(qsos: allQSOs)
             }
             #endif
         }
@@ -71,7 +84,7 @@ struct ContentView: View {
             QSOEditorView(data: data) { updated in
                 appState.saveLastUsed(from: updated)
                 if let id = updated.id,
-                   let qso = allQSOs.first(where: { $0.persistentModelID == id }) {
+                   let qso = modelContext.model(for: id) as? QSO {
                     updated.apply(to: qso)
                 }
             }
@@ -80,16 +93,30 @@ struct ContentView: View {
                        allowedContentTypes: [.plainText, .data],
                        allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first {
-                let accessed = url.startAccessingSecurityScopedResource()
-                appState.importADIF(from: url, context: modelContext)
-                if accessed { url.stopAccessingSecurityScopedResource() }
+                // File is read inside its security scope; parsing and
+                // classification happen off the main actor, then the
+                // preview sheet below asks for confirmation.
+                appState.beginImport(from: url, context: modelContext)
             }
         }
+        .sheet(item: $appState.importPreview) { preview in
+            ImportPreviewSheet(preview: preview)
+        }
         #if os(macOS)
+        // Build the document only while the export sheet is up so body
+        // doesn't read the filter state (searchText etc.) on every keystroke.
         .fileExporter(isPresented: $showingExportSheet,
-                       document: ADIFDocument(qsos: allQSOs),
+                       document: showingExportSheet ? ADIFDocument(qsos: exportQSOs) : nil,
                        contentType: ADIFDocument.adifType,
-                       defaultFilename: "amateur_radio_log.adi") { _ in }
+                       defaultFilename: ADIFDocument.exportFileName(
+                           callsign: appState.settings?.stationCallsign, suffix: "log")) { _ in }
+        #else
+        // iOS: exports go through the share sheet (Files, AirDrop, Mail)
+        // with a temp file written on Export tap.
+        .sheet(item: $shareFile) { file in
+            ShareSheet(items: [file.url])
+                .presentationDetents([.medium, .large])
+        }
         #endif
         .alert("Error", isPresented: Binding(
             get: { appState.errorMessage != nil },
@@ -99,60 +126,77 @@ struct ContentView: View {
         } message: {
             Text(appState.errorMessage ?? "")
         }
-        .sheet(isPresented: $showingSetup) {
-            NavigationStack {
-                #if os(macOS)
-                SettingsView()
-                    .navigationTitle("Welcome to Amateur Radio Log")
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showingSetup = false }
-                        }
-                    }
-                #else
-                Form {
-                    Section("My Station") {
-                        GeneralSettingsView()
-                    }
-                    Section("Defaults") {
-                        GeneralDefaultsView()
-                    }
-                    Section("QRZ.com") {
-                        QRZSettingsView()
-                    }
-                    Section("HamQTH") {
-                        HamQTHSettingsView()
-                    }
-                    Section {
-                        LoTWSettingsView()
-                    } header: {
-                        Text("LoTW")
-                    }
-                }
-                .navigationTitle("Welcome")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { showingSetup = false }
-                    }
-                }
-                #endif
+        .sheet(isPresented: $showingOnboarding, onDismiss: {
+            // Safety net: any exit from onboarding counts as completion so
+            // it can never loop on every launch (e.g. SWL users with no
+            // callsign who dismiss without tapping Done).
+            if let settings = appState.settings, !settings.hasCompletedOnboarding {
+                settings.hasCompletedOnboarding = true
+                try? modelContext.save()
             }
+        }) {
+            OnboardingView { showingOnboarding = false }
+                .interactiveDismissDisabled()
         }
+        #if os(macOS)
+        .confirmationDialog(
+            deleteConfirmationTitle,
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { qso in
+            Button("Delete", role: .destructive) { performDelete(qso) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("The QSO is removed from the log on all your devices. You can undo this with Cmd-Z.")
+        }
+        #endif
         .onAppear {
             let settings = AppSettings.shared(context: modelContext)
             appState.settings = settings
-            if settings.stationCallsign.isEmpty {
-                showingSetup = true
+            #if os(macOS)
+            modelContext.undoManager = undoManager
+            #endif
+            if !settings.stationCallsign.isEmpty && !settings.hasCompletedOnboarding {
+                // Upgrader with a configured station: mark complete
+                // retroactively so onboarding never shows.
+                settings.hasCompletedOnboarding = true
+            }
+            if OnboardingView.shouldPresent(
+                stationCallsign: settings.stationCallsign,
+                hasCompletedOnboarding: settings.hasCompletedOnboarding
+            ) {
+                showingOnboarding = true
             }
         }
+        #if os(macOS)
+        // The environment undo manager can arrive after onAppear (and change
+        // per window); keep the model context pointed at the current one.
+        .onChange(of: undoManager.map(ObjectIdentifier.init)) { _, _ in
+            modelContext.undoManager = undoManager
+        }
+        #endif
         .onChange(of: appState.pendingImportURL) { _, url in
             if let url {
-                let accessed = url.startAccessingSecurityScopedResource()
-                appState.importADIF(from: url, context: modelContext)
-                if accessed { url.stopAccessingSecurityScopedResource() }
+                appState.beginImport(from: url, context: modelContext)
                 appState.pendingImportURL = nil
             }
+        }
+        .onChange(of: appState.exportLogRequested) { _, requested in
+            // Sidebar "Export Log (ADIF)" row.
+            guard requested else { return }
+            appState.exportLogRequested = false
+            beginExport()
+        }
+        .onChange(of: appState.dataRevision) { _, _ in
+            // Background QSOStore saves don't always propagate into the
+            // main-context @Query on iOS 17 — nudge the main context with a
+            // lightweight refetch so `allQSOs` picks up merged/imported rows.
+            modelContext.processPendingChanges()
+            _ = try? modelContext.fetch(FetchDescriptor<QSO>())
         }
         #if os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: .newQSO)) { _ in showingNewQSO = true }
@@ -160,6 +204,50 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .exportADIF)) { _ in showingExportSheet = true }
         #endif
     }
+
+    private var exportQSOs: [QSO] {
+        if appState.selectedTab == .log {
+            return appState.filteredQSOs(from: allQSOs)
+        }
+        return allQSOs.filter { $0.deletedAt == nil }
+    }
+
+    /// Count for the "Export N QSOs" label. Uses the list's maintained
+    /// visible count on the log tab instead of re-running the filter pass
+    /// on every body evaluation.
+    private var exportCount: Int {
+        if appState.selectedTab == .log, let visible = appState.visibleQSOCount {
+            return visible
+        }
+        return allQSOs.count
+    }
+
+    /// Toolbar Export / sidebar "Export Log (ADIF)": save panel on macOS,
+    /// share sheet with a freshly written temp file on iOS.
+    private func beginExport() {
+        #if os(macOS)
+        showingExportSheet = true
+        #else
+        shareFile = writeShareFile(qsos: exportQSOs)
+        #endif
+    }
+
+    #if os(iOS)
+    @State private var shareFile: ShareFile?
+
+    private func writeShareFile(qsos: [QSO]) -> ShareFile? {
+        let name = ADIFDocument.exportFileName(
+            callsign: appState.settings?.stationCallsign, suffix: "log")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        do {
+            try ADIFWriter().write(qsos: qsos).write(to: url, atomically: true, encoding: .utf8)
+            return ShareFile(url: url)
+        } catch {
+            appState.errorMessage = String(localized: "Export failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    #endif
 
     private func newQSOData() -> QSOEditData {
         var data = QSOEditData()
@@ -172,6 +260,7 @@ struct ContentView: View {
 
     #if os(iOS)
     @State private var hasShownMap = false
+    @State private var hasShownSpots = false
     @State private var hasShownStats = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -186,6 +275,11 @@ struct ContentView: View {
                         ContactMapView(qsos: allQSOs)
                             .opacity(appState.selectedTab == .map ? 1 : 0)
                             .allowsHitTesting(appState.selectedTab == .map)
+                    }
+                    if hasShownSpots {
+                        SpotListView(allQSOs: allQSOs)
+                            .opacity(appState.selectedTab == .spots ? 1 : 0)
+                            .allowsHitTesting(appState.selectedTab == .spots)
                     }
                     if hasShownStats {
                         StatsView(qsos: allQSOs)
@@ -210,8 +304,10 @@ struct ContentView: View {
                 .padding(.leading, 12)
             }
         }
+        .overlay(alignment: .bottom) { undoSnackbar }
         .onChange(of: appState.selectedTab) { _, tab in
             if tab == .map { hasShownMap = true }
+            if tab == .spots { hasShownSpots = true }
             if tab == .stats { hasShownStats = true }
         }
     }
@@ -219,12 +315,75 @@ struct ContentView: View {
 
     private var logView: some View {
         QSOLogView(
+            allQSOs: allQSOs,
             selectedQSO: $selectedQSO,
             onEdit: { editData = QSOEditData(from: $0) },
-            onDelete: { modelContext.delete($0); selectedQSO = nil },
+            onDelete: { requestDelete($0) },
             onNew: { showingNewQSO = true }
         )
     }
+
+    // MARK: - Guarded deletion
+
+    /// Entry point for both delete gestures. macOS asks for confirmation
+    /// (context menu clicks are easy to slip on); iOS deletes immediately
+    /// (swipe already has friction) and offers a 5-second Undo snackbar.
+    private func requestDelete(_ qso: QSO) {
+        #if os(macOS)
+        pendingDelete = qso
+        #else
+        let snapshot = QSOEditData(from: qso)
+        performDelete(qso)
+        undoDismissTask?.cancel()
+        withAnimation { deletedSnapshot = snapshot }
+        undoDismissTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            withAnimation { deletedSnapshot = nil }
+        }
+        #endif
+    }
+
+    /// Single funnel for confirmed deletions. Delegates to
+    /// `AppState.deleteQSO`, which tombstones QSOs belonging to the active
+    /// operation and hard-deletes (with an immediate save for CloudKit push)
+    /// otherwise.
+    private func performDelete(_ qso: QSO) {
+        if selectedQSO == qso { selectedQSO = nil }
+        appState.deleteQSO(qso, context: modelContext)
+    }
+
+    #if os(macOS)
+    private var deleteConfirmationTitle: Text {
+        guard let qso = pendingDelete else { return Text(verbatim: "") }
+        return Text("Delete QSO with \(qso.call) on \(ADIFDateFormatter.displayDate(qso.qsoDate))?")
+    }
+    #else
+    /// Bottom "QSO deleted — Undo" capsule. Undo re-inserts a value-type
+    /// snapshot of the deleted QSO (it gets a fresh identity; nothing
+    /// references QSOs by record ID).
+    @ViewBuilder
+    private var undoSnackbar: some View {
+        if let snapshot = deletedSnapshot {
+            HStack(spacing: 16) {
+                Text("QSO deleted")
+                Button("Undo") {
+                    undoDismissTask?.cancel()
+                    modelContext.insert(snapshot.toQSO())
+                    try? modelContext.save()
+                    withAnimation { deletedSnapshot = nil }
+                }
+                .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(.regularMaterial, in: Capsule())
+            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+            .padding(.bottom, 16)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+    #endif
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
@@ -235,11 +394,11 @@ struct ContentView: View {
             Button(action: { showingImporter = true }) {
                 Label("Import", systemImage: "square.and.arrow.down")
             }
-            #if os(macOS)
-            Button(action: { showingExportSheet = true }) {
-                Label("Export", systemImage: "square.and.arrow.up")
+            // "Export N QSOs" makes the filter effect explicit: on the log
+            // tab the current filters apply; elsewhere the full log exports.
+            Button(action: beginExport) {
+                Label("Export \(exportCount) QSOs", systemImage: "square.and.arrow.up")
             }
-            #endif
         }
         #if os(macOS)
         ToolbarItem(placement: .status) {
@@ -257,6 +416,7 @@ struct ContentView: View {
 
 struct QSOLogView: View {
     @Environment(AppState.self) private var appState
+    let allQSOs: [QSO]
     @Binding var selectedQSO: QSO?
     var onEdit: (QSO) -> Void
     var onDelete: (QSO) -> Void
@@ -275,8 +435,29 @@ struct QSOLogView: View {
         VStack(spacing: 0) {
             SearchBarView()
             Divider()
+            // Quick entry: macOS always, iPad regular width only (compact
+            // iPhone keeps the sheet flow).
+            if usesSidePanel {
+                // Defaults follow live WSJT-X rig state when connected,
+                // falling back to the last-used values otherwise.
+                QuickEntryBar(defaultsProvider: { [appState] in
+                    let rig = appState.wsjtxRigState
+                    guard rig.connected else {
+                        return QuickEntryDefaults(
+                            band: appState.lastBand, mode: appState.lastMode,
+                            freq: appState.lastFreq, power: appState.lastPower)
+                    }
+                    return QuickEntryDefaults(
+                        band: rig.band ?? appState.lastBand,
+                        mode: rig.mode ?? appState.lastMode,
+                        freq: rig.dialFrequencyMHz ?? appState.lastFreq,
+                        power: appState.lastPower)
+                })
+                Divider()
+            }
             HStack(spacing: 0) {
                 QSOListView(
+                    allQSOs: allQSOs,
                     selectedQSO: $selectedQSO,
                     showsNavigationLinks: !usesSidePanel,
                     onEdit: onEdit, onDelete: onDelete)
@@ -339,19 +520,47 @@ struct QSOLogView: View {
 
 // MARK: - ADIF Document
 
+// Holds Sendable QSORecord DTOs (converted from the models at construction,
+// which only happens while the export sheet is up), so the document is
+// genuinely Sendable under strict concurrency.
 struct ADIFDocument: FileDocument {
     static let adifType = UTType("com.amateurradiolog.adif") ?? UTType(filenameExtension: "adi", conformingTo: .plainText) ?? .plainText
     static var readableContentTypes: [UTType] { [adifType, .plainText] }
     static var writableContentTypes: [UTType] { [adifType] }
-    var content: String
+
+    // Serialization is deferred to fileWrapper() so constructing the
+    // document (which happens during body evaluation) stays cheap.
+    var records: [QSORecord]
 
     init(qsos: [QSO]) {
-        self.content = ADIFWriter().write(qsos: qsos)
+        records = qsos.map(QSORecord.init)
     }
 
-    init(configuration: ReadConfiguration) throws { content = "" }
+    /// Pre-converted records (e.g. the LoTW un-uploaded slice fetched off
+    /// the main actor).
+    init(records: [QSORecord]) {
+        self.records = records
+    }
+
+    init(configuration: ReadConfiguration) throws { records = [] }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: content.data(using: .utf8) ?? Data())
+        let content = ADIFWriter().write(records: records)
+        return FileWrapper(regularFileWithContents: content.data(using: .utf8) ?? Data())
+    }
+
+    /// "<CALLSIGN>-<suffix>-<yyyyMMdd>.adi" (e.g. "W2ASM-log-20260704.adi");
+    /// just "<suffix>-<yyyyMMdd>.adi" when no station callsign is configured.
+    static func exportFileName(callsign: String?, suffix: String, date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyyMMdd"
+        let cleaned = (callsign ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+            .replacingOccurrences(of: "/", with: "-")
+        let base = cleaned.isEmpty ? suffix : "\(cleaned)-\(suffix)"
+        return "\(base)-\(formatter.string(from: date)).adi"
     }
 }

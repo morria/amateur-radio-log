@@ -5,16 +5,24 @@ import UniformTypeIdentifiers
 struct POTAExportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \QSO.qsoDate, order: .reverse) private var allQSOs: [QSO]
+    @Query private var allSettings: [AppSettings]
 
     @State private var parkReference = ""
     @State private var activationDate = Date()
     @State private var showExporter = false
     @State private var exportContent = ""
     @State private var exportFilename = "pota.adi"
+    @State private var matchingQSOs: [QSO] = []
+
+    /// Standalone export: empty park, today's date. "End Activation" passes
+    /// the session's park and start date to prefill the sheet.
+    init(prefillPark: String = "", prefillDate: Date = Date()) {
+        _parkReference = State(initialValue: prefillPark.uppercased())
+        _activationDate = State(initialValue: prefillDate)
+    }
 
     private var stationCallsign: String {
-        NSUbiquitousKeyValueStore.default.string(forKey: "stationCallsign") ?? ""
+        allSettings.first?.stationCallsign ?? ""
     }
 
     private var dateString: String {
@@ -22,10 +30,6 @@ struct POTAExportSheet: View {
         f.dateFormat = "yyyyMMdd"
         f.timeZone = TimeZone(identifier: "UTC")
         return f.string(from: activationDate)
-    }
-
-    private var matchingQSOs: [QSO] {
-        allQSOs.filter { $0.qsoDate == dateString }
     }
 
     var body: some View {
@@ -103,6 +107,13 @@ struct POTAExportSheet: View {
                         .disabled(parkReference.isEmpty || matchingQSOs.isEmpty)
                 }
             }
+            .onAppear(perform: refreshMatchingQSOs)
+            .onChange(of: activationDate) { _, _ in
+                refreshMatchingQSOs()
+            }
+            .onChange(of: parkReference) { _, _ in
+                refreshMatchingQSOs()
+            }
             .fileExporter(
                 isPresented: $showExporter,
                 document: POTADocument(content: exportContent),
@@ -114,6 +125,27 @@ struct POTAExportSheet: View {
                 }
             }
         }
+    }
+
+    /// QSOs on the activation date. When a park is set, QSOs explicitly
+    /// stamped for a *different* park (a second activation the same day)
+    /// are excluded; unstamped QSOs stay in and get the park injected at
+    /// export time.
+    private func refreshMatchingQSOs() {
+        let dateStr = dateString
+        let descriptor = FetchDescriptor<QSO>(
+            predicate: #Predicate { $0.qsoDate == dateStr },
+            sortBy: [SortDescriptor(\.timeOn)]
+        )
+        var qsos = (try? modelContext.fetch(descriptor)) ?? []
+        let park = parkReference.trimmingCharacters(in: .whitespaces)
+        if !park.isEmpty {
+            qsos = qsos.filter { qso in
+                guard let info = qso.mySigInfo, !info.isEmpty else { return true }
+                return info.caseInsensitiveCompare(park) == .orderedSame
+            }
+        }
+        matchingQSOs = qsos
     }
 
     private func prepareExport() {
@@ -129,19 +161,27 @@ struct POTAExportSheet: View {
         output += "\r\n<EOH>\r\n\r\n"
 
         for qso in matchingQSOs {
-            var record = writer.writeSingleRecord(qso)
+            var record = QSORecord(from: qso)
+            // Hoist legacy MY_SIG/MY_SIG_INFO stored as overflow fields
+            // (imports predating the dedicated columns) so they aren't
+            // written twice.
+            if let legacy = record.extraFields.removeValue(forKey: "MY_SIG"),
+               (record.mySig ?? "").isEmpty {
+                record.mySig = legacy
+            }
+            if let legacy = record.extraFields.removeValue(forKey: "MY_SIG_INFO"),
+               (record.mySigInfo ?? "").isEmpty {
+                record.mySigInfo = legacy
+            }
             // Ensure POTA fields are present
-            if !record.contains("<MY_SIG:") {
-                record = record.replacingOccurrences(of: "<EOR>", with: "<MY_SIG:4>POTA <EOR>")
-            }
-            if !record.contains("<MY_SIG_INFO:") {
-                record = record.replacingOccurrences(of: "<EOR>", with: "<MY_SIG_INFO:\(park.count)>\(park) <EOR>")
-            }
-            if !record.contains("<STATION_CALLSIGN:") && !callsign.isEmpty {
-                record = record.replacingOccurrences(of: "<EOR>", with: "<STATION_CALLSIGN:\(callsign.count)>\(callsign) <EOR>")
+            if (record.mySig ?? "").isEmpty { record.mySig = "POTA" }
+            if (record.mySigInfo ?? "").isEmpty { record.mySigInfo = park }
+            if (record.stationCallsign ?? "").isEmpty && !callsign.isEmpty {
+                record.stationCallsign = callsign
             }
             // Use CRLF line endings per POTA requirements
-            output += record.replacingOccurrences(of: "\n", with: "\r\n")
+            output += writer.writeSingleRecord(record)
+                .replacingOccurrences(of: "\n", with: "\r\n")
             output += "\r\n"
         }
 

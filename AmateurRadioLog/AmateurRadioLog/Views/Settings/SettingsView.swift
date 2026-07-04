@@ -13,8 +13,12 @@ struct SettingsView: View {
                 .tabItem { Label("HamQTH", systemImage: "globe") }
             LoTWSettingsView()
                 .tabItem { Label("LoTW", systemImage: "checkmark.seal") }
+            WSJTXSettingsView()
+                .tabItem { Label("WSJT-X", systemImage: "dot.radiowaves.left.and.right") }
+            SpotsSettingsView()
+                .tabItem { Label("Spots", systemImage: "dot.radiowaves.up.forward") }
         }
-        .frame(width: 450, height: 300)
+        .frame(width: 450, height: 340)
         #else
         Form {
             Section("My Station") {
@@ -35,6 +39,20 @@ struct SettingsView: View {
                 Text("LoTW")
             } footer: {
                 Text("LoTW upload requires digitally signed ADIF files via TQSL. Download of QSL confirmations works with these credentials.")
+            }
+            Section {
+                WSJTXSettingsView()
+            } header: {
+                Text("WSJT-X")
+            } footer: {
+                Text("In WSJT-X, open Settings \u{2192} Reporting and set \u{201C}UDP Server\u{201D} to this device's IP address (both devices must be on the same network). Contacts you log in WSJT-X appear here automatically.")
+            }
+            Section {
+                SpotsSettingsView()
+            } header: {
+                Text("DX Cluster & RBN")
+            } footer: {
+                Text("Live DX spots on the Spots tab. Cluster login uses your station callsign. The Reverse Beacon Network is high-volume; spots below the minimum SNR are dropped, and repeats of the same station on a band are suppressed.")
             }
         }
         #endif
@@ -371,6 +389,7 @@ struct HamQTHSettingsView: View {
 // MARK: - LoTW Settings
 
 struct LoTWSettingsView: View {
+    @Query private var allSettings: [AppSettings]
     @State private var username = ""
     @State private var password = ""
     @State private var status = ""
@@ -400,6 +419,9 @@ struct LoTWSettingsView: View {
 
                     Button("Save") { save() }
                 }
+
+                Button("Full LoTW Resync") { resetSyncCursors() }
+                    .help("Clears the incremental sync cursors so the next LoTW sync downloads your full log")
 
                 if !status.isEmpty {
                     Text(status)
@@ -446,6 +468,8 @@ struct LoTWSettingsView: View {
 
             Button("Save Credentials") { save() }
 
+            Button("Full LoTW Resync") { resetSyncCursors() }
+
             if !status.isEmpty {
                 Text(status)
                     .font(.caption)
@@ -454,6 +478,15 @@ struct LoTWSettingsView: View {
         }
     }
     #endif
+
+    /// Clears the incremental-sync cursors so the next LoTW sync fetches the full log.
+    private func resetSyncCursors() {
+        guard let settings = allSettings.first else { return }
+        settings.lotwQSORxSince = nil
+        settings.lotwQSLSince = nil
+        status = String(localized: "Next LoTW sync will download the full log")
+        statusIsError = false
+    }
 
     private func load() {
         let creds = KeychainManager.loadCredentials(for: .lotw)
@@ -490,5 +523,119 @@ struct LoTWSettingsView: View {
             statusIsError = true
         }
         isTesting = false
+    }
+}
+
+// MARK: - WSJT-X Settings
+
+/// WSJT-X UDP listener preferences. Stored in UserDefaults (per device),
+/// not AppSettings/CloudKit — see `WSJTXPreferences`. Changing the toggle
+/// applies immediately; port/multicast changes apply on submit.
+struct WSJTXSettingsView: View {
+    @Environment(AppState.self) private var appState
+    @AppStorage(WSJTXPreferences.enabledKey) private var enabled = false
+    @AppStorage(WSJTXPreferences.portKey) private var port = WSJTXPreferences.defaultPort
+    #if os(macOS)
+    @AppStorage(WSJTXPreferences.multicastGroupKey) private var multicastGroup = ""
+    #endif
+
+    var body: some View {
+        #if os(macOS)
+        Form {
+            Section("WSJT-X Auto-Logging") {
+                Toggle("Listen for WSJT-X", isOn: $enabled)
+                TextField("UDP Port", value: $port, format: .number.grouping(.never))
+                    .onSubmit { applyChanges() }
+                TextField("Multicast Group (optional)", text: $multicastGroup,
+                          prompt: Text(verbatim: "239.255.0.0"))
+                    .onSubmit { applyChanges() }
+            }
+            Section {
+                Text("Contacts logged in WSJT-X are added automatically, and the quick-entry bar follows the rig's frequency and mode. WSJT-X's default UDP port is 2237. Set a multicast group here (and the same one in WSJT-X's \u{201C}UDP Server\u{201D} field) to share the port with GridTracker or JTAlert.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .onChange(of: enabled) { _, _ in applyChanges() }
+        #else
+        // No multicast field on iOS: com.apple.developer.networking.multicast
+        // requires special Apple approval, so iOS is unicast-only.
+        Toggle("Listen for WSJT-X", isOn: $enabled)
+            .onChange(of: enabled) { _, _ in applyChanges() }
+        TextField("UDP Port", value: $port, format: .number.grouping(.never))
+            .keyboardType(.numberPad)
+            .onSubmit { applyChanges() }
+        #endif
+    }
+
+    private func applyChanges() {
+        // Normalize an out-of-range port back to the WSJT-X default.
+        if !(1...65535).contains(port) { port = WSJTXPreferences.defaultPort }
+        appState.restartWSJTX()
+    }
+}
+
+// MARK: - Spots (DX Cluster / RBN) Settings
+
+/// DX cluster and RBN telnet feed preferences. Stored on AppSettings
+/// (CloudKit-synced, defaulted fields). Changes apply the next time the
+/// Spots tab starts polling — AppState rebuilds the providers when the
+/// config signature changes. RBN defaults to off (it is a firehose,
+/// especially on cellular).
+struct SpotsSettingsView: View {
+    @Query private var allSettings: [AppSettings]
+
+    var body: some View {
+        if let settings = allSettings.first {
+            @Bindable var s = settings
+            #if os(macOS)
+            Form {
+                Section("DX Cluster") {
+                    Toggle("Connect to DX cluster", isOn: $s.clusterEnabled)
+                    TextField("Host", text: $s.clusterHost,
+                              prompt: Text(verbatim: "dxc.ve7cc.net"))
+                        .disabled(!s.clusterEnabled)
+                    TextField("Port", value: $s.clusterPort,
+                              format: .number.grouping(.never))
+                        .disabled(!s.clusterEnabled)
+                }
+                Section("Reverse Beacon Network") {
+                    Toggle("Connect to RBN (CW/RTTY)", isOn: $s.rbnEnabled)
+                    Stepper(value: $s.rbnMinSNRdB, in: 0...40) {
+                        Text("Minimum SNR: \(s.rbnMinSNRdB) dB")
+                    }
+                    .disabled(!s.rbnEnabled)
+                    Toggle("CQ spots only", isOn: $s.rbnCQOnly)
+                        .disabled(!s.rbnEnabled)
+                }
+                Section {
+                    Text("Cluster login uses your station callsign (General tab). RBN is high-volume: spots below the minimum SNR are dropped and repeats of the same station on a band are suppressed.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+            #else
+            Toggle("Connect to DX Cluster", isOn: $s.clusterEnabled)
+            TextField("Cluster Host", text: $s.clusterHost,
+                      prompt: Text(verbatim: "dxc.ve7cc.net"))
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                .disabled(!s.clusterEnabled)
+            TextField("Cluster Port", value: $s.clusterPort,
+                      format: .number.grouping(.never))
+                .keyboardType(.numberPad)
+                .disabled(!s.clusterEnabled)
+            Toggle("Connect to RBN (CW/RTTY)", isOn: $s.rbnEnabled)
+            Stepper(value: $s.rbnMinSNRdB, in: 0...40) {
+                Text("Minimum SNR: \(s.rbnMinSNRdB) dB")
+            }
+            .disabled(!s.rbnEnabled)
+            Toggle("CQ Spots Only", isOn: $s.rbnCQOnly)
+                .disabled(!s.rbnEnabled)
+            #endif
+        }
     }
 }
