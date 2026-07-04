@@ -63,13 +63,20 @@ struct QSOEditorView: View {
                 }
             }
             .onAppear {
+                // Live rig beats the generic last-used prefill for a brand
+                // new QSO (see applyRigPrefill for the "don't clobber a
+                // spot's real frequency" rule).
+                if data.isNew, appState.rigState.connected {
+                    applyRigPrefill()
+                }
                 // Pre-fill (still editable) operator from settings for new QSOs
                 if data.isNew, data.operatorCallsign?.isEmpty != false,
                    let callsign = appState.settings?.stationCallsign, !callsign.isEmpty {
                     data.operatorCallsign = callsign
                 }
-                // Mode is often pre-filled (last-used) before the sheet opens,
-                // so the mode onChange never fires — prefill RST here too.
+                // Mode is often pre-filled (last-used, or just now from the
+                // rig) before the sheet opens, so the mode onChange never
+                // fires — prefill RST here too.
                 if data.isNew {
                     prefillRST(for: data.mode)
                 }
@@ -143,6 +150,16 @@ struct QSOEditorView: View {
 
     private var frequencySection: some View {
         Section("Frequency & Mode") {
+            if data.isNew, appState.rigState.connected {
+                Button {
+                    refreshFromRig()
+                } label: {
+                    Label("From Rig", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .buttonStyle(.bordered)
+                .help("Re-read frequency and mode from the connected rig")
+            }
+
             Picker("Band", selection: $data.band) {
                 Text("—").tag(nil as Band?)
                 ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
@@ -294,6 +311,36 @@ struct QSOEditorView: View {
     }
 
     // MARK: - Helpers
+
+    /// Initial rig prefill for a brand-new QSO: swaps the generic
+    /// last-used band/freq/mode for the live rig reading, but only for
+    /// fields that still hold the generic last-used value (or nil) — a
+    /// spot-derived freq/band (logging a DX spot) is a deliberate value and
+    /// is left alone. Runs once, from onAppear; never touches the fields
+    /// again afterward except via the explicit "From Rig" button.
+    private func applyRigPrefill() {
+        let rig = appState.rigState
+        if data.freq == nil || data.freq == appState.lastFreq, let freq = rig.frequencyMHz {
+            data.freq = freq
+        }
+        if data.band == nil || data.band == appState.lastBand, let band = rig.band {
+            data.band = band
+        }
+        if data.mode == nil || data.mode == appState.lastMode, let mode = rig.mode {
+            data.mode = mode
+        }
+    }
+
+    /// "From Rig" button: unconditionally re-reads the current rig state,
+    /// overwriting whatever is in the Frequency & Mode section right now.
+    /// Unlike `applyRigPrefill`, this is an explicit user action, so it's
+    /// fine to overwrite values the user (or a spot) already set.
+    private func refreshFromRig() {
+        let rig = appState.rigState
+        if let freq = rig.frequencyMHz { data.freq = freq }
+        if let band = rig.band { data.band = band }
+        if let mode = rig.mode { data.mode = mode }
+    }
 
     /// Fill empty RST fields with the mode's conventional default
     /// (shared with the quick-entry bar via QuickEntryParser.defaultRST).

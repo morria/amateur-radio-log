@@ -15,6 +15,8 @@ struct SettingsView: View {
                 .tabItem { Label("LoTW", systemImage: "checkmark.seal") }
             WSJTXSettingsView()
                 .tabItem { Label("WSJT-X", systemImage: "dot.radiowaves.left.and.right") }
+            RigSettingsView()
+                .tabItem { Label("Rig Control", systemImage: "radio") }
             SpotsSettingsView()
                 .tabItem { Label("Spots", systemImage: "dot.radiowaves.up.forward") }
         }
@@ -46,6 +48,13 @@ struct SettingsView: View {
                 Text("WSJT-X")
             } footer: {
                 Text("In WSJT-X, open Settings \u{2192} Reporting and set \u{201C}UDP Server\u{201D} to this device's IP address (both devices must be on the same network). Contacts you log in WSJT-X appear here automatically.")
+            }
+            Section {
+                RigSettingsView()
+            } header: {
+                Text("Rig Control")
+            } footer: {
+                Text("Reads frequency and mode read-only from rigctld (Hamlib) or FLRig over the network \u{2014} no commands are ever sent to the radio. Host and port are stored on this device only, so an iPad pointed at the shack Mac won't be overwritten by the Mac's own loopback setting.")
             }
             Section {
                 SpotsSettingsView()
@@ -573,6 +582,161 @@ struct WSJTXSettingsView: View {
         // Normalize an out-of-range port back to the WSJT-X default.
         if !(1...65535).contains(port) { port = WSJTXPreferences.defaultPort }
         appState.restartWSJTX()
+    }
+}
+
+// MARK: - Rig Control Settings
+
+/// CAT rig control preferences (rigctld/FLRig network polling). Stored in
+/// UserDefaults (per device) via `RigPreferences` — not AppSettings/CloudKit,
+/// since which host a device polls is machine-local (see `RigPreferences`'s
+/// doc comment). Enable/protocol changes apply immediately; host/port apply
+/// on submit. "Test Connection" runs a one-shot probe on a throwaway
+/// `RigService` instance, independent of the live poller.
+struct RigSettingsView: View {
+    @Environment(AppState.self) private var appState
+    @AppStorage(RigPreferences.enabledKey) private var enabled = false
+    @AppStorage(RigPreferences.protocolKey) private var protocolRaw = RigProtocolChoice.rigctld.rawValue
+    @AppStorage(RigPreferences.hostKey) private var host = ""
+    @AppStorage(RigPreferences.portKey) private var port = RigProtocolChoice.rigctld.defaultPort
+    @State private var status = ""
+    @State private var statusIsError = false
+    @State private var isTesting = false
+
+    private var rigProtocol: RigProtocolChoice {
+        RigProtocolChoice(rawValue: protocolRaw) ?? .rigctld
+    }
+
+    var body: some View {
+        #if os(macOS)
+        Form {
+            Section("CAT Rig Control") {
+                Toggle("Enable rig control", isOn: $enabled)
+                Picker("Protocol", selection: $protocolRaw) {
+                    ForEach(RigProtocolChoice.allCases) { choice in
+                        Text(choice.displayName).tag(choice.rawValue)
+                    }
+                }
+                .onChange(of: protocolRaw) { oldValue, newValue in
+                    adjustPortForProtocolChange(from: oldValue, to: newValue)
+                    applyChanges()
+                }
+                TextField("Host", text: $host, prompt: Text(verbatim: RigPreferences.defaultHost))
+                    .onSubmit { applyChanges() }
+                TextField("Port", value: $port, format: .number.grouping(.never))
+                    .onSubmit { applyChanges() }
+            }
+            Section {
+                HStack {
+                    Button("Test Connection") {
+                        Task { await testConnection() }
+                    }
+                    .disabled(isTesting)
+
+                    if isTesting {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+
+                if !status.isEmpty {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(statusIsError ? .red : .green)
+                }
+
+                Text("Read-only: frequency and mode are polled once a second while connected; no commands are ever sent to the radio.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .onChange(of: enabled) { _, _ in applyChanges() }
+        #else
+        Toggle("Enable Rig Control", isOn: $enabled)
+            .onChange(of: enabled) { _, _ in applyChanges() }
+        Picker("Protocol", selection: $protocolRaw) {
+            ForEach(RigProtocolChoice.allCases) { choice in
+                Text(choice.displayName).tag(choice.rawValue)
+            }
+        }
+        .onChange(of: protocolRaw) { oldValue, newValue in
+            adjustPortForProtocolChange(from: oldValue, to: newValue)
+            applyChanges()
+        }
+        TextField("Host", text: $host, prompt: Text(verbatim: RigPreferences.defaultHost))
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .keyboardType(.URL)
+            .onSubmit { applyChanges() }
+        TextField("Port", value: $port, format: .number.grouping(.never))
+            .keyboardType(.numberPad)
+            .onSubmit { applyChanges() }
+
+        rigTestConnectionActions
+        #endif
+    }
+
+    #if os(iOS)
+    private var rigTestConnectionActions: some View {
+        Group {
+            Button {
+                Task { await testConnection() }
+            } label: {
+                HStack {
+                    Text("Test Connection")
+                    Spacer()
+                    if isTesting {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            }
+            .disabled(isTesting)
+
+            if !status.isEmpty {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(statusIsError ? .red : .green)
+            }
+        }
+    }
+    #endif
+
+    /// When the user hasn't customized the port (it still matches the
+    /// previous protocol's default), follow the new protocol's default too
+    /// — rigctld's 4532 and FLRig's 12345 otherwise silently fail.
+    private func adjustPortForProtocolChange(from oldValue: String, to newValue: String) {
+        let old = RigProtocolChoice(rawValue: oldValue) ?? .rigctld
+        let new = RigProtocolChoice(rawValue: newValue) ?? .rigctld
+        if port == old.defaultPort { port = new.defaultPort }
+    }
+
+    private func applyChanges() {
+        if !(1...65535).contains(port) { port = rigProtocol.defaultPort }
+        appState.restartRig()
+    }
+
+    private func testConnection() async {
+        isTesting = true
+        status = ""
+        let service = RigService()
+        do {
+            let reading = try await service.probe(configuration: RigPreferences.configuration)
+            var parts: [String] = []
+            if let freq = reading.frequencyMHz {
+                parts.append(String(format: "%.4f MHz", freq))
+            }
+            if let mode = reading.rigModeName {
+                parts.append(mode)
+            }
+            status = parts.isEmpty
+                ? String(localized: "Connected, but no reading was returned")
+                : String(localized: "Success! \(parts.joined(separator: " "))")
+            statusIsError = false
+        } catch {
+            status = String(localized: "Failed: \(error.localizedDescription)")
+            statusIsError = true
+        }
+        isTesting = false
     }
 }
 

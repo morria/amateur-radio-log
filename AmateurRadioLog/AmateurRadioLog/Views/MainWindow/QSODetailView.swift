@@ -110,6 +110,7 @@ struct QSODetailView: View {
                     DetailRow(label: "RST Rcvd", value: qso.rstRcvd)
                     DetailRow(label: "Power", value: qso.txPower.map { "\($0)W" })
                     DetailRow(label: "Propagation", value: qso.propMode)
+                    DetailRow(label: "Distance", value: distanceBearingText)
                 }
 
                 // QSL Status
@@ -171,6 +172,19 @@ struct QSODetailView: View {
             hasQRZ = !KeychainManager.loadCredentials(for: .qrz).isEmpty
             hasHamQTH = !KeychainManager.loadCredentials(for: .hamqth).isEmpty
         }
+    }
+
+    /// "8,432 km · 47°" from myGridsquare to this QSO's coordinates, or nil
+    /// if either is unavailable.
+    private var distanceBearingText: String? {
+        guard let myGrid = appState.settings?.myGridsquare, !myGrid.isEmpty,
+              let myCoord = MaidenheadConverter.toCoordinate(grid: myGrid),
+              let qsoCoord = qso.coordinate else { return nil }
+        let km = GeoMath.distanceKm(from: myCoord, to: qsoCoord)
+        let bearing = GeoMath.initialBearing(from: myCoord, to: qsoCoord)
+        let formattedKm = km.formatted(.number.precision(.fractionLength(0)))
+        let formattedBearing = bearing.formatted(.number.precision(.fractionLength(0)))
+        return "\(formattedKm) km · \(formattedBearing)°"
     }
 
     @ViewBuilder

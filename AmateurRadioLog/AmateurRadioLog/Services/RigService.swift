@@ -133,7 +133,12 @@ enum RigModeMapper {
 /// tolerated as well.
 enum RigctldReplyParser {
     private static func lines(_ reply: String) -> [String] {
-        reply.split(whereSeparator: { $0 == "\n" || $0 == "\r" })
+        // Normalize CRLF first: Swift treats "\r\n" as a single Character
+        // (extended grapheme cluster), so splitting on individual "\n"/"\r"
+        // characters would never match it and a CRLF-terminated reply
+        // (some Windows-hosted rigctld proxies) would collapse into one line.
+        reply.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(whereSeparator: { $0 == "\n" || $0 == "\r" })
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
     }

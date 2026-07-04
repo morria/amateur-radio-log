@@ -88,17 +88,28 @@ enum MapPalette {
         ("S3-S4", skyBlue), ("S1-S2 (Weak)", blue), ("Unknown", gray)
     ]
 
-    /// Index into `snr` for an RST-received string.
+    /// Index into `snr` for a raw RST-received string, via the shared
+    /// `SignalReport` parser (so the map agrees with stats on what a report
+    /// means). dB reports (FT8/FT4) are bucketed by strength as well, using
+    /// the same -20/-10/0 dBSNR breakpoints as StatsSummary's dB buckets
+    /// mapped onto the classic S-unit ramp.
     static func snrBucketIndex(_ rst: String) -> Int {
-        guard rst.count >= 2, let s = Int(String(rst.dropFirst().prefix(1))) else {
+        switch SignalReport.parse(rst) {
+        case .rst(_, let s):
+            switch s {
+            case 9: return 0
+            case 7...8: return 1
+            case 5...6: return 2
+            case 3...4: return 3
+            default: return 4
+            }
+        case .db(let value):
+            if value > 0 { return 0 }
+            if value >= -9 { return 1 }
+            if value >= -19 { return 3 }
+            return 4
+        case nil:
             return snr.count - 1  // Unknown
-        }
-        switch s {
-        case 9: return 0
-        case 7...8: return 1
-        case 5...6: return 2
-        case 3...4: return 3
-        default: return 4
         }
     }
 
@@ -591,6 +602,9 @@ struct ContactMapView: View {
             if let name = qso.name { Text(name).font(.caption) }
             if let country = qso.country { Text(country).font(.caption).foregroundStyle(.secondary) }
             if let grid = qso.gridsquare { Text("Grid: \(grid)").font(.caption).foregroundStyle(.secondary) }
+            if let distance = distanceBearingText(for: qso) {
+                Text(distance).font(.caption).foregroundStyle(.secondary)
+            }
             if let comment = qso.comment, !comment.isEmpty {
                 Text(comment).font(.caption2).foregroundStyle(.secondary).italic()
             }
@@ -598,6 +612,19 @@ struct ContactMapView: View {
         .padding(8)
         .background(.quaternary.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    /// "8,432 km · 47°" from my station's grid square to the QSO's
+    /// coordinates, or nil if either is unavailable.
+    private func distanceBearingText(for qso: QSO) -> String? {
+        guard let myGrid = appState.settings?.myGridsquare, !myGrid.isEmpty,
+              let myCoord = MaidenheadConverter.toCoordinate(grid: myGrid),
+              let qsoCoord = qso.coordinate else { return nil }
+        let km = GeoMath.distanceKm(from: myCoord, to: qsoCoord)
+        let bearing = GeoMath.initialBearing(from: myCoord, to: qsoCoord)
+        let formattedKm = km.formatted(.number.precision(.fractionLength(0)))
+        let formattedBearing = bearing.formatted(.number.precision(.fractionLength(0)))
+        return "\(formattedKm) km · \(formattedBearing)°"
     }
 
     // MARK: - Map Style

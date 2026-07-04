@@ -15,6 +15,11 @@ struct StatsView: View {
     // of once per chart per render
     @State private var summary = StatsSummary()
 
+    // DXCC/WAS/WAZ award progress (see AwardEngine). Kept separate from
+    // StatsSummary since it isn't affected by the band/mode/time-range
+    // filters above — award progress is always computed over the whole log.
+    @State private var awardEngine = AwardEngine(qsos: [])
+
     private struct SummaryKey: Hashable {
         var count: Int
         var band: Band?
@@ -31,6 +36,19 @@ struct StatsView: View {
                    revision: appState.dataRevision)
     }
 
+    /// Award progress only needs recomputing when the QSO set actually
+    /// changes shape (count) or content (most recent edit timestamp) —
+    /// cheaper than a full StatsSummary key since there's no band/mode/time
+    /// filter to track.
+    private struct AwardsKey: Hashable {
+        var count: Int
+        var latestUpdate: Date?
+    }
+
+    private var awardsKey: AwardsKey {
+        AwardsKey(count: qsos.count, latestUpdate: qsos.map(\.updatedAt).max())
+    }
+
     private func refreshSummary() {
         summary = StatsSummary.compute(
             qsos: qsos,
@@ -40,6 +58,10 @@ struct StatsView: View {
             myGridsquare: appState.settings?.myGridsquare,
             operationId: appState.filterOperationId
         )
+    }
+
+    private func refreshAwards() {
+        awardEngine = AwardEngine(qsos: qsos)
     }
 
     // MARK: - Body
@@ -189,7 +211,10 @@ struct StatsView: View {
                             recordRow(label: "Lowest SNR", detail: qso.rstRcvd ?? "", qso: qso)
                         }
                         if let qso = summary.furthestQSO {
-                            recordRow(label: "Furthest QSO", detail: qso.country ?? qso.gridsquare ?? "", qso: qso)
+                            let place = qso.country ?? qso.gridsquare ?? ""
+                            let kmText = summary.furthestQSODistanceKm.map { "\($0.formatted(.number.precision(.fractionLength(0)))) km" }
+                            let detail = [place.isEmpty ? nil : place, kmText].compactMap { $0 }.joined(separator: " · ")
+                            recordRow(label: "Furthest QSO", detail: detail, qso: qso)
                         }
                     }
                     .padding(.vertical, 4)
@@ -287,10 +312,139 @@ struct StatsView: View {
                         .padding(.vertical, 4)
                     }
                 }
+
+                Divider()
+                awardsSection
             }
             .padding()
         }
         .task(id: summaryKey) { refreshSummary() }
+        .task(id: awardsKey) { refreshAwards() }
+    }
+
+    // MARK: - Awards (DXCC / WAS / WAZ)
+
+    private var awardsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Awards").font(.title2).bold()
+            awardsDXCCBox
+            awardsWASBox
+            awardsWAZBox
+        }
+    }
+
+    private var awardsDXCCBox: some View {
+        let rows = awardEngine.dxccProgressByBandMode
+        return GroupBox("DXCC (\(awardEngine.dxccWorkedCount()) worked / \(awardEngine.dxccConfirmedCount()) confirmed)") {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(rows) { progress in
+                    awardProgressRow(title: awardTitle(for: progress.slice),
+                                      worked: progress.worked,
+                                      confirmed: progress.confirmed) {
+                        // Band+mode-group cells reuse the existing band/mode
+                        // filters; a mode group other than CW covers several
+                        // Mode values, so only the band filter is applied
+                        // for those (no new filter plumbing per spec).
+                        if progress.slice.modeGroup == .cw {
+                            appState.showLogFiltered(band: progress.slice.band, mode: .cw)
+                        } else {
+                            appState.showLogFiltered(band: progress.slice.band)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var awardsWASBox: some View {
+        let statuses = awardEngine.wasStatuses()
+        let confirmedCount = statuses.filter(\.confirmed).count
+        return GroupBox("WAS (\(confirmedCount)/50 confirmed)") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 4) {
+                ForEach(statuses) { status in
+                    Button(action: { appState.showLogFiltered(state: status.state) }) {
+                        Text(status.state)
+                            .font(.system(.caption, design: .monospaced))
+                            .bold()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .background(awardColor(worked: status.worked, confirmed: status.confirmed))
+                            .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var awardsWAZBox: some View {
+        let statuses = awardEngine.wazStatuses()
+        let confirmedCount = statuses.filter(\.confirmed).count
+        return GroupBox("WAZ (\(confirmedCount)/40 confirmed)") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 4) {
+                ForEach(statuses) { status in
+                    Button(action: { appState.showLogFiltered(cqZone: status.zone) }) {
+                        Text("\(status.zone)")
+                            .font(.system(.caption, design: .monospaced))
+                            .bold()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .background(awardColor(worked: status.worked, confirmed: status.confirmed))
+                            .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func awardTitle(for slice: AwardEngine.Slice) -> String {
+        switch (slice.band, slice.modeGroup) {
+        case (nil, nil):
+            return "All Bands / All Modes"
+        case (let band?, let group?):
+            return "\(band.displayName) \(group.rawValue)"
+        case (let band?, nil):
+            return band.displayName
+        case (nil, let group?):
+            return group.rawValue
+        }
+    }
+
+    private func awardProgressRow(title: String, worked: Int, confirmed: Int, onTap: @escaping () -> Void) -> some View {
+        let maxVal = max(worked, 1)
+        return Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(title).font(.caption).fontDesign(.monospaced)
+                    Spacer()
+                    Text("\(worked) worked / \(confirmed) confirmed")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: g.size.width)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.blue.opacity(0.6))
+                            .frame(width: g.size.width * CGFloat(confirmed) / CGFloat(maxVal))
+                    }
+                }
+                .frame(height: 10)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func awardColor(worked: Bool, confirmed: Bool) -> Color {
+        if confirmed { return Color.green.opacity(0.35) }
+        if worked { return Color.blue.opacity(0.2) }
+        return Color.clear
     }
 
     // MARK: - Helpers

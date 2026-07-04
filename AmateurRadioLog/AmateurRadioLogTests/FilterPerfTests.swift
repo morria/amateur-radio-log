@@ -172,9 +172,10 @@ final class StatsSummaryTests: XCTestCase {
         let s = StatsSummary.compute(qsos: sampleQSOs, band: nil, mode: nil,
                                      timeRange: .allTime, myGridsquare: nil)
         let byName = Dictionary(uniqueKeysWithValues: s.snrCounts.map { ($0.0, $0.1) })
-        XCTAssertEqual(byName["S5-S6"], 1)   // "59"
-        XCTAssertEqual(byName["S3-S4"], 1)   // "339"
-        XCTAssertEqual(byName["S7-S8"], 1)   // "73"
+        // Bucketed by the STRENGTH digit (2nd digit), not readability:
+        // "59" -> strength 9, "339" -> strength 3, "73" -> strength 3.
+        XCTAssertEqual(byName["S9"], 1)      // "59"
+        XCTAssertEqual(byName["S3-S4"], 2)   // "339" and "73"
         XCTAssertEqual(byName["Unknown"], 1) // no RST
     }
 
@@ -206,9 +207,12 @@ final class StatsSummaryTests: XCTestCase {
     func testRecords() {
         let s = StatsSummary.compute(qsos: sampleQSOs, band: nil, mode: nil,
                                      timeRange: .allTime, myGridsquare: "FN31pr")
-        // Lowest numeric RST value ("59" = 59 < 73 < 339)
-        XCTAssertEqual(s.lowestSNR?.rstRcvd, "59")
-        // Furthest from FN31 (Connecticut) by manhattan distance is Australia
+        // None of the sample QSOs have a dB (FT8-style) report, so this
+        // falls back to the weakest classic-RST strength digit: "339" and
+        // "73" are tied at strength 3, and "339" comes first in the list.
+        XCTAssertEqual(s.lowestSNR?.rstRcvd, "339")
+        // Furthest from FN31 (Connecticut) by real great-circle distance is
+        // still Australia.
         XCTAssertEqual(s.furthestQSO?.call, "VK2XYZ")
     }
 

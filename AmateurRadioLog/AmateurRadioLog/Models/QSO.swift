@@ -209,13 +209,72 @@ final class QSO {
     var rstRcvdSort: String { rstRcvd ?? "" }
     var stateSort: String { state ?? "" }
 
-    /// RST received as a numeric value for SNR statistics
-    var snrValue: Int? {
-        guard let rst = rstRcvd else { return nil }
-        // For signal reports like "59", "599", extract the S-meter reading
-        if rst.count >= 2, let first = rst.first, first.isNumber {
-            return Int(String(rst.dropFirst().prefix(1)))
+    /// The received signal report, parsed once via `SignalReport.parse` so
+    /// every consumer (stats, map, table) agrees on what it means.
+    var signalReportRcvd: SignalReport? { SignalReport.parse(rstRcvd) }
+
+    /// The sent signal report, parsed the same way.
+    var signalReportSent: SignalReport? { SignalReport.parse(rstSent) }
+
+    /// Legacy accessor kept for call sites that only want the classic-RST
+    /// S-meter strength digit. Returns nil for dB (FT8/FT4-style) reports —
+    /// use `signalReportRcvd` directly to distinguish the two.
+    var snrValue: Int? { signalReportRcvd?.strength }
+}
+
+/// A parsed signal report (ADIF RST_SENT/RST_RCVD). Classic RST reports
+/// ("59", "599") are read as readability + strength digits; a signed number
+/// in the -30...+30 range (WSJT-X/FT8/FT4-style reports like "-12", "+05")
+/// is read as a dB SNR value instead. Centralizing this here means stats,
+/// the map, and the log table can never disagree about the same QSO.
+enum SignalReport: Equatable, Sendable {
+    case rst(readability: Int, strength: Int)
+    case db(Int)
+
+    /// Parses a raw ADIF signal-report string. Returns nil for anything
+    /// that doesn't match either shape (including plain single digits,
+    /// which are ambiguous and too short to be a classic RST report).
+    static func parse(_ raw: String?) -> SignalReport? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty else {
+            return nil
         }
+
+        if trimmed.hasPrefix("+") || trimmed.hasPrefix("-"),
+           let value = Int(trimmed), (-30...30).contains(value) {
+            return .db(value)
+        }
+
+        let chars = Array(trimmed)
+        if chars.count >= 2,
+           let readability = chars[0].wholeNumberValue,
+           let strength = chars[1].wholeNumberValue {
+            return .rst(readability: readability, strength: strength)
+        }
+
         return nil
+    }
+
+    /// The classic-RST S-meter strength digit (2nd digit), or nil for a dB
+    /// report.
+    var strength: Int? {
+        if case .rst(_, let strength) = self { return strength }
+        return nil
+    }
+
+    /// The dB value, or nil for a classic RST report.
+    var db: Int? {
+        if case .db(let value) = self { return value }
+        return nil
+    }
+
+    /// Re-renders the report the way it would normally be logged, e.g.
+    /// "59", "599", "-12", "+5".
+    var displayString: String {
+        switch self {
+        case .rst(let readability, let strength):
+            return "\(readability)\(strength)"
+        case .db(let value):
+            return value >= 0 ? "+\(value)" : "\(value)"
+        }
     }
 }

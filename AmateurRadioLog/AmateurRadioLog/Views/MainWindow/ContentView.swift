@@ -402,6 +402,9 @@ struct ContentView: View {
         }
         #if os(macOS)
         ToolbarItem(placement: .status) {
+            rigStatusChip
+        }
+        ToolbarItem(placement: .status) {
             if appState.isLoading {
                 ProgressView().controlSize(.small)
             } else if let status = appState.statusMessage {
@@ -409,6 +412,34 @@ struct ContentView: View {
             }
         }
         #endif
+    }
+
+    /// Compact "14.074 FT8"-style chip with a green (connected) / gray
+    /// (enabled but not connected) dot. Only shown while rig control is
+    /// enabled in Settings; hidden entirely otherwise.
+    @ViewBuilder
+    private var rigStatusChip: some View {
+        if appState.rigControlActive {
+            let rig = appState.rigState
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(rig.connected ? Color.green : Color.gray)
+                    .frame(width: 6, height: 6)
+                if rig.connected, let freq = rig.frequencyMHz {
+                    Text(String(format: "%.3f", freq))
+                    if let mode = rig.rigModeRaw {
+                        Text(mode)
+                    }
+                } else {
+                    Text("Rig")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .help(rig.connected
+                  ? String(localized: "Rig connected")
+                  : String(localized: "Rig control enabled, not connected"))
+        }
     }
 }
 
@@ -438,11 +469,11 @@ struct QSOLogView: View {
             // Quick entry: macOS always, iPad regular width only (compact
             // iPhone keeps the sheet flow).
             if usesSidePanel {
-                // Defaults follow live WSJT-X rig state when connected,
-                // falling back to the last-used values otherwise.
+                // Defaults follow the live rig when connected (CAT rig wins
+                // over WSJT-X — see AppState.liveRigDefaults), falling back
+                // to the last-used values otherwise.
                 QuickEntryBar(defaultsProvider: { [appState] in
-                    let rig = appState.wsjtxRigState
-                    guard rig.connected else {
+                    guard let rig = appState.liveRigDefaults else {
                         return QuickEntryDefaults(
                             band: appState.lastBand, mode: appState.lastMode,
                             freq: appState.lastFreq, power: appState.lastPower)
@@ -450,7 +481,7 @@ struct QSOLogView: View {
                     return QuickEntryDefaults(
                         band: rig.band ?? appState.lastBand,
                         mode: rig.mode ?? appState.lastMode,
-                        freq: rig.dialFrequencyMHz ?? appState.lastFreq,
+                        freq: rig.freqMHz ?? appState.lastFreq,
                         power: appState.lastPower)
                 })
                 Divider()

@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 
 /// All log statistics computed in a single pass over the QSO list, so
 /// StatsView doesn't re-filter the whole log once per chart per render.
@@ -14,6 +15,9 @@ struct StatsSummary {
     var countriesByContinent: [(String, [(String, Int)])] = []
     var lowestSNR: QSO?
     var furthestQSO: QSO?
+    /// Great-circle distance in km from myGridsquare to `furthestQSO`, when
+    /// both are available.
+    var furthestQSODistanceKm: Double?
     /// QSO count per operator callsign, sorted descending. Only populated
     /// when an operation filter is active (multi-op Field Day).
     var operatorCounts: [(String, Int)] = []
@@ -105,8 +109,10 @@ struct StatsSummary {
         var operatorCountsByCall: [String: Int] = [:]
         var calls = Set<String>()
         var countries = Set<String>()
-        var lowestSNRValue = Int.max
-        var furthestDistance = -Double.infinity
+        var lowestSNRValue = Int.max      // dB (FT8/FT4) reports
+        var haveDBReport = false
+        var lowestRSTStrength = Int.max   // fallback when no dB reports exist
+        var furthestDistanceKm = -Double.infinity
 
         // Pre-populate with major countries so unworked ones still show
         for (cont, list) in Self.majorCountries {
@@ -135,8 +141,12 @@ struct StatsSummary {
             bandCountsByName[qso.band?.displayName ?? "Unknown", default: 0] += 1
             modeCountsByName[qso.mode?.displayName ?? "Unknown", default: 0] += 1
 
-            // SNR group by S-value (first digit of RST received)
-            if let rst = qso.rstRcvd, rst.count >= 2, let s = Int(String(rst.prefix(1))) {
+            // SNR bucket via the shared SignalReport parser: classic RST
+            // reports are bucketed by S-unit strength (2nd digit), dB
+            // reports (FT8/FT4) get their own buckets so they aren't all
+            // dumped into "Unknown".
+            switch qso.signalReportRcvd {
+            case .rst(_, let s):
                 switch s {
                 case 9: snrGroups["S9", default: 0] += 1
                 case 7...8: snrGroups["S7-S8", default: 0] += 1
@@ -144,7 +154,14 @@ struct StatsSummary {
                 case 3...4: snrGroups["S3-S4", default: 0] += 1
                 default: snrGroups["S1-S2", default: 0] += 1
                 }
-            } else {
+            case .db(let value):
+                switch value {
+                case let v where v > 0: snrGroups[">0 dB", default: 0] += 1
+                case -9...0: snrGroups["-9..0 dB", default: 0] += 1
+                case -19...(-10): snrGroups["-19..-10 dB", default: 0] += 1
+                default: snrGroups["<=-20 dB", default: 0] += 1
+                }
+            case nil:
                 snrGroups["Unknown", default: 0] += 1
             }
 
@@ -160,21 +177,33 @@ struct StatsSummary {
                 }
             }
 
-            // Record: lowest SNR received
-            if let rst = qso.rstRcvd, !rst.isEmpty {
-                let value = Int(rst) ?? 0
-                if summary.lowestSNR == nil || value < lowestSNRValue {
+            // Record: lowest SNR received. dB reports (FT8/FT4) compare
+            // directly; classic RST reports have no real SNR value, so we
+            // only use them as a last resort (min strength digit) when no
+            // dB report exists in the log at all.
+            switch qso.signalReportRcvd {
+            case .db(let value):
+                if !haveDBReport || value < lowestSNRValue {
                     lowestSNRValue = value
                     summary.lowestSNR = qso
+                    haveDBReport = true
                 }
+            case .rst(_, let strength):
+                if !haveDBReport && (summary.lowestSNR == nil || strength < lowestRSTStrength) {
+                    lowestRSTStrength = strength
+                    summary.lowestSNR = qso
+                }
+            case nil:
+                break
             }
 
-            // Record: furthest QSO (manhattan distance from my grid)
-            if let myCoord, let lat = qso.latitude, let lon = qso.longitude {
-                let dist = abs(lat - myCoord.latitude) + abs(lon - myCoord.longitude)
-                if dist > furthestDistance {
-                    furthestDistance = dist
+            // Record: furthest QSO, real great-circle distance from my grid.
+            if let myCoord, let coord = qso.coordinate {
+                let dist = GeoMath.distanceKm(from: myCoord, to: coord)
+                if dist > furthestDistanceKm {
+                    furthestDistanceKm = dist
                     summary.furthestQSO = qso
+                    summary.furthestQSODistanceKm = dist
                 }
             }
         }
@@ -200,7 +229,11 @@ struct StatsSummary {
         }
         summary.modeCounts = modeResult
 
-        let snrOrder = ["S9", "S7-S8", "S5-S6", "S3-S4", "S1-S2", "Unknown"]
+        let snrOrder = [
+            "S9", "S7-S8", "S5-S6", "S3-S4", "S1-S2",
+            ">0 dB", "-9..0 dB", "-19..-10 dB", "<=-20 dB",
+            "Unknown"
+        ]
         summary.snrCounts = snrOrder.compactMap { key in
             snrGroups[key].map { (key, $0) }
         }
