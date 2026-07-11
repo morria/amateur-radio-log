@@ -95,4 +95,77 @@ final class LogNavigationUITests: XCTestCase {
         // And out again -> globe (the regression this test exists for).
         pinchUntil("globe", scale: 0.25, label: "a globe on the second zoom-out")
     }
+
+    /// Full solo-operation lifecycle: set up a General operation, log a QSO
+    /// inside it, end it keeping the log, then find it in All Operations
+    /// and jump to its QSOs in the log.
+    @MainActor
+    func testOperationLifecycleAndList() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiSkipOnboarding", "-uiTab", "log"]
+        app.launch()
+
+        // Back out to the sidebar menu.
+        let back = app.buttons["logBackButton"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "log back button not found")
+        back.tap()
+
+        // A previous (failed) run may have left an operation running — end it.
+        let resume = app.buttons["Resume Operation"]
+        if resume.waitForExistence(timeout: 3) {
+            resume.tap()
+            let end = app.buttons["End Operation"].firstMatch
+            XCTAssertTrue(end.waitForExistence(timeout: 10))
+            end.tap()
+            let keep = app.buttons["End & Keep Log"].firstMatch
+            let noExport = app.buttons["End Without Exporting"].firstMatch
+            if keep.waitForExistence(timeout: 5) { keep.tap() } else { noExport.tap() }
+            XCTAssertTrue(app.buttons["New Operation"].waitForExistence(timeout: 10))
+        }
+
+        // New Operation -> General -> named -> Start.
+        app.buttons["New Operation"].firstMatch.tap()
+        let general = app.buttons["General"].firstMatch
+        XCTAssertTrue(general.waitForExistence(timeout: 10), "kind picker not found")
+        general.tap()
+        let nameField = app.textFields["operationNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("UI Test Op")
+        // A fresh install has no station callsign; Start requires one.
+        // (XCUITest reports the placeholder as an empty field's value, so
+        // don't bother checking — clear and type.)
+        let callsignField = app.textFields["operationCallsignField"]
+        callsignField.tap()
+        callsignField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8))
+        callsignField.typeText("W2TST")
+        app.buttons["Start"].firstMatch.tap()
+
+        // Logging screen: log one QSO into the operation.
+        let callField = app.textFields["CALLSIGN"]
+        XCTAssertTrue(callField.waitForExistence(timeout: 10), "operation logging screen not shown")
+        callField.tap()
+        callField.typeText("K2UIT\n")
+
+        // End, keeping the log.
+        app.buttons["End Operation"].firstMatch.tap()
+        let keepLog = app.buttons["End & Keep Log"].firstMatch
+        XCTAssertTrue(keepLog.waitForExistence(timeout: 10), "end confirmation not shown")
+        keepLog.tap()
+
+        // The operation shows up in All Operations with its QSOs.
+        let allOps = app.buttons["All Operations"]
+        XCTAssertTrue(allOps.waitForExistence(timeout: 10), "sidebar not visible after ending")
+        allOps.tap()
+        let row = app.staticTexts["UI Test Op"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "ended operation missing from list")
+        row.tap()
+        let showQSOs = app.buttons["Show QSOs in Log"].firstMatch
+        XCTAssertTrue(showQSOs.waitForExistence(timeout: 10), "operation detail not shown")
+        showQSOs.tap()
+
+        // Lands in the log, filtered to the operation's QSO.
+        XCTAssertTrue(app.staticTexts["K2UIT"].firstMatch.waitForExistence(timeout: 10),
+                      "operation QSO not visible in the filtered log")
+    }
 }

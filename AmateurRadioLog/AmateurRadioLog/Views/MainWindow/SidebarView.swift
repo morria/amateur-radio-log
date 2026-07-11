@@ -10,6 +10,7 @@ struct SidebarView: View {
     @State private var showSettings = false
     @State private var showActivation = false
     @State private var showFieldDay = false
+    @State private var showOperationList = false
     /// Drives the split view's detail column. Kept separate from
     /// `appState.selectedTab` so the same destination can be re-selected —
     /// see `select(_:)`.
@@ -44,7 +45,7 @@ struct SidebarView: View {
                             Text(appState.activationSession == nil
                                  ? "New Operation" : "Resume Operation")
                             if let session = appState.activationSession {
-                                Text(session.parkRef)
+                                Text(session.title)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -54,6 +55,11 @@ struct SidebarView: View {
                               ? "tree" : "tree.fill")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Button(action: { showOperationList = true }) {
+                    Label("All Operations", systemImage: "folder")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if showsSharedOperation {
@@ -126,8 +132,19 @@ struct SidebarView: View {
         .onChange(of: appState.selectedTab) { _, tab in
             if listSelection != tab { listSelection = tab }
         }
+        // Navigation requested from a sheet over the sidebar ("Show QSOs in
+        // Log" in an operation): the tab may not change, so re-drive the
+        // selection to push the detail column in compact width.
+        .onChange(of: appState.detailRevealSignal) { _, _ in
+            #if os(iOS)
+            select(appState.selectedTab)
+            #endif
+        }
         .sheet(isPresented: $showFieldDay) {
             FieldDayView()
+        }
+        .sheet(isPresented: $showOperationList) {
+            OperationListView()
         }
         .sheet(isPresented: $showQRZSync) {
             SyncConfigSheet(provider: "QRZ.com") { direction in

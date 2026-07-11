@@ -128,15 +128,27 @@ enum SyncService: String, Identifiable, Sendable {
 
 // MARK: - Activation Session
 
-/// A running POTA activation: the operator's park, grid and callsign plus
-/// the UTC start time. Mirrored to AppSettings so a crash or relaunch in
-/// the field can resume the session.
+/// A running solo operation (POTA/SOTA activation or a general session):
+/// what's being activated, the operator's grid and callsign, the UTC start
+/// time and the Operation row its QSOs are tagged with. Mirrored to
+/// AppSettings so a crash or relaunch in the field can resume the session.
 struct ActivationSession: Sendable, Equatable {
-    var parkRef: String
-    var parkName: String?
+    var kind: OperationKind = .pota
+    /// POTA park / SOTA summit; nil for general operations.
+    var reference: String?
+    var referenceName: String?
+    /// Session name for general operations ("Backyard portable").
+    var name: String?
     var grid: String?
     var callsign: String
     var startedAt: Date
+    var operationId: UUID?
+
+    var title: String {
+        if let reference, !reference.isEmpty { return reference }
+        if let name, !name.isEmpty { return name }
+        return String(localized: "Operation")
+    }
 }
 
 // MARK: - App State
@@ -169,6 +181,14 @@ final class AppState {
     var detailPopSignal = 0
 
     func popDetailStack() { detailPopSignal += 1 }
+
+    /// Incremented when navigation originates while the sidebar is the
+    /// visible column (compact width): setting `selectedTab` to its current
+    /// value doesn't push the detail, so the sidebar re-drives its
+    /// selection when this fires.
+    var detailRevealSignal = 0
+
+    func revealDetailColumn() { detailRevealSignal += 1 }
 
     // Log list visibility counts (maintained by QSOListView, shown by SearchBarView)
     var visibleQSOCount: Int?
@@ -241,52 +261,99 @@ final class AppState {
         }
     }
 
-    // MARK: - POTA Activation
+    // MARK: - Solo Operations (POTA / SOTA / General)
 
-    /// The in-progress POTA activation, nil when not activating. Mirrored
-    /// to AppSettings (crash recovery) on every change.
+    /// The in-progress solo operation, nil when not running. Mirrored to
+    /// AppSettings (crash recovery) on every change.
     var activationSession: ActivationSession?
 
-    func startActivation(parkRef: String, parkName: String?, grid: String?,
-                         callsign: String) {
+    /// Starts a solo operation: creates its Operation row so it appears in
+    /// the Operations list, and marks the id active so every QSO logged —
+    /// from any entry screen — is stamped with it.
+    func startActivation(kind: OperationKind, reference: String?,
+                         referenceName: String?, name: String?,
+                         grid: String?, callsign: String,
+                         context: ModelContext) {
+        let operation = Operation()
+        operation.uuid = UUID()
+        operation.kindRaw = kind.rawValue
+        operation.reference = reference?.uppercased()
+        operation.referenceName = referenceName
+        operation.name = name ?? referenceName ?? reference?.uppercased()
+            ?? String(localized: "Operation")
+        operation.startedAt = Date()
+        context.insert(operation)
+        try? context.save()
+
         let session = ActivationSession(
-            parkRef: parkRef.uppercased(),
-            parkName: parkName,
+            kind: kind,
+            reference: reference?.uppercased(),
+            referenceName: referenceName,
+            name: name,
             grid: grid,
             callsign: callsign.uppercased(),
-            startedAt: Date())
+            startedAt: operation.startedAt ?? Date(),
+            operationId: operation.uuid)
         activationSession = session
-        settings?.activationParkRef = session.parkRef
-        settings?.activationParkName = session.parkName
+        // A shared multi-operator session owns the stamp while it runs.
+        if activeOperation == nil, let id = operation.uuid {
+            ActiveOperationContext.set(id)
+        }
+        settings?.activationParkRef = session.reference ?? session.name
+        settings?.activationParkName = session.referenceName
         settings?.activationGrid = session.grid
         settings?.activationCallsign = session.callsign
         settings?.activationStartedAt = session.startedAt
+        settings?.activationKind = kind.rawValue
+        settings?.activationOperationId = session.operationId
         try? settings?.modelContext?.save()
     }
 
-    func endActivation() {
+    func endActivation(context: ModelContext? = nil) {
+        if let id = activationSession?.operationId, let context {
+            let target: UUID? = id
+            let descriptor = FetchDescriptor<Operation>(
+                predicate: #Predicate { $0.uuid == target })
+            if let operation = try? context.fetch(descriptor).first {
+                operation.endedAt = Date()
+                try? context.save()
+            }
+        }
         activationSession = nil
+        // Hand the stamp back to the shared operation if one is running.
+        ActiveOperationContext.set(activeOperation?.id)
         settings?.activationParkRef = nil
         settings?.activationParkName = nil
         settings?.activationGrid = nil
         settings?.activationCallsign = nil
         settings?.activationStartedAt = nil
+        settings?.activationKind = nil
+        settings?.activationOperationId = nil
         try? settings?.modelContext?.save()
     }
 
     /// Crash recovery: rebuild the live session from the AppSettings mirror
-    /// at launch (first `settings` assignment).
+    /// at launch (first `settings` assignment). Runs before
+    /// restoreFieldDayOperation, which overwrites the stamp — a shared
+    /// operation wins while both are somehow live.
     private func restoreActivationSession() {
         guard activationSession == nil,
               let settings,
-              let parkRef = settings.activationParkRef, !parkRef.isEmpty,
+              let reference = settings.activationParkRef, !reference.isEmpty,
               let startedAt = settings.activationStartedAt else { return }
+        let kind = settings.activationKind.flatMap(OperationKind.init) ?? .pota
         activationSession = ActivationSession(
-            parkRef: parkRef,
-            parkName: settings.activationParkName,
+            kind: kind,
+            reference: kind == .general ? nil : reference,
+            referenceName: settings.activationParkName,
+            name: kind == .general ? reference : nil,
             grid: settings.activationGrid,
             callsign: settings.activationCallsign ?? settings.stationCallsign,
-            startedAt: startedAt)
+            startedAt: startedAt,
+            operationId: settings.activationOperationId)
+        if let id = settings.activationOperationId {
+            ActiveOperationContext.set(id)
+        }
     }
 
     // MARK: - Services
@@ -1249,7 +1316,9 @@ final class AppState {
     @ObservationIgnored
     private var fieldDaySession: FieldDaySession?
 
-    var activeOperationId: UUID? { activeOperation?.id }
+    /// The operation new QSOs are stamped with: a running shared session
+    /// wins, else the running solo operation.
+    var activeOperationId: UUID? { activeOperation?.id ?? activationSession?.operationId }
 
     private static let fieldDayOperationKey = "fieldDayActiveOperation"
     private static let fieldDayRoleKey = "fieldDayRole"
@@ -1290,7 +1359,9 @@ final class AppState {
 
     private func setActiveOperation(_ info: OperationInfo?) {
         activeOperation = info
-        ActiveOperationContext.set(info?.id)
+        // Ending the shared session hands the stamp back to a still-running
+        // solo operation.
+        ActiveOperationContext.set(info?.id ?? activationSession?.operationId)
         let defaults = UserDefaults.standard
         if let info, let data = try? JSONEncoder().encode(info) {
             defaults.set(data, forKey: Self.fieldDayOperationKey)

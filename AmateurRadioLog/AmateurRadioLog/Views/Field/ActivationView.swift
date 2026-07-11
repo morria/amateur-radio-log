@@ -28,15 +28,20 @@ struct ActivationView: View {
 
 // MARK: - Setup
 
-/// Park + station entry with GPS-assisted park suggestions from the bundled
-/// offline park database. Suggestions are never auto-committed: centroids
-/// are not boundaries, so the operator confirms the park explicitly.
+/// Operation type + reference + station entry, with GPS-assisted park
+/// suggestions from the bundled offline park database for POTA. Suggestions
+/// are never auto-committed: centroids are not boundaries, so the operator
+/// confirms the park explicitly.
 private struct ActivationSetupView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @State private var kind: OperationKind = .pota
     @State private var parkRef = ""
     @State private var parkName: String?
+    @State private var summitRef = ""
+    @State private var operationName = ""
     @State private var grid = ""
     @State private var callsign = ""
     @State private var suggestions: [ParkSuggestion] = []
@@ -55,80 +60,27 @@ private struct ActivationSetupView: View {
         NavigationStack {
             Form {
                 Section {
-                    HStack {
-                        Text("Park")
-                        TextField("US-0001", text: $parkRef)
-                            .autocorrectionDisabled()
-                            .font(.body.monospaced())
-                            #if os(iOS)
-                            .textInputAutocapitalization(.characters)
-                            .keyboardType(.asciiCapable)
-                            #endif
-                            .onChange(of: parkRef) { _, v in
-                                let upper = v.uppercased()
-                                if upper != v { parkRef = upper }
-                                lookupParkName(upper)
-                            }
-                    }
-                    if let parkName {
-                        Text(parkName)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Button {
-                        findNearbyParks()
-                    } label: {
-                        if isFindingParks {
-                            HStack {
-                                ProgressView().controlSize(.small)
-                                Text("Finding nearby parks...")
-                            }
-                        } else {
-                            Label("Suggest Nearby Parks", systemImage: "location.fill")
+                    Picker("Type", selection: $kind) {
+                        ForEach(OperationKind.allCases) { k in
+                            Text(k.localizedName).tag(k)
                         }
                     }
-                    .disabled(isFindingParks)
-
-                    if let locationError {
-                        Text(locationError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-
-                    ForEach(suggestions) { suggestion in
-                        Button {
-                            parkRef = suggestion.park.reference
-                            parkName = suggestion.park.name
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(suggestion.park.reference)
-                                        .font(.body.monospaced().bold())
-                                    Text(suggestion.park.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                Text(distanceText(suggestion.distanceKm))
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                } header: {
-                    Text("Park")
+                    .pickerStyle(.segmented)
                 } footer: {
-                    Text("Suggestions rank parks by distance to their center point — confirm you are actually within the park boundary.")
+                    Text(kindExplanation)
+                }
+
+                switch kind {
+                case .pota: potaSection
+                case .sota: sotaSection
+                case .general: generalSection
                 }
 
                 Section("My Station") {
                     HStack {
                         Text("Callsign")
                         TextField("W1AW", text: $callsign)
+                            .accessibilityIdentifier("operationCallsignField")
                             .autocorrectionDisabled()
                             .font(.body.monospaced())
                             #if os(iOS)
@@ -150,8 +102,14 @@ private struct ActivationSetupView: View {
                             #endif
                     }
                 }
+
+                Section {
+                    EmptyView()
+                } footer: {
+                    Text("While the operation is running, every QSO you log — from any screen — is tagged with it. End it from the logging screen; the log stays in Operations for export afterwards.")
+                }
             }
-            .navigationTitle("Start Activation")
+            .navigationTitle("New Operation")
             #if os(macOS)
             .formStyle(.grouped)
             #endif
@@ -160,15 +118,8 @@ private struct ActivationSetupView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Start") {
-                        appState.startActivation(
-                            parkRef: parkRef.trimmingCharacters(in: .whitespaces),
-                            parkName: parkName,
-                            grid: grid.trimmingCharacters(in: .whitespaces).isEmpty
-                                ? nil : grid.trimmingCharacters(in: .whitespaces),
-                            callsign: callsign.trimmingCharacters(in: .whitespaces))
-                    }
-                    .disabled(!canStart)
+                    Button("Start") { start() }
+                        .disabled(!canStart)
                 }
             }
             .onAppear {
@@ -182,9 +133,160 @@ private struct ActivationSetupView: View {
         }
     }
 
+    private var kindExplanation: String {
+        switch kind {
+        case .pota:
+            return String(localized: "Parks on the Air: QSOs record your park (MY_SIG_INFO) so the exported log is ready to upload at pota.app. 10 QSOs make a valid activation. You can self-spot to the POTA network from the logging screen.")
+        case .sota:
+            return String(localized: "Summits on the Air: QSOs record your summit so the exported log is ready for the SOTA database. 4 QSOs make a valid activation.")
+        case .general:
+            return String(localized: "A named session — portable outing, contest run, special event. QSOs are grouped under the operation for review and export; nothing extra is written to them.")
+        }
+    }
+
+    @ViewBuilder
+    private var potaSection: some View {
+        Section {
+            HStack {
+                Text("Park")
+                TextField("US-0001", text: $parkRef)
+                    .autocorrectionDisabled()
+                    .font(.body.monospaced())
+                    #if os(iOS)
+                    .textInputAutocapitalization(.characters)
+                    .keyboardType(.asciiCapable)
+                    #endif
+                    .onChange(of: parkRef) { _, v in
+                        let upper = v.uppercased()
+                        if upper != v { parkRef = upper }
+                        lookupParkName(upper)
+                    }
+            }
+            if let parkName {
+                Text(parkName)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                findNearbyParks()
+            } label: {
+                if isFindingParks {
+                    HStack {
+                        ProgressView().controlSize(.small)
+                        Text("Finding nearby parks...")
+                    }
+                } else {
+                    Label("Suggest Nearby Parks", systemImage: "location.fill")
+                }
+            }
+            .disabled(isFindingParks)
+
+            if let locationError {
+                Text(locationError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            ForEach(suggestions) { suggestion in
+                Button {
+                    parkRef = suggestion.park.reference
+                    parkName = suggestion.park.name
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.park.reference)
+                                .font(.body.monospaced().bold())
+                            Text(suggestion.park.name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Text(distanceText(suggestion.distanceKm))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        } header: {
+            Text("Park")
+        } footer: {
+            Text("Suggestions rank parks by distance to their center point — confirm you are actually within the park boundary.")
+        }
+    }
+
+    private var sotaSection: some View {
+        Section {
+            HStack {
+                Text("Summit")
+                TextField("W2/GC-001", text: $summitRef)
+                    .autocorrectionDisabled()
+                    .font(.body.monospaced())
+                    #if os(iOS)
+                    .textInputAutocapitalization(.characters)
+                    .keyboardType(.asciiCapable)
+                    #endif
+                    .onChange(of: summitRef) { _, v in
+                        let upper = v.uppercased()
+                        if upper != v { summitRef = upper }
+                    }
+            }
+        } header: {
+            Text("Summit")
+        } footer: {
+            Text("The SOTA summit reference from sotamaps or the SOTA app.")
+        }
+    }
+
+    private var generalSection: some View {
+        Section("Name") {
+            TextField("Backyard portable, NYQP, ...", text: $operationName)
+                .accessibilityIdentifier("operationNameField")
+        }
+    }
+
     private var canStart: Bool {
-        !parkRef.trimmingCharacters(in: .whitespaces).isEmpty
-            && !callsign.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasStation = !callsign.trimmingCharacters(in: .whitespaces).isEmpty
+        switch kind {
+        case .pota:
+            return hasStation && !parkRef.trimmingCharacters(in: .whitespaces).isEmpty
+        case .sota:
+            return hasStation && !summitRef.trimmingCharacters(in: .whitespaces).isEmpty
+        case .general:
+            return hasStation && !operationName.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    private func start() {
+        let trimmedGrid = grid.trimmingCharacters(in: .whitespaces)
+        let reference: String?
+        let referenceName: String?
+        let name: String?
+        switch kind {
+        case .pota:
+            reference = parkRef.trimmingCharacters(in: .whitespaces)
+            referenceName = parkName
+            name = nil
+        case .sota:
+            reference = summitRef.trimmingCharacters(in: .whitespaces)
+            referenceName = nil
+            name = nil
+        case .general:
+            reference = nil
+            referenceName = nil
+            name = operationName.trimmingCharacters(in: .whitespaces)
+        }
+        appState.startActivation(
+            kind: kind,
+            reference: reference,
+            referenceName: referenceName,
+            name: name,
+            grid: trimmedGrid.isEmpty ? nil : trimmedGrid,
+            callsign: callsign.trimmingCharacters(in: .whitespaces),
+            context: modelContext)
     }
 
     private func distanceText(_ km: Double) -> String {
@@ -290,12 +392,16 @@ private struct ActivationLoggingView: View {
                     detailControls
                     logButton
                     recentStrip
-                    spotSection
+                    // Self-spotting posts to the POTA network; the other
+                    // kinds have no unauthenticated spot endpoint.
+                    if session.kind == .pota {
+                        spotSection
+                    }
                     endSection
                 }
                 .padding()
             }
-            .navigationTitle(session.parkRef)
+            .navigationTitle(session.title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
@@ -307,34 +413,41 @@ private struct ActivationLoggingView: View {
             }
             .onAppear(perform: setUp)
             .sheet(isPresented: $showExport, onDismiss: {
-                appState.endActivation()
+                appState.endActivation(context: modelContext)
                 dismiss()
             }) {
-                POTAExportSheet(prefillPark: session.parkRef,
+                POTAExportSheet(prefillPark: session.reference ?? "",
                                 prefillDate: session.startedAt)
             }
             .confirmationDialog(
-                "End this activation?",
+                "End this operation?",
                 isPresented: $showEndConfirm,
                 titleVisibility: .visible
             ) {
-                Button("End & Export Log") { showExport = true }
-                Button("End Without Exporting", role: .destructive) {
-                    appState.endActivation()
+                if session.kind == .pota {
+                    Button("End & Export Log") { showExport = true }
+                }
+                Button(session.kind == .pota ? "End Without Exporting" : "End & Keep Log",
+                       role: .destructive) {
+                    appState.endActivation(context: modelContext)
                     dismiss()
                 }
-                Button("Keep Activating", role: .cancel) {}
+                Button("Keep Operating", role: .cancel) {}
             } message: {
-                Text("\(qsoCount) QSOs logged at \(session.parkRef).")
+                Text("\(qsoCount) QSOs logged in \(session.title). The log stays under Operations, where you can export or upload it anytime.")
             }
         }
     }
 
     // MARK: Header
 
+    /// POTA needs 10 QSOs for a valid activation, SOTA 4; general
+    /// operations have no goal.
+    private var activationGoal: Int? { session.kind.activationGoal }
+
     private var header: some View {
         VStack(spacing: 6) {
-            if let name = session.parkName {
+            if let name = session.referenceName {
                 Text(name)
                     .font(.headline)
                     .multilineTextAlignment(.center)
@@ -342,13 +455,22 @@ private struct ActivationLoggingView: View {
             }
             HStack(spacing: 16) {
                 VStack(spacing: 2) {
-                    Text("\(qsoCount)")
-                        .font(.system(size: 40, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(qsoCount >= 10 ? Color.green : Color.primary)
-                    Text(qsoCount >= 10 ? "Activated!" : "of 10 to activate")
-                        .font(.caption.bold())
-                        .foregroundStyle(qsoCount >= 10 ? Color.green : Color.secondary)
+                    if let goal = activationGoal {
+                        Text("\(qsoCount)")
+                            .font(.system(size: 40, weight: .black, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(qsoCount >= goal ? Color.green : Color.primary)
+                        Text(qsoCount >= goal ? "Activated!" : "of \(goal) to activate")
+                            .font(.caption.bold())
+                            .foregroundStyle(qsoCount >= goal ? Color.green : Color.secondary)
+                    } else {
+                        Text("\(qsoCount)")
+                            .font(.system(size: 40, weight: .black, design: .rounded))
+                            .monospacedDigit()
+                        Text("QSOs")
+                            .font(.caption.bold())
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Divider().frame(height: 44)
                 VStack(spacing: 2) {
@@ -360,8 +482,10 @@ private struct ActivationLoggingView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            ProgressView(value: Double(min(qsoCount, 10)), total: 10)
-                .tint(qsoCount >= 10 ? .green : .orange)
+            if let goal = activationGoal {
+                ProgressView(value: Double(min(qsoCount, goal)), total: Double(goal))
+                    .tint(qsoCount >= goal ? .green : .orange)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -441,11 +565,14 @@ private struct ActivationLoggingView: View {
             HStack(spacing: 12) {
                 LabeledRSTField(title: "Sent", text: $rstSent)
                 LabeledRSTField(title: "Rcvd", text: $rstRcvd)
+                if session.kind == .general { Spacer(minLength: 0) }
+                if session.kind != .general {
                 HStack(spacing: 4) {
-                    Text("P2P")
+                    Text(session.kind == .sota ? "S2S" : "P2P")
                         .font(.caption.bold())
                         .foregroundStyle(.secondary)
-                    TextField("Their park", text: $theirPark)
+                    TextField(session.kind == .sota ? "Their summit" : "Their park",
+                              text: $theirPark)
                         .autocorrectionDisabled()
                         .font(.body.monospaced())
                         #if os(iOS)
@@ -458,6 +585,7 @@ private struct ActivationLoggingView: View {
                             let upper = v.uppercased()
                             if upper != v { theirPark = upper }
                         }
+                }
                 }
             }
         }
@@ -547,6 +675,12 @@ private struct ActivationLoggingView: View {
                 .disabled(spotStatus == .sending || currentFrequency() == nil)
             }
             spotStatusView
+            // What the buttons actually do — first-time activators
+            // shouldn't have to guess.
+            Text("Spot Me posts your callsign, frequency and park to the POTA spot network so hunters can find you. QSY posts a fresh spot after you change frequency. QRT tells hunters you are going off the air.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary.opacity(0.5)))
@@ -593,7 +727,7 @@ private struct ActivationLoggingView: View {
         Button(role: .destructive) {
             showEndConfirm = true
         } label: {
-            Text("End Activation")
+            Text("End Operation")
                 .font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
@@ -653,13 +787,17 @@ private struct ActivationLoggingView: View {
         data.stationCallsign = session.callsign
         data.myGridsquare = session.grid
 
-        // P2P: the contacted station's park
+        // P2P / S2S: the contacted station's park or summit
         let p2p = theirPark.trimmingCharacters(in: .whitespaces)
         if !p2p.isEmpty {
-            data.potaRef = p2p
+            switch session.kind {
+            case .pota: data.potaRef = p2p
+            case .sota: data.sotaRef = p2p
+            case .general: break
+            }
         }
 
-        // Operator/station identity (same as the QuickEntryBar save path)
+        // Operator/station identity (same as LogEntryView's save path)
         if let opCall = appState.settings?.stationCallsign, !opCall.isEmpty {
             data.operatorCallsign = opCall
         } else {
@@ -668,13 +806,21 @@ private struct ActivationLoggingView: View {
         data.stationId = appState.settings?.stationId ?? AppSettings.installStationId
 
         let qso = data.toQSO()
-        qso.mySig = "POTA"
-        qso.mySigInfo = session.parkRef
-        if !p2p.isEmpty {
-            qso.sig = "POTA"
-            qso.sigInfo = p2p
+        // Program stamping: my park/summit in MY_SIG/MY_SIG_INFO, theirs in
+        // SIG/SIG_INFO — what the POTA/SOTA exports expect.
+        switch session.kind {
+        case .pota, .sota:
+            qso.mySig = session.kind == .pota ? "POTA" : "SOTA"
+            qso.mySigInfo = session.reference
+            if !p2p.isEmpty {
+                qso.sig = qso.mySig
+                qso.sigInfo = p2p
+            }
+        case .general:
+            break
         }
         modelContext.insert(qso)
+        try? modelContext.save()
         appState.saveLastUsed(from: data)
 
         call = ""
@@ -699,13 +845,25 @@ private struct ActivationLoggingView: View {
 
     /// Recomputes the session QSO count and the last-3 strip from the store
     /// (also correct after crash recovery — nothing is kept in memory only).
+    /// Counts by the operation id, so it works for every kind and catches
+    /// QSOs logged from other screens while the operation runs; legacy
+    /// sessions without an id fall back to the old park+time match.
     private func refreshSessionQSOs() {
-        let park = session.parkRef
-        let start = session.startedAt
-        var descriptor = FetchDescriptor<QSO>(
-            predicate: #Predicate { $0.mySigInfo == park && $0.createdAt >= start },
-            sortBy: [SortDescriptor(\QSO.createdAt, order: .reverse)]
-        )
+        var descriptor: FetchDescriptor<QSO>
+        if let opId = session.operationId {
+            let target: UUID? = opId
+            descriptor = FetchDescriptor<QSO>(
+                predicate: #Predicate { $0.operationId == target && $0.deletedAt == nil },
+                sortBy: [SortDescriptor(\QSO.createdAt, order: .reverse)]
+            )
+        } else {
+            let reference = session.reference ?? ""
+            let start = session.startedAt
+            descriptor = FetchDescriptor<QSO>(
+                predicate: #Predicate { $0.mySigInfo == reference && $0.createdAt >= start },
+                sortBy: [SortDescriptor(\QSO.createdAt, order: .reverse)]
+            )
+        }
         qsoCount = (try? modelContext.fetchCount(descriptor)) ?? 0
         descriptor.fetchLimit = 3
         recentQSOs = (try? modelContext.fetch(descriptor)) ?? []
@@ -714,9 +872,8 @@ private struct ActivationLoggingView: View {
     /// Fire-and-forget self-spot: never blocks logging; failures show a
     /// visible Retry instead of an alert.
     private func sendSpot(comment: String) {
-        guard let freq = currentFrequency() else { return }
+        guard let freq = currentFrequency(), let park = session.reference else { return }
         let modeRaw = mode?.rawValue
-        let park = session.parkRef
         let callsign = session.callsign
         lastSpotComment = comment
         spotStatus = .sending

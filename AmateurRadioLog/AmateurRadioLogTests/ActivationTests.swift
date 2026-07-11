@@ -185,11 +185,11 @@ final class SpotSubmitterTests: XCTestCase {
 final class ActivationSessionTests: XCTestCase {
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: QSO.self, AppSettings.self,
+            for: QSO.self, AppSettings.self, AmateurRadioLog.Operation.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     }
 
-    func testStartActivationMirrorsToSettings() throws {
+    func testStartActivationMirrorsToSettingsAndCreatesOperation() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let settings = AppSettings()
@@ -198,16 +198,31 @@ final class ActivationSessionTests: XCTestCase {
         let appState = AppState()
         appState.settings = settings
 
-        appState.startActivation(parkRef: "us-0001", parkName: "Acadia National Park",
-                                 grid: "FN54vh", callsign: "w2asm")
+        appState.startActivation(kind: .pota, reference: "us-0001",
+                                 referenceName: "Acadia National Park",
+                                 name: nil, grid: "FN54vh", callsign: "w2asm",
+                                 context: context)
 
-        XCTAssertEqual(appState.activationSession?.parkRef, "US-0001")
+        XCTAssertEqual(appState.activationSession?.reference, "US-0001")
         XCTAssertEqual(appState.activationSession?.callsign, "W2ASM")
         XCTAssertEqual(settings.activationParkRef, "US-0001")
         XCTAssertEqual(settings.activationParkName, "Acadia National Park")
         XCTAssertEqual(settings.activationGrid, "FN54vh")
         XCTAssertEqual(settings.activationCallsign, "W2ASM")
+        XCTAssertEqual(settings.activationKind, "pota")
         XCTAssertNotNil(settings.activationStartedAt)
+
+        // The session writes into a persisted Operation row so it shows up
+        // in the Operations list, and new QSOs get stamped with it.
+        let opId = try XCTUnwrap(appState.activationSession?.operationId)
+        XCTAssertEqual(settings.activationOperationId, opId)
+        XCTAssertEqual(ActiveOperationContext.operationId, opId)
+        let ops = try context.fetch(FetchDescriptor<AmateurRadioLog.Operation>())
+        XCTAssertEqual(ops.count, 1)
+        XCTAssertEqual(ops.first?.uuid, opId)
+        XCTAssertEqual(ops.first?.kindRaw, "pota")
+        XCTAssertEqual(ops.first?.reference, "US-0001")
+        appState.endActivation(context: context)
     }
 
     func testEndActivationClearsMirror() throws {
@@ -218,9 +233,10 @@ final class ActivationSessionTests: XCTestCase {
 
         let appState = AppState()
         appState.settings = settings
-        appState.startActivation(parkRef: "US-0001", parkName: nil,
-                                 grid: nil, callsign: "W2ASM")
-        appState.endActivation()
+        appState.startActivation(kind: .pota, reference: "US-0001",
+                                 referenceName: nil, name: nil,
+                                 grid: nil, callsign: "W2ASM", context: context)
+        appState.endActivation(context: context)
 
         XCTAssertNil(appState.activationSession)
         XCTAssertNil(settings.activationParkRef)
@@ -228,6 +244,14 @@ final class ActivationSessionTests: XCTestCase {
         XCTAssertNil(settings.activationGrid)
         XCTAssertNil(settings.activationCallsign)
         XCTAssertNil(settings.activationStartedAt)
+        XCTAssertNil(settings.activationKind)
+        XCTAssertNil(settings.activationOperationId)
+        XCTAssertNil(ActiveOperationContext.operationId)
+        // Ending stamps the row, it doesn't delete it — the log stays
+        // available in the Operations list.
+        let ops = try context.fetch(FetchDescriptor<AmateurRadioLog.Operation>())
+        XCTAssertEqual(ops.count, 1)
+        XCTAssertNotNil(ops.first?.endedAt)
     }
 
     func testCrashRecoveryRestoresSessionFromSettings() throws {
@@ -247,8 +271,10 @@ final class ActivationSessionTests: XCTestCase {
         appState.settings = settings
 
         let session = try XCTUnwrap(appState.activationSession)
-        XCTAssertEqual(session.parkRef, "US-1452")
-        XCTAssertEqual(session.parkName, "Bear Mountain State Park")
+        // A legacy mirror without a kind restores as a POTA session.
+        XCTAssertEqual(session.kind, .pota)
+        XCTAssertEqual(session.reference, "US-1452")
+        XCTAssertEqual(session.referenceName, "Bear Mountain State Park")
         XCTAssertEqual(session.grid, "FN21wh")
         XCTAssertEqual(session.callsign, "W2ASM")
         XCTAssertEqual(session.startedAt.timeIntervalSince1970,

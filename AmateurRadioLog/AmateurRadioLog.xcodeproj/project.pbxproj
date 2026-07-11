@@ -11,6 +11,7 @@
 		020E886940961C819FC2D034 /* FieldDaySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF37FB1C38AF284AB4F6933 /* FieldDaySession.swift */; };
 		0744B0373BDD960A17D15078 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB96D32A2C761676B98BBD9 /* StatsView.swift */; };
 		0756D0FDF747B7FCB0205031 /* WSJTXMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8033725A8E1E4C16F0BE2576 /* WSJTXMessage.swift */; };
+		08D2AB74CE36DC560BA277D2 /* OperationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F6D0CEE1122924B70B3FE6 /* OperationListView.swift */; };
 		0CAB53FC229703CA57C796DF /* QuickEntryBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD8C3278680F85D50E624F2 /* QuickEntryBar.swift */; };
 		0DF3F7CE365AEB412EEBFB37 /* ReplicationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D0C170A2ABFD25C8028769 /* ReplicationLog.swift */; };
 		102C3E048E5DB4CDCA05D7E0 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE906F1F502447279BDF9C8 /* DateFormatters.swift */; };
@@ -209,6 +210,7 @@
 		DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsSummary.swift; sourceTree = "<group>"; };
 		E1C48E5879F0405B6DCABF48 /* TransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportTests.swift; sourceTree = "<group>"; };
 		E3A9E8083EEE13CBB5E48857 /* WSJTXMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXMessageTests.swift; sourceTree = "<group>"; };
+		E3F6D0CEE1122924B70B3FE6 /* OperationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationListView.swift; sourceTree = "<group>"; };
 		E4F9667B78E543487D4805B4 /* QuickEntryParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryParserTests.swift; sourceTree = "<group>"; };
 		E7DF4847F085D3453F05951F /* ActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationView.swift; sourceTree = "<group>"; };
 		F106C61338C6F99B136BB883 /* FilterPerfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPerfTests.swift; sourceTree = "<group>"; };
@@ -428,6 +430,7 @@
 			isa = PBXGroup;
 			children = (
 				E7DF4847F085D3453F05951F /* ActivationView.swift */,
+				E3F6D0CEE1122924B70B3FE6 /* OperationListView.swift */,
 			);
 			path = Field;
 			sourceTree = "<group>";
@@ -692,6 +695,7 @@
 				26EF4116A34E2852176E8B59 /* Mode.swift in Sources */,
 				9FFAF59B4F7465E565A97F48 /* OnboardingView.swift in Sources */,
 				1EC801B97EC58C6096119B34 /* Operation.swift in Sources */,
+				08D2AB74CE36DC560BA277D2 /* OperationListView.swift in Sources */,
 				4682B3123A5EA6C94DA8F2A3 /* POTAExportSheet.swift in Sources */,
 				1B36D089ADFDFAB2D9339696 /* POTASpotProvider.swift in Sources */,
 				C7F65F634CD8A87180F05398 /* ParkDatabase.swift in Sources */,

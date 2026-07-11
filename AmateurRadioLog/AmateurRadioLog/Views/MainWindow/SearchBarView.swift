@@ -25,6 +25,8 @@ struct SearchBarView: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
+                .accessibilityLabel(Text("Back"))
+                .accessibilityIdentifier("logBackButton")
                 #endif
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)

@@ -38,15 +38,20 @@ final class AppSettings {
     /// station callsign are marked complete retroactively on launch.
     var hasCompletedOnboarding: Bool = false
 
-    /// Active POTA activation session, mirrored here for crash recovery
-    /// (AppState.activationSession is the live copy). All fields nil when
-    /// no activation is in progress. Optionals so the CloudKit schema
-    /// migration is safe.
+    /// Active solo operation (POTA/SOTA/general), mirrored here for crash
+    /// recovery (AppState.activationSession is the live copy). All fields
+    /// nil when no operation is in progress. Optionals so the CloudKit
+    /// schema migration is safe. The "Park" naming on the first two is
+    /// historical — they hold whatever the kind's reference is.
     var activationParkRef: String?
     var activationParkName: String?
     var activationGrid: String?
     var activationCallsign: String?
     var activationStartedAt: Date?
+    /// OperationKind rawValue; nil on legacy sessions = POTA.
+    var activationKind: String?
+    /// The Operation row this session writes to.
+    var activationOperationId: UUID?
 
     init() {}
 
