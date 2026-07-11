@@ -158,14 +158,24 @@ struct ContactMapView: View {
     /// Whether the map is currently rendering as a globe (standard style
     /// swapped for imagery at far zoom).
     @State private var globeMode = false
-    /// Enter the globe when the visible span is essentially the whole world.
-    private static let globeEnterSpanDegrees = 240.0
-    /// Leave it once the camera is back below this distance (meters). Lower
-    /// than the enter point's ~23,000 km so the boundary doesn't flap.
-    private static let globeExitDistance = 16_000_000.0
+    /// Enter the globe at the flat map's zoom-out clamp. Which axis hits the
+    /// clamp depends on viewport aspect: portrait fills the world's height
+    /// first (latitude ~170° visible while longitude shows only ~166°), wide
+    /// windows fill its width (longitude 360°). Watch both.
+    private static let globeEnterLonDegrees = 320.0
+    private static let globeEnterLatDegrees = 150.0
+    /// Leave it once the camera is back below this distance (meters) — well
+    /// under the ~16,000-19,000 km where a portrait phone hits the clamp,
+    /// so the boundary doesn't flap.
+    private static let globeExitDistance = 12_000_000.0
+    /// Zoom-to-fit switches to the globe for logs wider than this.
+    private static let globeFitSpanDegrees = 240.0
 
     private func updateGlobeMode(_ context: MapCameraUpdateContext) {
-        if !globeMode, context.region.span.longitudeDelta >= Self.globeEnterSpanDegrees {
+        let span = context.region.span
+        if !globeMode,
+           span.longitudeDelta >= Self.globeEnterLonDegrees
+            || span.latitudeDelta >= Self.globeEnterLatDegrees {
             globeMode = true
         } else if globeMode, context.camera.distance < Self.globeExitDistance {
             globeMode = false
@@ -503,6 +513,11 @@ struct ContactMapView: View {
                                 .clipShape(Circle())
                         }
                         .disabled(pins.isEmpty)
+                        .accessibilityLabel(Text("Zoom to fit all contacts"))
+                        .accessibilityIdentifier("fitAllButton")
+                        // Projection state, exposed so UI tests can assert
+                        // the globe <-> Mercator transitions.
+                        .accessibilityValue(globeMode ? "globe" : "flat")
                         #if os(macOS)
                         .help("Zoom to fit all contacts")
                         #endif
@@ -566,7 +581,7 @@ struct ContactMapView: View {
             latitude: (minLat + maxLat) / 2,
             longitude: (minLon + maxLon) / 2
         )
-        if lonSpan >= Self.globeEnterSpanDegrees {
+        if lonSpan >= Self.globeFitSpanDegrees {
             globeMode = true
             withAnimation(.easeInOut) {
                 cameraPosition = .camera(MapCamera(

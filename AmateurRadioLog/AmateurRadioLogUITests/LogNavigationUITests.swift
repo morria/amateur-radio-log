@@ -62,4 +62,37 @@ final class LogNavigationUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 10),
                       "filtered log list not visible after tapping a filter")
     }
+
+    /// Zooming the map out to the flat map's limit switches to the globe;
+    /// zooming back in returns to Mercator; zooming out again re-enters the
+    /// globe (the round trip regressed once: the enter threshold was
+    /// unreachable on portrait phones).
+    @MainActor
+    func testMapGlobeTransitions() throws {
+        let app = XCUIApplication()
+        // Start well inside Mercator range (4,000 km altitude).
+        app.launchArguments = ["-uiSkipOnboarding", "-uiTab", "map",
+                               "-uiMapDistance", "4000000"]
+        app.launch()
+
+        let projection = app.buttons["fitAllButton"]
+        XCTAssertTrue(projection.waitForExistence(timeout: 10), "map controls not found")
+        XCTAssertEqual(projection.value as? String, "flat", "map did not start flat")
+
+        func pinchUntil(_ expected: String, scale: CGFloat, label: String) {
+            for _ in 0..<6 {
+                app.pinch(withScale: scale, velocity: scale < 1 ? -0.6 : 0.6)
+                usleep(1_500_000) // let the camera settle so .onEnd fires
+                if projection.value as? String == expected { return }
+            }
+            XCTFail("map never became \(label)")
+        }
+
+        // Out to the clamp -> globe.
+        pinchUntil("globe", scale: 0.25, label: "a globe zooming out")
+        // Back in -> Mercator.
+        pinchUntil("flat", scale: 4.0, label: "flat zooming back in")
+        // And out again -> globe (the regression this test exists for).
+        pinchUntil("globe", scale: 0.25, label: "a globe on the second zoom-out")
+    }
 }
