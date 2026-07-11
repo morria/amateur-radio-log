@@ -298,25 +298,30 @@ struct QSOListView: View {
     #endif
 
     #if os(iOS)
+    @ViewBuilder
     private var iOSList: some View {
         let data = appState.filteredQSOs(from: allQSOs)
-        return List(data, id: \.persistentModelID, selection: Binding(
-            get: { selectedQSO?.persistentModelID },
-            set: { id in selectedQSO = id.flatMap { pid in data.first { $0.persistentModelID == pid } } }
-        )) { qso in
-            if showsNavigationLinks {
+        if showsNavigationLinks {
+            // Compact iPhone: no selection binding — a List that has one
+            // consumes row taps to set the selection, so the NavigationLink
+            // would highlight the row but never push. The matching
+            // navigationDestination is registered at the detail column's
+            // NavigationStack root in ContentView.
+            List(data, id: \.persistentModelID) { qso in
                 NavigationLink(value: qso.persistentModelID) {
                     qsoRow(qso)
                 }
-            } else {
+            }
+            .listStyle(.plain)
+        } else {
+            // iPad regular width: selection drives the side detail panel.
+            List(data, id: \.persistentModelID, selection: Binding(
+                get: { selectedQSO?.persistentModelID },
+                set: { id in selectedQSO = id.flatMap { pid in data.first { $0.persistentModelID == pid } } }
+            )) { qso in
                 qsoRow(qso)
             }
-        }
-        .listStyle(.plain)
-        .navigationDestination(for: PersistentIdentifier.self) { id in
-            if let qso = data.first(where: { $0.persistentModelID == id }) {
-                QSODetailView(qso: qso, onEdit: onEdit)
-            }
+            .listStyle(.plain)
         }
     }
 

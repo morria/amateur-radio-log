@@ -123,6 +123,7 @@ struct ContactMapView: View {
     @Environment(\.colorScheme) private var colorScheme
     #if os(iOS)
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     let qsos: [QSO]
     @State private var cameraPosition: MapCameraPosition = .automatic
@@ -245,6 +246,9 @@ struct ContactMapView: View {
     private func callsignSheetContent(pin: QSOMapPin) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                StationLookupCard(callsign: pin.callsign,
+                                  qso: selectedCallsignQSOs.first,
+                                  mapHeight: 140)
                 ForEach(selectedCallsignQSOs, id: \.persistentModelID) { qso in
                     qsoCard(qso)
                 }
@@ -395,85 +399,138 @@ struct ContactMapView: View {
                 updatePins()
             }
 
-            // Top-left: back button (iOS)
+            // Top-left: back button (compact iPhone only — on iPad the
+            // floating sidebar toggle occupies this corner)
             #if os(iOS)
-            VStack {
-                HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "chevron.left")
-                            .font(.body.weight(.semibold))
-                            .padding(10)
-                            .background(.regularMaterial)
-                            .clipShape(Circle())
+            if horizontalSizeClass == .compact {
+                VStack {
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "chevron.left")
+                                .font(.body.weight(.semibold))
+                                .padding(10)
+                                .background(.regularMaterial)
+                                .clipShape(Circle())
+                        }
+                        Spacer()
                     }
                     Spacer()
                 }
-                Spacer()
+                .padding()
             }
-            .padding()
             #endif
 
-            // Top-right: filter button
+            // Top-right: filter + zoom-to-fit buttons
             VStack {
                 HStack {
                     Spacer()
-                    Button(action: { showFilters.toggle() }) {
-                        Image(systemName: appState.hasActiveFilters || appState.mapTimeRange != .allTime
-                              ? "line.3.horizontal.decrease.circle.fill"
-                              : "line.3.horizontal.decrease.circle")
-                            .font(.title2)
-                            .padding(10)
-                            .background(.regularMaterial)
-                            .clipShape(Circle())
-                    }
-                    #if os(macOS)
-                    .popover(isPresented: $showFilters) {
-                        mapFiltersView.padding().frame(width: 280)
-                    }
-                    #else
-                    .sheet(isPresented: $showFilters) {
-                        NavigationStack {
-                            Form { mapFiltersContent }
-                                .navigationTitle("Map Filters")
-                                .navigationBarTitleDisplayMode(.inline)
-                                .toolbar {
-                                    ToolbarItem(placement: .topBarTrailing) {
-                                        Button("Done") { showFilters = false }
-                                    }
-                                }
+                    VStack(spacing: 8) {
+                        Button(action: { showFilters.toggle() }) {
+                            Image(systemName: appState.hasActiveFilters || appState.mapTimeRange != .allTime
+                                  ? "line.3.horizontal.decrease.circle.fill"
+                                  : "line.3.horizontal.decrease.circle")
+                                .font(.title2)
+                                .padding(10)
+                                .background(.regularMaterial)
+                                .clipShape(Circle())
                         }
-                        .presentationDetents([.medium])
+                        #if os(macOS)
+                        .popover(isPresented: $showFilters) {
+                            mapFiltersView.padding().frame(width: 280)
+                        }
+                        #else
+                        .sheet(isPresented: $showFilters) {
+                            NavigationStack {
+                                Form { mapFiltersContent }
+                                    .navigationTitle("Map Filters")
+                                    .navigationBarTitleDisplayMode(.inline)
+                                    .toolbar {
+                                        ToolbarItem(placement: .topBarTrailing) {
+                                            Button("Done") { showFilters = false }
+                                        }
+                                    }
+                            }
+                            .presentationDetents([.medium])
+                        }
+                        #endif
+
+                        Button(action: fitAllContacts) {
+                            Image(systemName: "arrow.down.left.and.arrow.up.right")
+                                .font(.title2)
+                                .padding(10)
+                                .background(.regularMaterial)
+                                .clipShape(Circle())
+                        }
+                        .disabled(pins.isEmpty)
+                        #if os(macOS)
+                        .help("Zoom to fit all contacts")
+                        #endif
                     }
-                    #endif
                 }
                 Spacer()
             }
             .padding()
 
-            // Bottom-left: legend
+            // Bottom row: legend (left) and counts pill (right) share one
+            // HStack so they can never overlap each other.
             VStack {
                 Spacer()
-                HStack {
+                HStack(alignment: .bottom, spacing: 12) {
                     compactLegend
-                    Spacer()
+                        .frame(maxWidth: 300, alignment: .leading)
+                    Spacer(minLength: 12)
+                    countsPill
                 }
             }
             .padding()
+            // Keep clear of MapKit's bottom-left attribution.
+            .padding(.bottom, 12)
+        }
+    }
 
-            // Bottom-right: stats
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Text("\(pins.count) mapped")
-                        .font(.caption2).bold()
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
-                }
+    /// "N mapped" plus, when some filtered QSOs have no coordinates, a
+    /// second line making the silently unmapped remainder visible.
+    private var countsPill: some View {
+        let unlocated = visibleQSOs.count - pins.count
+        return VStack(alignment: .trailing, spacing: 2) {
+            Text("\(pins.count) mapped")
+                .bold()
+            if unlocated > 0 {
+                Text("\(unlocated) without location")
+                    .foregroundStyle(.secondary)
             }
-            .padding()
+        }
+        .font(.caption2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// Frame every mapped contact in one camera move. MapKit clamps the
+    /// region to what the viewport can display, so a world-spanning log
+    /// simply ends up at the maximum zoom-out.
+    private func fitAllContacts() {
+        guard let first = pins.first else { return }
+        var minLat = first.latitude, maxLat = first.latitude
+        var minLon = first.longitude, maxLon = first.longitude
+        for pin in pins.dropFirst() {
+            minLat = min(minLat, pin.latitude); maxLat = max(maxLat, pin.latitude)
+            minLon = min(minLon, pin.longitude); maxLon = max(maxLon, pin.longitude)
+        }
+        let region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLat + maxLat) / 2,
+                longitude: (minLon + maxLon) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: min(max((maxLat - minLat) * 1.3, 4), 180),
+                longitudeDelta: min(max((maxLon - minLon) * 1.3, 4), 360)
+            )
+        )
+        selectedPin = nil
+        withAnimation(.easeInOut) {
+            cameraPosition = .region(region)
         }
     }
 
@@ -552,6 +609,9 @@ struct ContactMapView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
+                        StationLookupCard(callsign: pin.callsign,
+                                          qso: selectedCallsignQSOs.first,
+                                          mapHeight: 140)
                         ForEach(selectedCallsignQSOs, id: \.persistentModelID) { qso in
                             qsoCard(qso)
                         }

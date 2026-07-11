@@ -23,6 +23,10 @@ struct SpotListView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     let allQSOs: [QSO]
 
@@ -41,7 +45,6 @@ struct SpotListView: View {
     // Worked-before / reference-needed lookup sets, rebuilt from allQSOs
     // once per change — never per-row SwiftData queries.
     @State private var workedCalls: Set<String> = []
-    @State private var loggedRefs: Set<String> = []
 
     @State private var confirmation: String?
     @State private var confirmationTask: Task<Void, Never>?
@@ -96,57 +99,98 @@ struct SpotListView: View {
         .onChange(of: filterMode) { _, _ in pushFilter() }
         .onChange(of: enabledSources) { _, _ in pushFilter() }
         .sheet(item: $editorItem) { item in
-            QSOEditorView(data: item.data) { data in
-                appState.saveLastUsed(from: data)
-                modelContext.insert(data.toQSO())
+            LogEntryView(prefill: item.data, presentedAsSheet: true) { qso in
+                workedCalls.insert(qso.call.uppercased())
+                showConfirmation(String(localized: "Logged \(qso.call)"))
             }
         }
     }
 
     // MARK: - Filter Bar
 
+    /// One row is fine on the wide macOS window; on a phone the same content
+    /// overflows (clipping the chips and stretching their labels), so it
+    /// splits across two rows with the chips scrolling horizontally.
+    @ViewBuilder
     private var filterBar: some View {
+        #if os(macOS)
         HStack(spacing: 8) {
             ForEach(availableSources) { source in
                 sourceChip(source)
             }
-
             Divider().frame(height: 16)
-
-            Picker("Band", selection: $filterBand) {
-                Text("All Bands").tag(nil as Band?)
-                ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
-                Divider()
-                ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
-            }
-            .labelsHidden()
-            .fixedSize()
-
-            Picker("Mode", selection: $filterMode) {
-                Text("All Modes").tag(nil as String?)
-                ForEach(availableModes, id: \.self) { Text($0).tag($0 as String?) }
-            }
-            .labelsHidden()
-            .fixedSize()
-
+            bandPicker
+            modePicker
             Spacer(minLength: 0)
-
-            Picker("Presentation", selection: $bandMapMode) {
-                Image(systemName: "clock").tag(false)
-                    .accessibilityLabel(Text("Sort by age"))
-                    .help(Text("Newest first"))
-                Image(systemName: "chart.bar.yaxis").tag(true)
-                    .accessibilityLabel(Text("Band map"))
-                    .help(Text("Band map (sorted by frequency)"))
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-
+            presentationPicker
             statusView
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        #else
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                if horizontalSizeClass == .compact {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(availableSources) { source in
+                            sourceChip(source)
+                        }
+                    }
+                }
+                presentationPicker
+            }
+            HStack(spacing: 12) {
+                bandPicker
+                modePicker
+                Spacer(minLength: 0)
+                statusView
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        #endif
+    }
+
+    private var bandPicker: some View {
+        Picker("Band", selection: $filterBand) {
+            Text("All Bands").tag(nil as Band?)
+            ForEach(Band.hfBands) { Text($0.displayName).tag($0 as Band?) }
+            Divider()
+            ForEach(Band.vhfBands) { Text($0.displayName).tag($0 as Band?) }
+        }
+        .labelsHidden()
+        .fixedSize()
+    }
+
+    private var modePicker: some View {
+        Picker("Mode", selection: $filterMode) {
+            Text("All Modes").tag(nil as String?)
+            ForEach(availableModes, id: \.self) { Text($0).tag($0 as String?) }
+        }
+        .labelsHidden()
+        .fixedSize()
+    }
+
+    private var presentationPicker: some View {
+        Picker("Presentation", selection: $bandMapMode) {
+            Image(systemName: "clock").tag(false)
+                .accessibilityLabel(Text("Sort by age"))
+                .help(Text("Newest first"))
+            Image(systemName: "chart.bar.yaxis").tag(true)
+                .accessibilityLabel(Text("Band map"))
+                .help(Text("Band map (sorted by frequency)"))
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
     }
 
     private func sourceChip(_ source: SpotSource) -> some View {
@@ -161,6 +205,8 @@ struct SpotListView: View {
         } label: {
             Label(source.displayName, systemImage: source.icon)
                 .font(.caption)
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(isOn ? source.tint.opacity(0.18) : Color.gray.opacity(0.10),
@@ -239,7 +285,6 @@ struct SpotListView: View {
                             spot: spot,
                             now: now,
                             workedBefore: isWorkedBefore(spot),
-                            referenceNeeded: isReferenceNeeded(spot),
                             onOpen: { openEditor(spot) },
                             onLogNow: { logNow(spot) })
                     }
@@ -278,24 +323,15 @@ struct SpotListView: View {
         return workedCalls.contains(call) || workedCalls.contains(Self.baseCallsign(call))
     }
 
-    private func isReferenceNeeded(_ spot: Spot) -> Bool {
-        guard let reference = spot.reference, !reference.isEmpty else { return false }
-        return !loggedRefs.contains(reference.uppercased())
-    }
-
     /// Rebuilt once per QSO-set change; rows only do Set lookups.
     private func rebuildLookupSets() {
         var calls = Set<String>()
-        var refs = Set<String>()
         for qso in allQSOs {
             let call = qso.call.uppercased()
             calls.insert(call)
             calls.insert(Self.baseCallsign(call))
-            if let ref = qso.potaRef, !ref.isEmpty { refs.insert(ref.uppercased()) }
-            if let ref = qso.sotaRef, !ref.isEmpty { refs.insert(ref.uppercased()) }
         }
         workedCalls = calls
-        loggedRefs = refs
     }
 
     /// "EA8/W1AW/P" → "W1AW": the slash-separated segment that looks most
@@ -319,8 +355,9 @@ struct SpotListView: View {
                            power: appState.lastPower)
     }
 
-    /// Tap: open the full editor prefilled from the spot; the editor's
-    /// debounced lookup fills name/grid (SOTA spots carry no grid).
+    /// Tap: open the standard entry form prefilled from the spot; its lookup
+    /// fills name/location/grid (SOTA spots carry no grid) and pins the
+    /// station on the map.
     private func openEditor(_ spot: Spot) {
         editorItem = SpotEditorItem(data: QSOEditData(from: spot, defaults: currentDefaults()))
     }
@@ -334,7 +371,7 @@ struct SpotListView: View {
         data.rstRcvd = rst
 
         // Stamp operator/station identity from settings (same as
-        // QSOEditorView's save path).
+        // LogEntryView's save path).
         if let callsign = appState.settings?.stationCallsign, !callsign.isEmpty {
             data.operatorCallsign = callsign
         }
@@ -345,7 +382,6 @@ struct SpotListView: View {
         appState.saveLastUsed(from: data)
 
         workedCalls.insert(spot.activatorCall.uppercased())
-        if let ref = spot.reference { loggedRefs.insert(ref.uppercased()) }
 
         showConfirmation(String(localized: "Logged \(spot.activatorCall)"))
         backfill(qso, call: spot.activatorCall)
@@ -411,7 +447,6 @@ private struct SpotRowView: View {
     let spot: Spot
     let now: Date
     let workedBefore: Bool
-    let referenceNeeded: Bool
     var onOpen: () -> Void
     var onLogNow: () -> Void
 
@@ -435,17 +470,6 @@ private struct SpotRowView: View {
                             .foregroundStyle(.green)
                             #if os(macOS)
                             .help("Worked before")
-                            #endif
-                    }
-                    if referenceNeeded {
-                        Text("NEW REF")
-                            .font(.caption2.bold())
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.blue.opacity(0.18), in: Capsule())
-                            .foregroundStyle(.blue)
-                            #if os(macOS)
-                            .help("Reference not in your log yet")
                             #endif
                     }
                 }

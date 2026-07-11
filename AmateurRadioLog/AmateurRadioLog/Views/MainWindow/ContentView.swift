@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 enum NavigationTab: String, CaseIterable, Identifiable {
     case log = "Log"
+    case entry = "New QSO"
     case map = "Map"
     case spots = "Spots"
     case stats = "Statistics"
@@ -13,6 +14,7 @@ enum NavigationTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .log: return "list.bullet.rectangle"
+        case .entry: return "square.and.pencil"
         case .map: return "map"
         case .spots: return "dot.radiowaves.left.and.right"
         case .stats: return "chart.bar"
@@ -32,6 +34,10 @@ struct ContentView: View {
     @State private var showingExportSheet = false
     @State private var showingOnboarding = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+    #if os(iOS)
+    /// Pushed QSO details in the detail column (see detailPopSignal).
+    @State private var iosDetailPath: [PersistentIdentifier] = []
+    #endif
 
     #if os(macOS)
     // Window undo stack, wired into modelContext so SwiftData registers
@@ -56,13 +62,36 @@ struct ContentView: View {
                 #endif
         } detail: {
             #if os(iOS)
-            iOSDetailView
-                .toolbar(.hidden, for: .navigationBar)
+            // Explicit stack: value-based NavigationLinks (log rows) don't
+            // push through a collapsed NavigationSplitView's implicit stack.
+            // The destination is registered here at the stack root — inside
+            // the lazy List it wouldn't reliably be visible to the stack.
+            NavigationStack(path: $iosDetailPath) {
+                iOSDetailView
+                    .toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(for: PersistentIdentifier.self) { id in
+                        if let qso = allQSOs.first(where: { $0.persistentModelID == id }) {
+                            QSODetailView(qso: qso, onEdit: { editData = QSOEditData(from: $0) })
+                                // The detail root hides the navigation bar;
+                                // the pushed screen needs it for Back.
+                                .toolbar(.visible, for: .navigationBar)
+                                .navigationTitle(qso.call)
+                                .navigationBarTitleDisplayMode(.inline)
+                        }
+                    }
+            }
+            // Navigation actions (tapped filters, Show on Map) switch the
+            // tab *underneath* a pushed detail screen — pop it so the
+            // destination is actually visible.
+            .onChange(of: appState.detailPopSignal) { _, _ in
+                iosDetailPath.removeAll()
+            }
             #else
             // Only mount the active tab: invisible Map/Stats views would
             // otherwise recompute on every filter change and @Query update.
             switch appState.selectedTab {
             case .log: logView
+            case .entry: LogEntryView()
             case .map: ContactMapView(qsos: allQSOs)
             case .spots: SpotListView(allQSOs: allQSOs)
             case .stats: StatsView(qsos: allQSOs)
@@ -75,19 +104,17 @@ struct ContentView: View {
         #endif
         .toolbar { toolbarContent }
         .sheet(isPresented: $showingNewQSO) {
-            QSOEditorView(data: newQSOData()) { data in
-                appState.saveLastUsed(from: data)
-                modelContext.insert(data.toQSO())
-            }
+            // Same fast form as the New QSO tab; it inserts and saves
+            // last-used values itself.
+            LogEntryView(presentedAsSheet: true)
         }
         .sheet(item: $editData) { data in
-            QSOEditorView(data: data) { updated in
-                appState.saveLastUsed(from: updated)
+            LogEntryView(prefill: data, presentedAsSheet: true, onSave: { updated in
                 if let id = updated.id,
                    let qso = modelContext.model(for: id) as? QSO {
                     updated.apply(to: qso)
                 }
-            }
+            })
         }
         .fileImporter(isPresented: $showingImporter,
                        allowedContentTypes: [.plainText, .data],
@@ -102,22 +129,10 @@ struct ContentView: View {
         .sheet(item: $appState.importPreview) { preview in
             ImportPreviewSheet(preview: preview)
         }
-        #if os(macOS)
-        // Build the document only while the export sheet is up so body
-        // doesn't read the filter state (searchText etc.) on every keystroke.
-        .fileExporter(isPresented: $showingExportSheet,
-                       document: showingExportSheet ? ADIFDocument(qsos: exportQSOs) : nil,
-                       contentType: ADIFDocument.adifType,
-                       defaultFilename: ADIFDocument.exportFileName(
-                           callsign: appState.settings?.stationCallsign, suffix: "log")) { _ in }
-        #else
-        // iOS: exports go through the share sheet (Files, AirDrop, Mail)
-        // with a temp file written on Export tap.
-        .sheet(item: $shareFile) { file in
-            ShareSheet(items: [file.url])
-                .presentationDetents([.medium, .large])
+        // Unified export: format picker (ADIF / LoTW / POTA) in one sheet.
+        .sheet(isPresented: $showingExportSheet) {
+            ExportSheet(allQSOs: allQSOs)
         }
-        #endif
         .alert("Error", isPresented: Binding(
             get: { appState.errorMessage != nil },
             set: { if !$0 { appState.errorMessage = nil } }
@@ -157,6 +172,24 @@ struct ContentView: View {
         .onAppear {
             let settings = AppSettings.shared(context: modelContext)
             appState.settings = settings
+            #if DEBUG
+            // Screenshot/UI-test hook: `-uiTab stats` opens a tab directly,
+            // `-uiSkipOnboarding` suppresses first-run onboarding.
+            let args = ProcessInfo.processInfo.arguments
+            if let idx = args.firstIndex(of: "-uiTab"), args.indices.contains(idx + 1) {
+                switch args[idx + 1] {
+                case "log": appState.selectedTab = .log
+                case "entry": appState.selectedTab = .entry
+                case "map": appState.selectedTab = .map
+                case "spots": appState.selectedTab = .spots
+                case "stats": appState.selectedTab = .stats
+                default: break
+                }
+            }
+            if args.contains("-uiSkipOnboarding") {
+                settings.hasCompletedOnboarding = true
+            }
+            #endif
             #if os(macOS)
             modelContext.undoManager = undoManager
             #endif
@@ -205,13 +238,6 @@ struct ContentView: View {
         #endif
     }
 
-    private var exportQSOs: [QSO] {
-        if appState.selectedTab == .log {
-            return appState.filteredQSOs(from: allQSOs)
-        }
-        return allQSOs.filter { $0.deletedAt == nil }
-    }
-
     /// Count for the "Export N QSOs" label. Uses the list's maintained
     /// visible count on the log tab instead of re-running the filter pass
     /// on every body evaluation.
@@ -222,43 +248,14 @@ struct ContentView: View {
         return allQSOs.count
     }
 
-    /// Toolbar Export / sidebar "Export Log (ADIF)": save panel on macOS,
-    /// share sheet with a freshly written temp file on iOS.
+    /// Toolbar Export / sidebar "Export Log…": opens the unified export
+    /// sheet (format choice, then save panel on macOS / share sheet on iOS).
     private func beginExport() {
-        #if os(macOS)
         showingExportSheet = true
-        #else
-        shareFile = writeShareFile(qsos: exportQSOs)
-        #endif
     }
 
     #if os(iOS)
-    @State private var shareFile: ShareFile?
-
-    private func writeShareFile(qsos: [QSO]) -> ShareFile? {
-        let name = ADIFDocument.exportFileName(
-            callsign: appState.settings?.stationCallsign, suffix: "log")
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        do {
-            try ADIFWriter().write(qsos: qsos).write(to: url, atomically: true, encoding: .utf8)
-            return ShareFile(url: url)
-        } catch {
-            appState.errorMessage = String(localized: "Export failed: \(error.localizedDescription)")
-            return nil
-        }
-    }
-    #endif
-
-    private func newQSOData() -> QSOEditData {
-        var data = QSOEditData()
-        if data.band == nil { data.band = appState.lastBand }
-        if data.mode == nil { data.mode = appState.lastMode }
-        if data.freq == nil { data.freq = appState.lastFreq }
-        if data.txPower == nil { data.txPower = appState.lastPower }
-        return data
-    }
-
-    #if os(iOS)
+    @State private var hasShownEntry = false
     @State private var hasShownMap = false
     @State private var hasShownSpots = false
     @State private var hasShownStats = false
@@ -271,6 +268,11 @@ struct ContentView: View {
                     logView
                         .opacity(appState.selectedTab == .log ? 1 : 0)
                         .allowsHitTesting(appState.selectedTab == .log)
+                    if hasShownEntry {
+                        LogEntryView()
+                            .opacity(appState.selectedTab == .entry ? 1 : 0)
+                            .allowsHitTesting(appState.selectedTab == .entry)
+                    }
                     if hasShownMap {
                         ContactMapView(qsos: allQSOs)
                             .opacity(appState.selectedTab == .map ? 1 : 0)
@@ -306,6 +308,7 @@ struct ContentView: View {
         }
         .overlay(alignment: .bottom) { undoSnackbar }
         .onChange(of: appState.selectedTab) { _, tab in
+            if tab == .entry { hasShownEntry = true }
             if tab == .map { hasShownMap = true }
             if tab == .spots { hasShownSpots = true }
             if tab == .stats { hasShownStats = true }
@@ -466,26 +469,6 @@ struct QSOLogView: View {
         VStack(spacing: 0) {
             SearchBarView()
             Divider()
-            // Quick entry: macOS always, iPad regular width only (compact
-            // iPhone keeps the sheet flow).
-            if usesSidePanel {
-                // Defaults follow the live rig when connected (CAT rig wins
-                // over WSJT-X — see AppState.liveRigDefaults), falling back
-                // to the last-used values otherwise.
-                QuickEntryBar(defaultsProvider: { [appState] in
-                    guard let rig = appState.liveRigDefaults else {
-                        return QuickEntryDefaults(
-                            band: appState.lastBand, mode: appState.lastMode,
-                            freq: appState.lastFreq, power: appState.lastPower)
-                    }
-                    return QuickEntryDefaults(
-                        band: rig.band ?? appState.lastBand,
-                        mode: rig.mode ?? appState.lastMode,
-                        freq: rig.freqMHz ?? appState.lastFreq,
-                        power: appState.lastPower)
-                })
-                Divider()
-            }
             HStack(spacing: 0) {
                 QSOListView(
                     allQSOs: allQSOs,
@@ -507,16 +490,16 @@ struct QSOLogView: View {
                     withAnimation { showDetailPanel = true }
                 }
             }
-            .toolbar {
-                if usesSidePanel {
-                    ToolbarItem(placement: .automatic) {
-                        Button(action: { withAnimation { showDetailPanel.toggle() } }) {
-                            Label("Inspector", systemImage: "sidebar.trailing")
-                        }
-                        #if os(macOS)
-                        .help(showDetailPanel ? "Hide Detail Panel" : "Show Detail Panel")
-                        #endif
+        }
+        .toolbar {
+            if usesSidePanel {
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { withAnimation { showDetailPanel.toggle() } }) {
+                        Label("Inspector", systemImage: "sidebar.trailing")
                     }
+                    #if os(macOS)
+                    .help(showDetailPanel ? "Hide Detail Panel" : "Show Detail Panel")
+                    #endif
                 }
             }
         }

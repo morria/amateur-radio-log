@@ -70,6 +70,20 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Amateur Radio Log.app/Contents/MacOS/Amateur Radio Log"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  AmateurRadioLogUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS]
+    sources:
+      - AmateurRadioLogUITests
+    dependencies:
+      - target: AmateurRadioLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.w2asm.AmateurRadioLogUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: AmateurRadioLog
+        DEVELOPMENT_TEAM: 7Q2SS8772K
+
 schemes:
   AmateurRadioLog:
     build:
@@ -87,3 +101,13 @@ schemes:
       config: Debug
     archive:
       config: Release
+  # iOS-only UI tests: the unit-test bundle is macOS-only, so these get
+  # their own scheme rather than sharing the main scheme's test action.
+  AmateurRadioLogUITests:
+    build:
+      targets:
+        AmateurRadioLogUITests: test
+    test:
+      config: Debug
+      targets:
+        - AmateurRadioLogUITests

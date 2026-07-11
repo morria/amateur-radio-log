@@ -49,7 +49,7 @@ struct AmateurRadioLogApp: App {
                 }
                 .keyboardShortcut("i")
 
-                Button("Export ADIF...") {
+                Button("Export...") {
                     NotificationCenter.default.post(name: .exportADIF, object: nil)
                 }
                 .keyboardShortcut("e")
@@ -67,12 +67,8 @@ struct AmateurRadioLogApp: App {
                 .keyboardShortcut("f")
 
                 Button("Quick Entry") {
-                    appState.selectedTab = .log
-                    // Post async so the log tab (and the quick-entry bar) is
-                    // mounted before the focus request arrives
-                    DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: .quickEntryFocus, object: nil)
-                    }
+                    // The New QSO tab focuses its callsign field on appear.
+                    appState.selectedTab = .entry
                 }
                 .keyboardShortcut("l")
             }
@@ -101,5 +97,4 @@ extension Notification.Name {
     static let importADIF = Notification.Name("importADIF")
     static let exportADIF = Notification.Name("exportADIF")
     static let findQSO = Notification.Name("findQSO")
-    static let quickEntryFocus = Notification.Name("quickEntryFocus")
 }

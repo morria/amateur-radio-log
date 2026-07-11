@@ -46,6 +46,8 @@ struct QSODetailView: View {
                     Button(action: {
                         appState.clearFilters()
                         appState.searchText = qso.qsoDate
+                        appState.selectedTab = .log
+                        appState.popDetailStack()
                     }) {
                         Text(qso.displayDate)
                             .foregroundStyle(.blue)
@@ -57,6 +59,10 @@ struct QSODetailView: View {
                         Button("Edit") { onEdit(qso) }
                     }
                 }
+
+                // Who and where, with a pin — the QSO's own values, with any
+                // gaps filled from QRZ/HamQTH.
+                StationLookupCard(callsign: qso.call, qso: qso, mapHeight: 160)
 
                 Divider()
 
@@ -97,6 +103,7 @@ struct QSODetailView: View {
                         appState.clearFilters()
                         appState.searchText = qso.qsoDate.isEmpty ? "" : ADIFDateFormatter.displayDate(qso.qsoDate)
                         appState.selectedTab = .log
+                        appState.popDetailStack()
                     }
                     DetailRow(label: "Frequency", value: qso.displayFrequency)
                     clickableDetailRow(label: "Band", value: qso.band?.displayName) {

@@ -127,30 +127,45 @@ struct POTAExportSheet: View {
         }
     }
 
+    private func refreshMatchingQSOs() {
+        matchingQSOs = POTAExportBuilder.matchingQSOs(
+            context: modelContext, dateString: dateString, park: parkReference)
+    }
+
+    private func prepareExport() {
+        exportContent = POTAExportBuilder.buildContent(
+            qsos: matchingQSOs, park: parkReference, callsign: stationCallsign)
+        exportFilename = POTAExportBuilder.filename(
+            callsign: stationCallsign, park: parkReference, dateString: dateString)
+        showExporter = true
+    }
+}
+
+/// POTA export logic shared by POTAExportSheet (activation flow) and the
+/// unified ExportSheet.
+@MainActor
+enum POTAExportBuilder {
     /// QSOs on the activation date. When a park is set, QSOs explicitly
     /// stamped for a *different* park (a second activation the same day)
     /// are excluded; unstamped QSOs stay in and get the park injected at
     /// export time.
-    private func refreshMatchingQSOs() {
-        let dateStr = dateString
+    static func matchingQSOs(context: ModelContext, dateString: String, park: String) -> [QSO] {
         let descriptor = FetchDescriptor<QSO>(
-            predicate: #Predicate { $0.qsoDate == dateStr },
+            predicate: #Predicate { $0.qsoDate == dateString },
             sortBy: [SortDescriptor(\.timeOn)]
         )
-        var qsos = (try? modelContext.fetch(descriptor)) ?? []
-        let park = parkReference.trimmingCharacters(in: .whitespaces)
-        if !park.isEmpty {
+        var qsos = (try? context.fetch(descriptor)) ?? []
+        let trimmedPark = park.trimmingCharacters(in: .whitespaces)
+        if !trimmedPark.isEmpty {
             qsos = qsos.filter { qso in
                 guard let info = qso.mySigInfo, !info.isEmpty else { return true }
-                return info.caseInsensitiveCompare(park) == .orderedSame
+                return info.caseInsensitiveCompare(trimmedPark) == .orderedSame
             }
         }
-        matchingQSOs = qsos
+        return qsos
     }
 
-    private func prepareExport() {
-        let callsign = stationCallsign
-        let park = parkReference
+    static func buildContent(qsos: [QSO], park: String, callsign: String) -> String {
         let writer = ADIFWriter()
 
         var output = ""
@@ -160,7 +175,7 @@ struct POTAExportSheet: View {
         output += "<PROGRAMVERSION:5>1.0.0 "
         output += "\r\n<EOH>\r\n\r\n"
 
-        for qso in matchingQSOs {
+        for qso in qsos {
             var record = QSORecord(from: qso)
             // Hoist legacy MY_SIG/MY_SIG_INFO stored as overflow fields
             // (imports predating the dedicated columns) so they aren't
@@ -184,12 +199,13 @@ struct POTAExportSheet: View {
                 .replacingOccurrences(of: "\n", with: "\r\n")
             output += "\r\n"
         }
+        return output
+    }
 
-        exportContent = output
-        // Filename convention: callsign@park-date.adi
+    /// Filename convention: callsign@park-date.adi
+    static func filename(callsign: String, park: String, dateString: String) -> String {
         let safePark = park.replacingOccurrences(of: "/", with: "-")
-        exportFilename = "\(callsign.isEmpty ? "log" : callsign)@\(safePark)-\(dateString).adi"
-        showExporter = true
+        return "\(callsign.isEmpty ? "log" : callsign)@\(safePark)-\(dateString).adi"
     }
 }
 

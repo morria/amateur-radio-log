@@ -71,29 +71,30 @@ struct StatsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Filters
-                #if os(iOS)
-                VStack(spacing: 8) {
-                    HStack {
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "chevron.left")
-                                .font(.title2.weight(.semibold))
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        Spacer()
-                        if hasStatsFilters {
-                            Button("Clear Filters") {
-                                statsBand = nil
-                                statsMode = nil
-                                statsTimeRange = .allTime
-                            }
-                            .font(.subheadline)
-                        }
-                    }
-                    HStack(spacing: 12) {
+        VStack(spacing: 0) {
+            #if os(iOS)
+            // Fixed header: back + filters stay put while the stats scroll,
+            // and the content isn't subject to the hidden-navigation-bar
+            // inset a top-of-screen ScrollView picks up.
+            iOSFilterHeader
+            Divider()
+            #endif
+            statsScrollView
+        }
+    }
+
+    #if os(iOS)
+    private var iOSFilterHeader: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
                         Menu {
                             Picker("Band", selection: $statsBand) {
                                 Text("All Bands").tag(nil as Band?)
@@ -136,11 +137,28 @@ struct StatsView: View {
                                 .background(.quaternary)
                                 .clipShape(Capsule())
                         }
-                        Spacer()
+                        if hasStatsFilters {
+                            Button("Clear") {
+                                statsBand = nil
+                                statsMode = nil
+                                statsTimeRange = .allTime
+                            }
+                            .font(.subheadline)
+                        }
                     }
                 }
-                .padding(.horizontal)
-                #else
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        }
+    }
+    #endif
+
+    private var statsScrollView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Filters
+                #if os(macOS)
                 GroupBox {
                     HStack(spacing: 16) {
                         Picker("Band", selection: $statsBand) {

@@ -163,6 +163,12 @@ final class AppState {
     // MARK: - Navigation
     var selectedTab: NavigationTab = .log
     var mapHighlightQSOId: String?
+    /// Incremented to pop the iPhone detail navigation stack (a pushed QSO
+    /// detail screen would otherwise stay on top when a tapped filter or
+    /// "Show on Map" switches the tab underneath it).
+    var detailPopSignal = 0
+
+    func popDetailStack() { detailPopSignal += 1 }
 
     // Log list visibility counts (maintained by QSOListView, shown by SearchBarView)
     var visibleQSOCount: Int?
@@ -605,10 +611,12 @@ final class AppState {
     func showOnMap(qso: QSO) {
         mapHighlightQSOId = "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)"
         selectedTab = .map
+        popDetailStack()
     }
 
     func showFilteredOnMap() {
         selectedTab = .map
+        popDetailStack()
     }
 
     func showLogFiltered(callsign: String? = nil, country: String? = nil, state: String? = nil,
@@ -630,6 +638,7 @@ final class AppState {
         filterOperationId = operationId
         filterOperationLabel = operationLabel
         selectedTab = .log
+        popDetailStack()
     }
 
     func saveLastUsed(from data: QSOEditData) {

@@ -21,19 +21,21 @@
 		19097C0389A3281BF52548B5 /* SignalReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9608DE44244D28AC40650023 /* SignalReportTests.swift */; };
 		1A88093BD5F11210FFB8CE4E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F92A9393C186928D96B2C35 /* SettingsView.swift */; };
 		1B36D089ADFDFAB2D9339696 /* POTASpotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEF94CD2F382292F9D4A703 /* POTASpotProvider.swift */; };
+		1C776DF9732340F3DAB11238 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F71B16C1D273164AC9A61F /* ExportSheet.swift */; };
 		1EAC967CC8733795865AF197 /* SearchBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E81E8F81A3699300D8265B9 /* SearchBarView.swift */; };
 		1EC801B97EC58C6096119B34 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B96575BF9DA100395A383A /* Operation.swift */; };
+		1FEE73AA367F2CDA4E7DC43A /* LogNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */; };
 		26EF4116A34E2852176E8B59 /* Mode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F44254B1312E8C10FAECED7 /* Mode.swift */; };
 		27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FD889A4B81B4BF6623F368E /* SyncEngine.swift */; };
 		28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */; };
 		2A025DF68A820CA19D11B48E /* FrequencyBandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */; };
+		2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C20 /* StationInfoCard.swift */; };
 		32AF577147893E10F915E91A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */; };
 		342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */; };
 		3E21A60E4FA3F089CC9385CA /* ADIFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */; };
 		3E2D570DF678103C64D88A1D /* XMLResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5E74769E2B699BCAA597B7 /* XMLResponseParser.swift */; };
 		4682B3123A5EA6C94DA8F2A3 /* POTAExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */; };
 		48C8760B6FAB8E247FA7A80B /* SpotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733F41AD731BAB10F094E805 /* SpotTests.swift */; };
-		4F457C4EF7685B3F66A2CA7C /* QSOEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BAE4C3BE98BF2EEE041BCF /* QSOEditorView.swift */; };
 		4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */; };
 		555AF6B24AACEBD7F9D000A1 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908896B782E1C73A0E87D9C6 /* AppSettings.swift */; };
 		5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */; };
@@ -73,6 +75,7 @@
 		BF84C71FB3F043313B4829C8 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC69A3DA9ED827733908D386 /* SidebarView.swift */; };
 		BF9953C0718F0E1FA326C3B6 /* SpotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0510701E4652985EC2569789 /* SpotProvider.swift */; };
 		C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1606C15DE6AFF14E21D041DB /* SpotSubmitter.swift */; };
+		C775845EEB2D4BDCBA864C4E /* LogEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D602CAA8FEA9D6503701EF /* LogEntryView.swift */; };
 		C7F65F634CD8A87180F05398 /* ParkDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */; };
 		CC84B2F8FBAB6BC81293AEDB /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 4358E0583762C64EA1F32B3A /* Localizable.xcstrings */; };
 		CF63EB88DA24FFF973E7CD44 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDDCC7FE322839647F492A6A /* SyncEngineTests.swift */; };
@@ -99,6 +102,13 @@
 
 /* Begin PBXContainerItemProxy section */
 		7091996ECAE4A77481C5245C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B747FE01BF86B24E2DFB327E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0E7D9AE1B42CB74A20FF148F;
+			remoteInfo = AmateurRadioLog;
+		};
+		8278C836C8BB603365ED2DA3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B747FE01BF86B24E2DFB327E /* Project object */;
 			proxyType = 1;
@@ -134,6 +144,7 @@
 		2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParkDatabase.swift; sourceTree = "<group>"; };
 		32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactMapView.swift; sourceTree = "<group>"; };
 		33FF7077DF7629746C2915FC /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
+		364515BC2452FE33C5C76C20 /* StationInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationInfoCard.swift; sourceTree = "<group>"; };
 		3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TQSLLauncher.swift; sourceTree = "<group>"; };
 		3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXListener.swift; sourceTree = "<group>"; };
 		3D76E301651BC205642DEDC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -146,6 +157,7 @@
 		4CCE36237C486A6263722A95 /* SOTASpotProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SOTASpotProvider.swift; sourceTree = "<group>"; };
 		4E81E8F81A3699300D8265B9 /* SearchBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBarView.swift; sourceTree = "<group>"; };
 		4F5E74769E2B699BCAA597B7 /* XMLResponseParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XMLResponseParser.swift; sourceTree = "<group>"; };
+		52D602CAA8FEA9D6503701EF /* LogEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntryView.swift; sourceTree = "<group>"; };
 		5B533A3F90ACF8E596A7C622 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5FD889A4B81B4BF6623F368E /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
 		60F8F307E5EFA04807765245 /* AmateurRadioLogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AmateurRadioLogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -156,8 +168,10 @@
 		6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POTAExportSheet.swift; sourceTree = "<group>"; };
 		6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceCredentials.swift; sourceTree = "<group>"; };
 		733F41AD731BAB10F094E805 /* SpotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotTests.swift; sourceTree = "<group>"; };
+		73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogNavigationUITests.swift; sourceTree = "<group>"; };
 		751E4D19CC969EC2263A7F5E /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		761336091234E9F93ED4B666 /* UploadResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResult.swift; sourceTree = "<group>"; };
+		77F71B16C1D273164AC9A61F /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		78E3BA1BA315779F6F1BFDBE /* Band.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Band.swift; sourceTree = "<group>"; };
 		797C4DCC41A6E63706ECBAED /* QSODetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSODetailView.swift; sourceTree = "<group>"; };
 		7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigServiceTests.swift; sourceTree = "<group>"; };
@@ -185,7 +199,6 @@
 		CC2483A64E690C0B3928EA6A /* ImportPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPreviewSheet.swift; sourceTree = "<group>"; };
 		D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ADIFWriter.swift; sourceTree = "<group>"; };
 		D250A1822805EEF592F8859A /* QSO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSO.swift; sourceTree = "<group>"; };
-		D3BAE4C3BE98BF2EEE041BCF /* QSOEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOEditorView.swift; sourceTree = "<group>"; };
 		D5065C428C2F4027D8B9B9DD /* SpotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotService.swift; sourceTree = "<group>"; };
 		D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncResultTests.swift; sourceTree = "<group>"; };
 		D7B96575BF9DA100395A383A /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
@@ -200,6 +213,7 @@
 		E7DF4847F085D3453F05951F /* ActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationView.swift; sourceTree = "<group>"; };
 		F106C61338C6F99B136BB883 /* FilterPerfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPerfTests.swift; sourceTree = "<group>"; };
 		F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignLookupResult.swift; sourceTree = "<group>"; };
+		F7C1963EF5268CDE6655022B /* AmateurRadioLogUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AmateurRadioLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -218,6 +232,7 @@
 			children = (
 				6803286BF695C3F0F92EB2F3 /* AmateurRadioLog */,
 				8FAC315BA010FCFB30487B7C /* AmateurRadioLogTests */,
+				4D988DED40AF95AD21D31107 /* AmateurRadioLogUITests */,
 				F83FFE5BBAE2F3DD12F802A2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -278,6 +293,14 @@
 			path = Settings;
 			sourceTree = "<group>";
 		};
+		4D988DED40AF95AD21D31107 /* AmateurRadioLogUITests */ = {
+			isa = PBXGroup;
+			children = (
+				73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */,
+			);
+			path = AmateurRadioLogUITests;
+			sourceTree = "<group>";
+		};
 		508E2A639159BE0426EDE1D3 /* Spots */ = {
 			isa = PBXGroup;
 			children = (
@@ -289,6 +312,7 @@
 		6316CCC34F629DF90E8E3169 /* Export */ = {
 			isa = PBXGroup;
 			children = (
+				77F71B16C1D273164AC9A61F /* ExportSheet.swift */,
 				6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */,
 			);
 			path = Export;
@@ -422,7 +446,7 @@
 		D96138A96E37C2AC547946C1 /* Editor */ = {
 			isa = PBXGroup;
 			children = (
-				D3BAE4C3BE98BF2EEE041BCF /* QSOEditorView.swift */,
+				52D602CAA8FEA9D6503701EF /* LogEntryView.swift */,
 			);
 			path = Editor;
 			sourceTree = "<group>";
@@ -453,6 +477,7 @@
 			isa = PBXGroup;
 			children = (
 				834B46C3E471F216FB58CCE9 /* ShareSheet.swift */,
+				364515BC2452FE33C5C76C20 /* StationInfoCard.swift */,
 				DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */,
 				ADB96D32A2C761676B98BBD9 /* StatsView.swift */,
 			);
@@ -464,6 +489,7 @@
 			children = (
 				6D213CB06684EA31D0ECBEB1 /* AmateurRadioLog.app */,
 				60F8F307E5EFA04807765245 /* AmateurRadioLogTests.xctest */,
+				F7C1963EF5268CDE6655022B /* AmateurRadioLogUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -506,6 +532,24 @@
 			productReference = 6D213CB06684EA31D0ECBEB1 /* AmateurRadioLog.app */;
 			productType = "com.apple.product-type.application";
 		};
+		66CE212D47E55AB4BDBF9C3C /* AmateurRadioLogUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54598DF195FA07316078DDDF /* Build configuration list for PBXNativeTarget "AmateurRadioLogUITests" */;
+			buildPhases = (
+				7DCFAD0B98535339CE0EA07D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8DA756FE2BC72F515D1B88F4 /* PBXTargetDependency */,
+			);
+			name = AmateurRadioLogUITests;
+			packageProductDependencies = (
+			);
+			productName = AmateurRadioLogUITests;
+			productReference = F7C1963EF5268CDE6655022B /* AmateurRadioLogUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		F17C98F5EF83D2EAF1BC5AFD /* AmateurRadioLogTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F4CCAE402F3AF910D02896DB /* Build configuration list for PBXNativeTarget "AmateurRadioLogTests" */;
@@ -536,6 +580,10 @@
 					0E7D9AE1B42CB74A20FF148F = {
 						DevelopmentTeam = 7Q2SS8772K;
 					};
+					66CE212D47E55AB4BDBF9C3C = {
+						DevelopmentTeam = 7Q2SS8772K;
+						TestTargetID = 0E7D9AE1B42CB74A20FF148F;
+					};
 				};
 			};
 			buildConfigurationList = 9D8DAF2F843E7CF58464EE49 /* Build configuration list for PBXProject "AmateurRadioLog" */;
@@ -559,6 +607,7 @@
 			targets = (
 				0E7D9AE1B42CB74A20FF148F /* AmateurRadioLog */,
 				F17C98F5EF83D2EAF1BC5AFD /* AmateurRadioLogTests */,
+				66CE212D47E55AB4BDBF9C3C /* AmateurRadioLogUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -577,6 +626,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		7DCFAD0B98535339CE0EA07D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1FEE73AA367F2CDA4E7DC43A /* LogNavigationUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		91BF8231598CFCFCDB149E60 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -619,6 +676,7 @@
 				61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */,
 				32AF577147893E10F915E91A /* ContentView.swift in Sources */,
 				102C3E048E5DB4CDCA05D7E0 /* DateFormatters.swift in Sources */,
+				1C776DF9732340F3DAB11238 /* ExportSheet.swift in Sources */,
 				020E886940961C819FC2D034 /* FieldDaySession.swift in Sources */,
 				FFAA95827B9009EA6DFD902B /* FieldDayView.swift in Sources */,
 				2A025DF68A820CA19D11B48E /* FrequencyBandMapper.swift in Sources */,
@@ -629,6 +687,7 @@
 				B34998BF85699C26C7DA09AA /* KeychainManager.swift in Sources */,
 				9CC7306B7E7DDB9D5E51A514 /* LoTWService.swift in Sources */,
 				A0B09F303E4E3B501249FB64 /* LocationManager.swift in Sources */,
+				C775845EEB2D4BDCBA864C4E /* LogEntryView.swift in Sources */,
 				F803FBB2B739CF4D92328E6F /* MaidenheadConverter.swift in Sources */,
 				26EF4116A34E2852176E8B59 /* Mode.swift in Sources */,
 				9FFAF59B4F7465E565A97F48 /* OnboardingView.swift in Sources */,
@@ -641,7 +700,6 @@
 				6C13E0D8CCD6A444B34AA48D /* QSO.swift in Sources */,
 				88916F5020FC16BDAB78A525 /* QSODetailView.swift in Sources */,
 				95687669ABD2CC5C6919295F /* QSOEditData.swift in Sources */,
-				4F457C4EF7685B3F66A2CA7C /* QSOEditorView.swift in Sources */,
 				5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */,
 				95B96BB33A15A649D893EEEC /* QSOListView.swift in Sources */,
 				9788B752C9A09395D697C64E /* QSOMatcher.swift in Sources */,
@@ -664,6 +722,7 @@
 				ECB12A39E0A4DC0D3FB91C5B /* SpotService.swift in Sources */,
 				D8CDB7723B7A99DBF5274B5B /* SpotStore.swift in Sources */,
 				C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */,
+				2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */,
 				99C619B13EBF85303B7DE910 /* StatsSummary.swift in Sources */,
 				0744B0373BDD960A17D15078 /* StatsView.swift in Sources */,
 				27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */,
@@ -683,6 +742,11 @@
 			isa = PBXTargetDependency;
 			target = 0E7D9AE1B42CB74A20FF148F /* AmateurRadioLog */;
 			targetProxy = 7091996ECAE4A77481C5245C /* PBXContainerItemProxy */;
+		};
+		8DA756FE2BC72F515D1B88F4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0E7D9AE1B42CB74A20FF148F /* AmateurRadioLog */;
+			targetProxy = 8278C836C8BB603365ED2DA3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -825,6 +889,50 @@
 			};
 			name = Debug;
 		};
+		4765FC5EBBB01D30FE896105 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = 7Q2SS8772K;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLogUITests;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AmateurRadioLog;
+			};
+			name = Release;
+		};
+		550D84BFD290B3323DDA5A2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = 7Q2SS8772K;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLogUITests;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AmateurRadioLog;
+			};
+			name = Debug;
+		};
 		5AEC07F879CE6B665269B220 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -915,6 +1023,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		54598DF195FA07316078DDDF /* Build configuration list for PBXNativeTarget "AmateurRadioLogUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				550D84BFD290B3323DDA5A2F /* Debug */,
+				4765FC5EBBB01D30FE896105 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		90F0CEAC776588F845178DA7 /* Build configuration list for PBXNativeTarget "AmateurRadioLog" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

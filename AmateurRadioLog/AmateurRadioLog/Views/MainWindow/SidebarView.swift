@@ -1,8 +1,5 @@
 import SwiftUI
 import SwiftData
-#if os(macOS)
-import AppKit
-#endif
 
 struct SidebarView: View {
     @Environment(AppState.self) private var appState
@@ -10,21 +7,20 @@ struct SidebarView: View {
     @State private var showQRZSync = false
     @State private var showLoTWSync = false
     @State private var showHamQTHSync = false
-    @State private var showPOTAExport = false
     @State private var showSettings = false
     @State private var showActivation = false
     @State private var showFieldDay = false
+    /// Drives the split view's detail column. Kept separate from
+    /// `appState.selectedTab` so the same destination can be re-selected —
+    /// see `select(_:)`.
+    @State private var listSelection: NavigationTab?
 
     var body: some View {
         @Bindable var appState = appState
-        List(selection: Binding<NavigationTab?>(
-            get: { appState.selectedTab },
-            set: { if let tab = $0 { appState.selectedTab = tab } }
-        )) {
+        List(selection: $listSelection) {
             Section("Views") {
                 ForEach(NavigationTab.allCases) { tab in
-                    Label(tab.rawValue, systemImage: tab.icon)
-                        .tag(tab)
+                    viewsRow(tab)
                 }
             }
 
@@ -93,11 +89,7 @@ struct SidebarView: View {
 
             Section("Export") {
                 Button(action: { appState.requestLogExport() }) {
-                    Label("Export Log (ADIF)", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Button(action: { showPOTAExport = true }) {
-                    Label("POTA Export", systemImage: "tree")
+                    Label("Export Log…", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -113,6 +105,14 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("Amateur Radio Log")
+        .onAppear {
+            if listSelection == nil { listSelection = appState.selectedTab }
+        }
+        // Programmatic tab changes (Show on Map, Find QSO, ...) keep the
+        // sidebar highlight in step.
+        .onChange(of: appState.selectedTab) { _, tab in
+            if listSelection != tab { listSelection = tab }
+        }
         .sheet(isPresented: $showFieldDay) {
             FieldDayView()
         }
@@ -130,9 +130,6 @@ struct SidebarView: View {
             HamQTHUploadSheet {
                 appState.startSync(.hamqth, context: modelContext)
             }
-        }
-        .sheet(isPresented: $showPOTAExport) {
-            POTAExportSheet()
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showActivation) {
@@ -158,6 +155,49 @@ struct SidebarView: View {
         }
         #endif
     }
+}
+
+// MARK: - Views Section
+
+private extension SidebarView {
+    /// On iOS the row is a Button so we can intercept the tap: a compact-width
+    /// NavigationSplitView pushes the detail column only when the selection
+    /// *changes*, so tapping the destination you're already on (having
+    /// navigated back to the sidebar) would otherwise do nothing.
+    @ViewBuilder
+    func viewsRow(_ tab: NavigationTab) -> some View {
+        #if os(iOS)
+        Button { select(tab) } label: {
+            Label(tab.rawValue, systemImage: tab.icon)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .tag(tab)
+        .listRowBackground(appState.selectedTab == tab
+                           ? Color.accentColor.opacity(0.15)
+                           : Color.clear)
+        #else
+        Label(tab.rawValue, systemImage: tab.icon)
+            .tag(tab)
+        #endif
+    }
+
+    #if os(iOS)
+    func select(_ tab: NavigationTab) {
+        let alreadySelected = listSelection == tab
+        appState.selectedTab = tab
+        if alreadySelected {
+            // Bounce the selection through nil so the split view sees a
+            // change and pushes the detail column.
+            listSelection = nil
+            DispatchQueue.main.async { listSelection = tab }
+        } else {
+            listSelection = tab
+        }
+    }
+    #endif
 }
 
 // MARK: - Sidebar Sync Row
@@ -331,29 +371,12 @@ struct SyncConfigSheet: View {
     }
 }
 
-// MARK: - LoTW Sheet (download sync + TQSL upload)
+// MARK: - LoTW Sheet (download sync)
 
 struct LoTWDownloadSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    @Environment(\.modelContext) private var modelContext
     let onDownload: () -> Void
-
-    /// QSOs with `lotwQslSent != "Y"`, i.e. never seen in a LoTW report.
-    @State private var unuploadedCount = 0
-    #if os(macOS)
-    /// nil when TQSL isn't installed — the sheet then falls back to export.
-    @State private var tqslURL: URL?
-    /// True after TQSL was launched; prompts the closing download sync.
-    @State private var tqslLaunched = false
-    @State private var showTQSLExporter = false
-    @State private var exportDocument: ADIFDocument?
-    @State private var exportFilename = "lotw.adi"
-    #else
-    @State private var shareFile: ShareFile?
-    #endif
-
-    private let tqslDownloadURL = URL(string: "https://www.arrl.org/tqsl-download")!
 
     var body: some View {
         NavigationStack {
@@ -362,15 +385,15 @@ struct LoTWDownloadSheet: View {
                     Text("Download QSL confirmations from LoTW. New QSOs and confirmations will be added to your log.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } footer: {
+                    Text("To upload, use Export and choose the LoTW format: LoTW only accepts logs signed with TQSL.")
                 }
-
-                uploadSection
 
                 SyncProgressSection()
             }
             .navigationTitle("Sync LoTW")
             #if os(macOS)
-            .frame(width: 420, height: 380)
+            .frame(width: 420, height: 300)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -381,123 +404,7 @@ struct LoTWDownloadSheet: View {
                         .disabled(appState.isSyncing)
                 }
             }
-            .onAppear(perform: refresh)
-            .onChange(of: appState.isSyncing) { _, syncing in
-                // A finished download sync may have flipped lotwQslSent flags.
-                if !syncing { refreshUnuploadedCount() }
-            }
-            #if os(macOS)
-            .fileExporter(isPresented: $showTQSLExporter,
-                          document: exportDocument,
-                          contentType: ADIFDocument.adifType,
-                          defaultFilename: exportFilename) { result in
-                if case .success(let url) = result {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                }
-            }
-            #else
-            .sheet(item: $shareFile) { file in
-                ShareSheet(items: [file.url])
-                    .presentationDetents([.medium, .large])
-            }
-            #endif
         }
-    }
-
-    // MARK: Upload section
-
-    @ViewBuilder
-    private var uploadSection: some View {
-        #if os(macOS)
-        if tqslURL != nil {
-            Section {
-                Button {
-                    Task {
-                        if await appState.uploadViaTQSL(context: modelContext) {
-                            tqslLaunched = true
-                        }
-                    }
-                } label: {
-                    Label("Sign & Upload with TQSL", systemImage: "square.and.arrow.up")
-                }
-                .disabled(appState.isSyncing || unuploadedCount == 0)
-
-                if tqslLaunched {
-                    Text("TQSL is signing and uploading your log. When it finishes, click Download so LoTW's report updates the upload and confirmation status here.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Upload")
-            } footer: {
-                Text("\(unuploadedCount) QSOs have not been uploaded. TQSL will open to sign them with your callsign certificate and upload them to LoTW.")
-            }
-        } else {
-            exportFallbackSection
-        }
-        #else
-        exportFallbackSection
-        #endif
-    }
-
-    /// Shown when TQSL is not installed (macOS) and always on iOS: export
-    /// the un-uploaded slice for signing with TQSL on a computer.
-    private var exportFallbackSection: some View {
-        Section {
-            Button(action: exportForTQSL) {
-                Label("Export for TQSL (\(unuploadedCount) QSOs)",
-                      systemImage: "square.and.arrow.up")
-            }
-            .disabled(unuploadedCount == 0)
-
-            Link(destination: tqslDownloadURL) {
-                Label("Get TQSL from ARRL", systemImage: "arrow.down.circle")
-            }
-        } header: {
-            Text("Upload")
-        } footer: {
-            Text("LoTW only accepts digitally signed logs. Export the QSOs that have not been uploaded, then sign and upload the file with TQSL. Afterwards, download here to update their status.")
-        }
-    }
-
-    private func exportForTQSL() {
-        Task {
-            do {
-                let records = try await appState.lotwUploadRecords(context: modelContext)
-                guard !records.isEmpty else { return }
-                #if os(macOS)
-                exportFilename = ADIFDocument.exportFileName(
-                    callsign: appState.settings?.stationCallsign, suffix: "lotw")
-                exportDocument = ADIFDocument(records: records)
-                showTQSLExporter = true
-                #else
-                let name = ADIFDocument.exportFileName(
-                    callsign: appState.settings?.stationCallsign, suffix: "lotw")
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-                try ADIFWriter().write(records: records)
-                    .write(to: url, atomically: true, encoding: .utf8)
-                shareFile = ShareFile(url: url)
-                #endif
-            } catch {
-                appState.errorMessage = String(
-                    localized: "Export failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func refresh() {
-        #if os(macOS)
-        tqslURL = TQSLLauncher.locate()
-        #endif
-        refreshUnuploadedCount()
-    }
-
-    private func refreshUnuploadedCount() {
-        // NULL never matches `!= "Y"` in the SQLite store, so nil is
-        // checked explicitly.
-        let descriptor = FetchDescriptor<QSO>(
-            predicate: #Predicate { $0.lotwQslSent == nil || $0.lotwQslSent != "Y" })
-        unuploadedCount = (try? modelContext.fetchCount(descriptor)) ?? 0
     }
 }
 
