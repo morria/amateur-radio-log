@@ -106,6 +106,9 @@ final class LogNavigationUITests: XCTestCase {
     /// and jump to its QSOs in the log.
     @MainActor
     func testOperationLifecycleAndList() throws {
+        // Unique per run: the simulator store accumulates operations from
+        // earlier runs, and list assertions must target this run's rows.
+        let opName = "Op\(Int(Date().timeIntervalSince1970) % 1_000_000)"
         let app = XCUIApplication()
         app.launchArguments = ["-uiSkipOnboarding", "-uiTab", "log"]
         app.launch()
@@ -141,7 +144,7 @@ final class LogNavigationUITests: XCTestCase {
         let nameField = app.textFields["operationNameField"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
-        nameField.typeText("UI Test Op")
+        nameField.typeText(opName)
         // A fresh install has no station callsign; Start requires one.
         // (XCUITest reports the placeholder as an empty field's value, so
         // don't bother checking — clear and type.)
@@ -178,7 +181,7 @@ final class LogNavigationUITests: XCTestCase {
         let allOps = app.buttons["All Operations"]
         XCTAssertTrue(allOps.waitForExistence(timeout: 10), "sidebar not visible after ending")
         allOps.tap()
-        let row = app.staticTexts["UI Test Op"].firstMatch
+        let row = app.staticTexts[opName].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "ended operation missing from list")
         row.tap()
         let showQSOs = app.buttons["Show QSOs in Log"].firstMatch
@@ -188,5 +191,34 @@ final class LogNavigationUITests: XCTestCase {
         // Lands in the log, filtered to the operation's QSO.
         XCTAssertTrue(app.staticTexts["K2UIT"].firstMatch.waitForExistence(timeout: 10),
                       "operation QSO not visible in the filtered log")
+
+        // Delete the operation from its detail screen, keeping the QSOs —
+        // this crashed in production when the detail re-rendered its
+        // already-deleted model.
+        app.buttons["logBackButton"].tap()
+        XCTAssertTrue(app.buttons["All Operations"].waitForExistence(timeout: 10))
+        app.buttons["All Operations"].tap()
+        let opRow = app.staticTexts[opName].firstMatch
+        XCTAssertTrue(opRow.waitForExistence(timeout: 10))
+        opRow.tap()
+        let deleteButton = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'Delete Operation'")).firstMatch
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 10), "delete button missing")
+        deleteButton.tap()
+        let keepQSOs = app.buttons["Delete Operation, Keep QSOs"].firstMatch
+        XCTAssertTrue(keepQSOs.waitForExistence(timeout: 10), "delete dialog missing")
+        keepQSOs.tap()
+        // Back on the (still alive) list, without the deleted operation.
+        XCTAssertTrue(app.navigationBars["Operations"].waitForExistence(timeout: 10),
+                      "app did not return to the operations list after deleting")
+        XCTAssertTrue(opRow.waitForNonExistence(timeout: 10),
+                      "deleted operation still listed")
+        // The kept QSO is still in the log.
+        app.buttons["Done"].firstMatch.tap()
+        let logRow = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'List'")).firstMatch
+        if logRow.waitForExistence(timeout: 5) { logRow.tap() }
+        XCTAssertTrue(app.staticTexts["K2UIT"].firstMatch.waitForExistence(timeout: 10),
+                      "kept QSO disappeared with the operation")
     }
 }

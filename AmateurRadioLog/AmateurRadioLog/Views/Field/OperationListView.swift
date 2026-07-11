@@ -124,9 +124,17 @@ private struct OperationDeleteDialog: ViewModifier {
     }
 
     private func delete(_ operation: Operation, deleteQSOs: Bool) {
-        appState.deleteOperation(operation, deleteQSOs: deleteQSOs, context: modelContext)
         pendingDelete = nil
+        // Dismiss the screen showing the model BEFORE deleting it: a detail
+        // view re-rendering its @Bindable during the pop would touch a
+        // deleted SwiftData model (crashes on device).
         onDeleted?()
+        let appState = appState
+        let context = modelContext
+        Task { @MainActor in
+            // One runloop turn so the pop is committed first.
+            appState.deleteOperation(operation, deleteQSOs: deleteQSOs, context: context)
+        }
     }
 }
 

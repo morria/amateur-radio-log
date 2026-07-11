@@ -350,6 +350,12 @@ final class AppState {
             if activeOperation?.id == opId {
                 endFieldDayOperation(context: context)
             }
+            // A log filter pointing at the deleted operation would show an
+            // empty (or wrong) log with no visible reason.
+            if filterOperationId == opId {
+                filterOperationId = nil
+                filterOperationLabel = nil
+            }
             let target: UUID? = opId
             let qsos = (try? context.fetch(FetchDescriptor<QSO>(
                 predicate: #Predicate { $0.operationId == target }))) ?? []

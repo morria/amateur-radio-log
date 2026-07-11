@@ -195,9 +195,11 @@ private extension SidebarView {
         }
         .buttonStyle(.plain)
         .tag(tab)
+        // nil = the list's default card background, so unselected rows
+        // match the Button-less rows in the other sections.
         .listRowBackground(appState.selectedTab == tab
                            ? Color.accentColor.opacity(0.15)
-                           : Color.clear)
+                           : nil)
         #else
         Label(tab.title, systemImage: tab.icon)
             .tag(tab)
