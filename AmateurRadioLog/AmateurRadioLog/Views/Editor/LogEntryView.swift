@@ -658,6 +658,18 @@ struct LogEntryView: View {
         }
 
         let qso = data.toQSO()
+        // A running POTA/SOTA operation stamps its program reference on
+        // QSOs logged from anywhere — spot taps included — so the
+        // activation log is complete without waiting for export-time
+        // injection.
+        if let session = appState.activationSession, session.kind != .general {
+            if qso.mySig?.isEmpty != false {
+                qso.mySig = session.kind == .pota ? "POTA" : "SOTA"
+                qso.mySigInfo = session.reference
+            }
+            if qso.myGridsquare?.isEmpty != false { qso.myGridsquare = session.grid }
+            if qso.stationCallsign?.isEmpty != false { qso.stationCallsign = session.callsign }
+        }
         modelContext.insert(qso)
         // Persist immediately: autosave can lose the QSO if the app is
         // killed right after logging, and the save also kicks off the

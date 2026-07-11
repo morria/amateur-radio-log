@@ -99,18 +99,29 @@ struct ContentView: View {
                 iosDetailPath.removeAll()
             }
             #else
-            // Only mount the active tab: invisible Map/Stats views would
-            // otherwise recompute on every filter change and @Query update.
-            switch appState.selectedTab {
-            case .log: logView
-            case .entry: LogEntryView()
-            case .map: ContactMapView(qsos: allQSOs)
-            case .spots: SpotListView(allQSOs: allQSOs)
-            case .stats: StatsView(qsos: allQSOs)
+            Group {
+                // Only mount the active tab: invisible Map/Stats views would
+                // otherwise recompute on every filter change and @Query update.
+                switch appState.selectedTab {
+                case .log: logView
+                case .entry: LogEntryView()
+                case .map: ContactMapView(qsos: allQSOs)
+                case .spots: SpotListView(allQSOs: allQSOs)
+                case .stats: StatsView(qsos: allQSOs)
+                }
             }
             #endif
         }
         .navigationSplitViewStyle(.balanced)
+        // The operation "mini-player": while a solo operation runs, a slim
+        // ON AIR bar stays pinned under everything — sidebar and every tab
+        // (Spots included, so spot taps log into the operation without
+        // leaving it).
+        .safeAreaInset(edge: .bottom) {
+            if let session = appState.activationSession {
+                OperationStatusBar(session: session)
+            }
+        }
         #if os(macOS)
         .frame(minWidth: 900, minHeight: 600)
         #endif
@@ -120,6 +131,18 @@ struct ContentView: View {
             // last-used values itself.
             LogEntryView(presentedAsSheet: true)
         }
+        // The operation screen (setup, or the field logging HUD while a
+        // session runs). Presented here — not from the sidebar — so the ON
+        // AIR status bar can slide it up from any tab.
+        #if os(iOS)
+        .fullScreenCover(isPresented: $appState.showOperationScreen) {
+            ActivationView()
+        }
+        #else
+        .sheet(isPresented: $appState.showOperationScreen) {
+            ActivationView()
+        }
+        #endif
         .sheet(item: $editData) { data in
             LogEntryView(prefill: data, presentedAsSheet: true, onSave: { updated in
                 if let id = updated.id,

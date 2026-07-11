@@ -8,7 +8,6 @@ struct SidebarView: View {
     @State private var showLoTWSync = false
     @State private var showHamQTHSync = false
     @State private var showSettings = false
-    @State private var showActivation = false
     @State private var showFieldDay = false
     @State private var showOperationList = false
     /// Drives the split view's detail column. Kept separate from
@@ -39,7 +38,7 @@ struct SidebarView: View {
             Section("Operations") {
                 viewsRow(.entry)
 
-                Button(action: { showActivation = true }) {
+                Button(action: { appState.showOperationScreen = true }) {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(appState.activationSession == nil
@@ -161,15 +160,6 @@ struct SidebarView: View {
                 appState.startSync(.hamqth, context: modelContext)
             }
         }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showActivation) {
-            ActivationView()
-        }
-        #else
-        .sheet(isPresented: $showActivation) {
-            ActivationView()
-        }
-        #endif
         #if os(iOS)
         .sheet(isPresented: $showSettings) {
             NavigationStack {

@@ -26,6 +26,81 @@ struct ActivationView: View {
     }
 }
 
+// MARK: - ON AIR Status Bar
+
+/// The mini-player: a slim bar pinned to the bottom of every screen while a
+/// solo operation runs, so you can browse Spots, the map or the log without
+/// losing the operation. Shows the live QSO count and elapsed time; tapping
+/// it slides the full logging screen back up.
+struct OperationStatusBar: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+
+    let session: ActivationSession
+
+    @State private var qsoCount = 0
+
+    var body: some View {
+        Button {
+            appState.showOperationScreen = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .foregroundStyle(.green)
+                Text(session.title)
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                Text("\(qsoCount) QSOs")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text(session.startedAt, style: .timer)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.up")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.green.opacity(0.5), lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("operationStatusBar")
+        .accessibilityLabel(Text("On air: \(session.title), \(qsoCount) QSOs. Opens the operation."))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
+        .onAppear(perform: refreshCount)
+        // Cheap count refresh whenever anything in the store changes while
+        // the bar is visible (logging from Spots, the entry tab, ...), plus
+        // a slow heartbeat as a catch-all — fetchCount is trivial.
+        .onChange(of: appState.totalQSOCount) { _, _ in refreshCount() }
+        .onChange(of: appState.dataRevision) { _, _ in refreshCount() }
+        .onChange(of: appState.showOperationScreen) { _, shown in
+            if !shown { refreshCount() }
+        }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                refreshCount()
+            }
+        }
+    }
+
+    private func refreshCount() {
+        guard let opId = session.operationId else { return }
+        let target: UUID? = opId
+        let descriptor = FetchDescriptor<QSO>(
+            predicate: #Predicate { $0.operationId == target && $0.deletedAt == nil })
+        qsoCount = (try? modelContext.fetchCount(descriptor)) ?? 0
+    }
+}
+
 // MARK: - Setup
 
 /// Operation type + reference + station entry, with GPS-assisted park
@@ -408,7 +483,13 @@ private struct ActivationLoggingView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    // Collapses to the ON AIR bar; the operation keeps
+                    // running while you browse Spots, the map or the log.
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label("Minimize", systemImage: "chevron.down")
+                    }
                 }
             }
             .onAppear(perform: setUp)
@@ -544,11 +625,9 @@ private struct ActivationLoggingView: View {
                         Text(m.displayName).tag(Mode?.some(m))
                     }
                 }
-                .onChange(of: mode) { _, newMode in
-                    let rst = QuickEntryParser.defaultRST(for: newMode) ?? ""
-                    rstSent = rst
-                    rstRcvd = rst
-                }
+                // RST fields show the mode's conventional report as ghost
+                // text and apply it on save when left empty — nothing to
+                // pre-fill (or force the operator to delete).
 
                 TextField("MHz", text: $freqText)
                     .frame(maxWidth: 110)
@@ -563,8 +642,10 @@ private struct ActivationLoggingView: View {
             .labelsHidden()
 
             HStack(spacing: 12) {
-                LabeledRSTField(title: "Sent", text: $rstSent)
-                LabeledRSTField(title: "Rcvd", text: $rstRcvd)
+                LabeledRSTField(title: "Sent", text: $rstSent,
+                                placeholder: QuickEntryParser.defaultRST(for: mode) ?? "")
+                LabeledRSTField(title: "Rcvd", text: $rstRcvd,
+                                placeholder: QuickEntryParser.defaultRST(for: mode) ?? "")
                 if session.kind == .general { Spacer(minLength: 0) }
                 if session.kind != .general {
                 HStack(spacing: 4) {
@@ -739,12 +820,7 @@ private struct ActivationLoggingView: View {
 
     private func setUp() {
         if band == nil { band = appState.lastBand }
-        if mode == nil {
-            mode = appState.lastMode
-            let rst = QuickEntryParser.defaultRST(for: mode) ?? ""
-            if rstSent.isEmpty { rstSent = rst }
-            if rstRcvd.isEmpty { rstRcvd = rst }
-        }
+        if mode == nil { mode = appState.lastMode }
         if freqText.isEmpty, let f = appState.lastFreq {
             freqText = String(f)
         }
@@ -781,8 +857,11 @@ private struct ActivationLoggingView: View {
         if data.band == nil, let f = data.freq {
             data.band = Band.from(frequencyMHz: f)
         }
-        data.rstSent = rstSent.isEmpty ? nil : rstSent
-        data.rstRcvd = rstRcvd.isEmpty ? nil : rstRcvd
+        // Empty RST = the usual report for this mode (what the ghost
+        // text promised); nil for modes without RST-style reports.
+        let rstDefault = QuickEntryParser.defaultRST(for: data.mode)
+        data.rstSent = rstSent.isEmpty ? rstDefault : rstSent
+        data.rstRcvd = rstRcvd.isEmpty ? rstDefault : rstRcvd
         data.txPower = appState.lastPower
         data.stationCallsign = session.callsign
         data.myGridsquare = session.grid
@@ -825,9 +904,8 @@ private struct ActivationLoggingView: View {
 
         call = ""
         theirPark = ""
-        let rst = QuickEntryParser.defaultRST(for: mode) ?? ""
-        rstSent = rst
-        rstRcvd = rst
+        rstSent = ""
+        rstRcvd = ""
         callFocused = true
         refreshSessionQSOs()
         showConfirmation(String(localized: "Logged \(trimmedCall)"))
@@ -899,13 +977,14 @@ private struct ActivationLoggingView: View {
 private struct LabeledRSTField: View {
     let title: LocalizedStringKey
     @Binding var text: String
+    var placeholder: String = "59"
 
     var body: some View {
         HStack(spacing: 4) {
             Text(title)
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
-            TextField("59", text: $text)
+            TextField(placeholder, text: $text)
                 .frame(maxWidth: 64)
                 .font(.body.monospacedDigit())
                 #if os(iOS)

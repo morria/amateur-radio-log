@@ -110,8 +110,11 @@ final class LogNavigationUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 10), "log back button not found")
         back.tap()
 
-        // A previous (failed) run may have left an operation running — end it.
-        let resume = app.buttons["Resume Operation"]
+        // A previous (failed) run may have left an operation running — end
+        // it. The row's label includes the session title as a subtitle, so
+        // match by prefix.
+        let resume = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'Resume Operation'")).firstMatch
         if resume.waitForExistence(timeout: 3) {
             resume.tap()
             let end = app.buttons["End Operation"].firstMatch
@@ -120,11 +123,13 @@ final class LogNavigationUITests: XCTestCase {
             let keep = app.buttons["End & Keep Log"].firstMatch
             let noExport = app.buttons["End Without Exporting"].firstMatch
             if keep.waitForExistence(timeout: 5) { keep.tap() } else { noExport.tap() }
-            XCTAssertTrue(app.buttons["New Operation"].waitForExistence(timeout: 10))
         }
 
         // New Operation -> General -> named -> Start.
-        app.buttons["New Operation"].firstMatch.tap()
+        let newOp = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'New Operation'")).firstMatch
+        XCTAssertTrue(newOp.waitForExistence(timeout: 10), "New Operation row not found")
+        newOp.tap()
         let general = app.buttons["General"].firstMatch
         XCTAssertTrue(general.waitForExistence(timeout: 10), "kind picker not found")
         general.tap()
@@ -146,6 +151,17 @@ final class LogNavigationUITests: XCTestCase {
         XCTAssertTrue(callField.waitForExistence(timeout: 10), "operation logging screen not shown")
         callField.tap()
         callField.typeText("K2UIT\n")
+
+        // Minimize: the operation collapses to the ON AIR bar and the rest
+        // of the app is usable while it keeps running.
+        app.buttons["Minimize"].firstMatch.tap()
+        let statusBar = app.buttons["operationStatusBar"]
+        XCTAssertTrue(statusBar.waitForExistence(timeout: 10),
+                      "ON AIR status bar missing after minimizing")
+        // Tapping the bar slides the logging screen back up.
+        statusBar.tap()
+        XCTAssertTrue(callField.waitForExistence(timeout: 10),
+                      "status bar tap did not reopen the operation")
 
         // End, keeping the log.
         app.buttons["End Operation"].firstMatch.tap()

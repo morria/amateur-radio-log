@@ -267,6 +267,12 @@ final class AppState {
     /// AppSettings (crash recovery) on every change.
     var activationSession: ActivationSession?
 
+    /// Whether the full operation screen (setup or logging) is presented.
+    /// Lives here so the sidebar, the ON AIR status bar and the Operations
+    /// list can all open it; closing it while a session runs just collapses
+    /// to the status bar.
+    var showOperationScreen = false
+
     /// Starts a solo operation: creates its Operation row so it appears in
     /// the Operations list, and marks the id active so every QSO logged —
     /// from any entry screen — is stamped with it.
