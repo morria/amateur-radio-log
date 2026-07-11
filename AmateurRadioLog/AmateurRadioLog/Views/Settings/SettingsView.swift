@@ -63,8 +63,25 @@ struct SettingsView: View {
             } footer: {
                 Text("Live DX spots on the Spots tab. Cluster login uses your station callsign. The Reverse Beacon Network is high-volume; spots below the minimum SNR are dropped, and repeats of the same station on a band are suppressed.")
             }
+            Section {
+                BetaSettingsView()
+            } header: {
+                Text("Beta Features")
+            } footer: {
+                Text("Shared Operations lets several operators contribute to one replicated log (Field Day style). Adds \u{201C}New Shared Operation\u{201D} to the sidebar.")
+            }
         }
         #endif
+    }
+}
+
+// MARK: - Beta Features
+
+struct BetaSettingsView: View {
+    @AppStorage("sharedOperationsBetaEnabled") private var sharedOperationsBeta = false
+
+    var body: some View {
+        Toggle("Shared Operations", isOn: $sharedOperationsBeta)
     }
 }
 
@@ -97,6 +114,9 @@ struct GeneralSettingsView: View {
                             Text(mode.displayName).tag(mode.rawValue)
                         }
                     }
+                }
+                Section("Beta Features") {
+                    BetaSettingsView()
                 }
             }
             .padding()

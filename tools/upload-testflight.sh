@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Archive the iOS app and upload it to TestFlight / App Store Connect.
+# Archive the app and upload it to TestFlight / App Store Connect.
 #
 # Prereqs (one-time):
 #   - Apple Developer membership with the current Program License Agreement
@@ -8,11 +8,19 @@
 #     blocks uploads with "PLA Update available" and shows a misleading
 #     "No signing certificate iOS Distribution found" as a side effect.
 #   - A signed-in Xcode account for the team (Xcode > Settings > Accounts).
-#   - An App Store Connect app record for com.amateurradiolog.app.
+#   - An App Store Connect app record for com.w2asm.AmateurRadioLog, with
+#     the platform being uploaded enabled on that record.
 #
-# Usage: tools/upload-testflight.sh
+# Usage: tools/upload-testflight.sh [ios|macos]   (default: ios)
 #
 set -euo pipefail
+
+PLATFORM="${1:-ios}"
+case "$PLATFORM" in
+  ios)   DESTINATION='generic/platform=iOS' ;;
+  macos) DESTINATION='generic/platform=macOS' ;;
+  *) echo "usage: $0 [ios|macos]" >&2; exit 2 ;;
+esac
 
 TEAM_ID="7Q2SS8772K"
 SCHEME="AmateurRadioLog"
@@ -28,6 +36,7 @@ ARCHIVE="$WORK/AmateurRadioLog-$BUILD.xcarchive"
 EXPORT_DIR="$WORK/upload-$BUILD"
 EXPORT_OPTS="$WORK/ExportOptions.plist"
 
+echo "==> Platform:     $PLATFORM"
 echo "==> Build number: $BUILD"
 echo "==> Work dir:     $WORK"
 
@@ -51,7 +60,7 @@ PLIST
 echo "==> Archiving (Release, build $BUILD)"
 xcodebuild archive \
   -project "$PROJECT" -scheme "$SCHEME" \
-  -destination 'generic/platform=iOS' \
+  -destination "$DESTINATION" \
   -archivePath "$ARCHIVE" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   CURRENT_PROJECT_VERSION="$BUILD" \
@@ -65,6 +74,6 @@ xcodebuild -exportArchive \
   -allowProvisioningUpdates
 
 echo ""
-echo "==> Done. Build $BUILD uploaded."
+echo "==> Done. $PLATFORM build $BUILD uploaded."
 echo "    Apple processes it in ~5-15 min, then it appears in"
 echo "    App Store Connect > TestFlight."

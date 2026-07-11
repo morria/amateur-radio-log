@@ -11,6 +11,18 @@ enum NavigationTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Sidebar label ("List" reads better than "Log" under a log-centric
+    /// first section; rawValues stay stable).
+    var title: String {
+        switch self {
+        case .log: return String(localized: "List")
+        case .entry: return String(localized: "New QSO")
+        case .map: return String(localized: "Map")
+        case .spots: return String(localized: "Spots")
+        case .stats: return String(localized: "Statistics")
+        }
+    }
+
     var icon: String {
         switch self {
         case .log: return "list.bullet.rectangle"

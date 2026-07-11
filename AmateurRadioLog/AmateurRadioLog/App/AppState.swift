@@ -196,11 +196,12 @@ final class AppState {
     var mapTimeRange: MapTimeRange = .allTime
     var mapColorBy: MapColorOption = .band
     var mapStyle: MapStyleOption = .hybrid
-    /// Last map camera region, preserved across tab switches now that the
-    /// map view is unmounted when not visible (macOS). Not observed: only
-    /// read back in ContactMapView.onAppear.
+    /// Last map camera, preserved across tab switches now that the map view
+    /// is unmounted when not visible (macOS). A full camera (not a region)
+    /// so globe-distance zoom levels survive the round trip. Not observed:
+    /// only read back in ContactMapView.onAppear.
     @ObservationIgnored
-    var lastMapRegion: MKCoordinateRegion?
+    var lastMapCamera: MapCamera?
 
     // MARK: - Last-used QSO defaults (synced via SwiftData/CloudKit)
     @ObservationIgnored

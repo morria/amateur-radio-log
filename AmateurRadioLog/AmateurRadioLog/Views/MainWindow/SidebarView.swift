@@ -14,22 +14,35 @@ struct SidebarView: View {
     /// `appState.selectedTab` so the same destination can be re-selected —
     /// see `select(_:)`.
     @State private var listSelection: NavigationTab?
+    /// Shared (multi-operator) operations are a beta feature, off by
+    /// default; the row also stays visible while one is already running.
+    @AppStorage("sharedOperationsBetaEnabled") private var sharedOperationsBeta = false
+
+    private var showsSharedOperation: Bool {
+        sharedOperationsBeta
+            || appState.activeOperation != nil
+            || appState.fieldDayPhase != .idle
+    }
 
     var body: some View {
         @Bindable var appState = appState
         List(selection: $listSelection) {
-            Section("Views") {
-                ForEach(NavigationTab.allCases) { tab in
-                    viewsRow(tab)
-                }
+            // The log, three ways — no header needed.
+            Section {
+                viewsRow(.log)
+                viewsRow(.map)
+                viewsRow(.spots)
+                viewsRow(.stats)
             }
 
-            Section("Activation") {
+            Section("Operations") {
+                viewsRow(.entry)
+
                 Button(action: { showActivation = true }) {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(appState.activationSession == nil
-                                 ? "Start Activation" : "Resume Activation")
+                                 ? "New Operation" : "Resume Operation")
                             if let session = appState.activationSession {
                                 Text(session.parkRef)
                                     .font(.caption)
@@ -42,31 +55,31 @@ struct SidebarView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
 
-            Section("Operation") {
-                Button(action: { showFieldDay = true }) {
-                    HStack(spacing: 8) {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(appState.activeOperation == nil
-                                     ? "Multi-Operator" : "Operation Active")
-                                if let operation = appState.activeOperation {
-                                    Text(operation.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                if showsSharedOperation {
+                    Button(action: { showFieldDay = true }) {
+                        HStack(spacing: 8) {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(appState.activeOperation == nil
+                                         ? "New Shared Operation" : "Operation Active")
+                                    if let operation = appState.activeOperation {
+                                        Text(operation.name)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
+                            } icon: {
+                                Image(systemName: appState.activeOperation == nil
+                                      ? "person.3" : "person.3.fill")
                             }
-                        } icon: {
-                            Image(systemName: appState.activeOperation == nil
-                                  ? "person.3" : "person.3.fill")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if appState.fieldDayPhase != .idle {
-                            Image(systemName: "dot.radiowaves.left.and.right")
-                                .foregroundStyle(.green)
-                                .font(.caption)
+                            if appState.fieldDayPhase != .idle {
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                            }
                         }
                     }
                 }
@@ -168,7 +181,7 @@ private extension SidebarView {
     func viewsRow(_ tab: NavigationTab) -> some View {
         #if os(iOS)
         Button { select(tab) } label: {
-            Label(tab.rawValue, systemImage: tab.icon)
+            Label(tab.title, systemImage: tab.icon)
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -179,7 +192,7 @@ private extension SidebarView {
                            ? Color.accentColor.opacity(0.15)
                            : Color.clear)
         #else
-        Label(tab.rawValue, systemImage: tab.icon)
+        Label(tab.title, systemImage: tab.icon)
             .tag(tab)
         #endif
     }

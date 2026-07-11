@@ -146,6 +146,32 @@ struct ContactMapView: View {
     /// Number of grid cells across the visible camera span.
     private static let clusterGridDivisions = 12.0
 
+    // MARK: Globe mode
+    //
+    // The standard (Mercator) style clamps zoom-out at "world fills the
+    // viewport"; imagery keeps going and turns into a 3D globe. So when the
+    // camera reaches the flat map's limit we swap the style to imagery and
+    // let the user keep pulling back; zooming back in swaps Mercator back.
+    // Pin annotations are depth-occluded on the far side of the globe
+    // automatically (verified), so the pin layer needs no changes.
+
+    /// Whether the map is currently rendering as a globe (standard style
+    /// swapped for imagery at far zoom).
+    @State private var globeMode = false
+    /// Enter the globe when the visible span is essentially the whole world.
+    private static let globeEnterSpanDegrees = 240.0
+    /// Leave it once the camera is back below this distance (meters). Lower
+    /// than the enter point's ~23,000 km so the boundary doesn't flap.
+    private static let globeExitDistance = 16_000_000.0
+
+    private func updateGlobeMode(_ context: MapCameraUpdateContext) {
+        if !globeMode, context.region.span.longitudeDelta >= Self.globeEnterSpanDegrees {
+            globeMode = true
+        } else if globeMode, context.camera.distance < Self.globeExitDistance {
+            globeMode = false
+        }
+    }
+
     /// Composite key describing every input that affects which pins exist.
     /// Color-by is included so legend/pin styling inputs stay in sync, and the
     /// field filters (callsign/country/state/...) are folded in because
@@ -259,9 +285,23 @@ struct ContactMapView: View {
     #endif
 
     private func restoreCamera() {
-        if let region = appState.lastMapRegion {
-            cameraPosition = .region(region)
-            currentSpan = region.span
+        #if DEBUG
+        // Screenshot hook: `-uiMapDistance <meters>` starts the camera at a
+        // given altitude (globe/Mercator rendering can't be pinch-driven
+        // from automation).
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-uiMapDistance"), args.indices.contains(i + 1),
+           let distance = Double(args[i + 1]) {
+            cameraPosition = .camera(MapCamera(
+                centerCoordinate: CLLocationCoordinate2D(latitude: 30, longitude: -40),
+                distance: distance))
+            globeMode = distance > Self.globeExitDistance
+            return
+        }
+        #endif
+        if let camera = appState.lastMapCamera {
+            cameraPosition = .camera(camera)
+            globeMode = camera.distance > Self.globeExitDistance
         }
     }
 
@@ -391,8 +431,9 @@ struct ContactMapView: View {
             .onMapCameraChange(frequency: .onEnd) { context in
                 // Remember the camera so the position survives the map view
                 // being unmounted on tab switches (macOS)
-                appState.lastMapRegion = context.region
+                appState.lastMapCamera = context.camera
                 currentSpan = context.region.span
+                updateGlobeMode(context)
                 recomputeClusters()
             }
             .onChange(of: pinRebuildKey) { _, _ in
@@ -507,9 +548,9 @@ struct ContactMapView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    /// Frame every mapped contact in one camera move. MapKit clamps the
-    /// region to what the viewport can display, so a world-spanning log
-    /// simply ends up at the maximum zoom-out.
+    /// Frame every mapped contact in one camera move. A log that spans the
+    /// world gets the globe (a region that wide would just be clamped by
+    /// the flat map); anything tighter gets a padded region.
     private func fitAllContacts() {
         guard let first = pins.first else { return }
         var minLat = first.latitude, maxLat = first.latitude
@@ -518,17 +559,28 @@ struct ContactMapView: View {
             minLat = min(minLat, pin.latitude); maxLat = max(maxLat, pin.latitude)
             minLon = min(minLon, pin.longitude); maxLon = max(maxLon, pin.longitude)
         }
+        selectedPin = nil
+
+        let lonSpan = (maxLon - minLon) * 1.3
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2
+        )
+        if lonSpan >= Self.globeEnterSpanDegrees {
+            globeMode = true
+            withAnimation(.easeInOut) {
+                cameraPosition = .camera(MapCamera(
+                    centerCoordinate: center, distance: 42_000_000))
+            }
+            return
+        }
         let region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(
-                latitude: (minLat + maxLat) / 2,
-                longitude: (minLon + maxLon) / 2
-            ),
+            center: center,
             span: MKCoordinateSpan(
                 latitudeDelta: min(max((maxLat - minLat) * 1.3, 4), 180),
-                longitudeDelta: min(max((maxLon - minLon) * 1.3, 4), 360)
+                longitudeDelta: min(max(lonSpan, 4), 360)
             )
         )
-        selectedPin = nil
         withAnimation(.easeInOut) {
             cameraPosition = .region(region)
         }
@@ -690,6 +742,15 @@ struct ContactMapView: View {
     // MARK: - Map Style
 
     private var currentMapStyle: MapStyle {
+        // Far enough out, every style becomes the realistic globe; zooming
+        // back in restores the user's choice (standard = flat Mercator).
+        if globeMode {
+            switch appState.mapStyle {
+            case .standard, .satellite: return .imagery(elevation: .realistic)
+            case .hybrid:               return .hybrid(elevation: .realistic,
+                                                       pointsOfInterest: .excludingAll)
+            }
+        }
         switch appState.mapStyle {
         case .standard:  return .standard(pointsOfInterest: .excludingAll)
         case .satellite: return .imagery
