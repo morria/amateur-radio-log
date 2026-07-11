@@ -159,20 +159,40 @@ struct ContactMapView: View {
     /// swapped for imagery at far zoom).
     @State private var globeMode = false
     /// Enter the globe at the flat map's zoom-out clamp. Which axis hits the
-    /// clamp depends on viewport aspect: portrait fills the world's height
-    /// first (latitude ~170° visible while longitude shows only ~166°), wide
-    /// windows fill its width (longitude 360°). Watch both.
-    private static let globeEnterLonDegrees = 320.0
-    private static let globeEnterLatDegrees = 150.0
+    /// clamp depends on viewport aspect: tall viewports fill the world's
+    /// height first, wide ones its width. Measured spans AT the clamp:
+    /// iPhone portrait lat≈152, iPad 11" portrait lat≈150 — so the
+    /// thresholds sit well below with margin (a ±65°-latitude view is
+    /// world-scale anyway; the globe is the right rendering there).
+    private static let globeEnterLonDegrees = 260.0
+    private static let globeEnterLatDegrees = 130.0
     /// Leave it once the camera is back below this distance (meters) — well
-    /// under the ~16,000-19,000 km where a portrait phone hits the clamp,
-    /// so the boundary doesn't flap.
-    private static let globeExitDistance = 12_000_000.0
+    /// under the ~14,000-20,000 km where viewports hit the clamp, so the
+    /// boundary doesn't flap.
+    private static let globeExitDistance = 10_000_000.0
     /// Zoom-to-fit switches to the globe for logs wider than this.
     private static let globeFitSpanDegrees = 240.0
 
+    #if DEBUG
+    /// Last camera values, surfaced through the fit button's accessibility
+    /// value so simulator UI runs can see why globe mode did(n't) engage.
+    @State private var debugCamera = ""
+    #endif
+
+    private var projectionDebugValue: String {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-uiMapDebug") {
+            return (globeMode ? "globe " : "flat ") + debugCamera
+        }
+        #endif
+        return globeMode ? "globe" : "flat"
+    }
+
     private func updateGlobeMode(_ context: MapCameraUpdateContext) {
         let span = context.region.span
+        #if DEBUG
+        debugCamera = "lat=\(Int(span.latitudeDelta)) lon=\(Int(span.longitudeDelta)) d=\(Int(context.camera.distance / 1000))km"
+        #endif
         if !globeMode,
            span.longitudeDelta >= Self.globeEnterLonDegrees
             || span.latitudeDelta >= Self.globeEnterLatDegrees {
@@ -517,7 +537,7 @@ struct ContactMapView: View {
                         .accessibilityIdentifier("fitAllButton")
                         // Projection state, exposed so UI tests can assert
                         // the globe <-> Mercator transitions.
-                        .accessibilityValue(globeMode ? "globe" : "flat")
+                        .accessibilityValue(projectionDebugValue)
                         #if os(macOS)
                         .help("Zoom to fit all contacts")
                         #endif

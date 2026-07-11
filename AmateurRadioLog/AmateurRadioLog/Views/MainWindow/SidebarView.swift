@@ -31,12 +31,12 @@ struct SidebarView: View {
             Section {
                 viewsRow(.log)
                 viewsRow(.map)
-                viewsRow(.spots)
                 viewsRow(.stats)
             }
 
             Section("Operations") {
                 viewsRow(.entry)
+                viewsRow(.spots)
 
                 Button(action: { appState.showOperationScreen = true }) {
                     Label {

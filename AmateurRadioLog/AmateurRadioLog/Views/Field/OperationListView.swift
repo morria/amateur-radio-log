@@ -13,7 +13,10 @@ import AppKit
 struct OperationListView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Operation.createdAt, order: .reverse) private var operations: [Operation]
+
+    @State private var pendingDelete: Operation?
 
     var body: some View {
         NavigationStack {
@@ -33,6 +36,13 @@ struct OperationListView: View {
                             OperationRow(operation: operation,
                                          isActive: isActive(operation))
                         }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                pendingDelete = operation
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                     .listStyle(.plain)
                 }
@@ -49,6 +59,7 @@ struct OperationListView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .operationDeleteDialog(pendingDelete: $pendingDelete)
         }
     }
 
@@ -56,6 +67,73 @@ struct OperationListView: View {
         guard let uuid = operation.uuid else { return false }
         return appState.activationSession?.operationId == uuid
             || appState.activeOperation?.id == uuid
+    }
+}
+
+// MARK: - Delete Dialog
+
+/// Shared keep-or-delete confirmation: deleting an operation always asks
+/// what happens to its QSOs.
+private struct OperationDeleteDialog: ViewModifier {
+    @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+
+    @Binding var pendingDelete: Operation?
+    /// Runs after a confirmed delete (pop the detail screen).
+    var onDeleted: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            "Delete \(pendingDelete?.displayTitle ?? "")?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { operation in
+            let count = qsoCount(operation)
+            if count > 0 {
+                Button("Delete Operation & \(count) QSOs", role: .destructive) {
+                    delete(operation, deleteQSOs: true)
+                }
+                Button("Delete Operation, Keep QSOs") {
+                    delete(operation, deleteQSOs: false)
+                }
+            } else {
+                Button("Delete Operation", role: .destructive) {
+                    delete(operation, deleteQSOs: false)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { operation in
+            if qsoCount(operation) > 0 {
+                Text("Keeping the QSOs leaves them in your log without the operation tag. Deleting them removes them from the log on all your devices.")
+            } else {
+                Text("This operation has no QSOs.")
+            }
+        }
+    }
+
+    private func qsoCount(_ operation: Operation) -> Int {
+        guard let uuid = operation.uuid else { return 0 }
+        let target: UUID? = uuid
+        let descriptor = FetchDescriptor<QSO>(
+            predicate: #Predicate { $0.operationId == target && $0.deletedAt == nil })
+        return (try? modelContext.fetchCount(descriptor)) ?? 0
+    }
+
+    private func delete(_ operation: Operation, deleteQSOs: Bool) {
+        appState.deleteOperation(operation, deleteQSOs: deleteQSOs, context: modelContext)
+        pendingDelete = nil
+        onDeleted?()
+    }
+}
+
+extension View {
+    fileprivate func operationDeleteDialog(pendingDelete: Binding<Operation?>,
+                                           onDeleted: (() -> Void)? = nil) -> some View {
+        modifier(OperationDeleteDialog(pendingDelete: pendingDelete, onDeleted: onDeleted))
     }
 }
 
@@ -118,6 +196,7 @@ struct OperationDetailView: View {
     var onNavigateAway: (() -> Void)?
 
     @State private var qsoCount = 0
+    @State private var pendingDelete: Operation?
     #if os(macOS)
     @State private var showExporter = false
     @State private var exportDocument = POTADocument(content: "")
@@ -243,7 +322,19 @@ struct OperationDetailView: View {
                     }
                 }
             }
+
+            Section {
+                Button(role: .destructive) {
+                    pendingDelete = operation
+                } label: {
+                    Label("Delete Operation…", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+            } footer: {
+                Text("You choose whether the operation's QSOs stay in your log or are deleted with it.")
+            }
         }
+        .operationDeleteDialog(pendingDelete: $pendingDelete, onDeleted: { dismiss() })
         .navigationTitle(operation.displayTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

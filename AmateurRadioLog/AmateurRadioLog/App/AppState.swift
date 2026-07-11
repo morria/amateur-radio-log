@@ -338,6 +338,38 @@ final class AppState {
         try? settings?.modelContext?.save()
     }
 
+    /// Deletes an operation of any kind. Its QSOs are either hard-deleted
+    /// with it or kept in the log with the operation tag cleared. A live
+    /// session referencing the operation is ended first, and any shared-
+    /// operation replication bookkeeping goes with the row.
+    func deleteOperation(_ operation: Operation, deleteQSOs: Bool, context: ModelContext) {
+        if let opId = operation.uuid {
+            if activationSession?.operationId == opId {
+                endActivation(context: context)
+            }
+            if activeOperation?.id == opId {
+                endFieldDayOperation(context: context)
+            }
+            let target: UUID? = opId
+            let qsos = (try? context.fetch(FetchDescriptor<QSO>(
+                predicate: #Predicate { $0.operationId == target }))) ?? []
+            for qso in qsos {
+                if deleteQSOs {
+                    context.delete(qso)
+                } else {
+                    qso.operationId = nil
+                    qso.updatedAt = Date()
+                }
+            }
+            let entries = (try? context.fetch(FetchDescriptor<ReplicationEntry>(
+                predicate: #Predicate { $0.operationId == target }))) ?? []
+            for entry in entries { context.delete(entry) }
+        }
+        context.delete(operation)
+        try? context.save()
+        dataRevision += 1
+    }
+
     /// Crash recovery: rebuild the live session from the AppSettings mirror
     /// at launch (first `settings` assignment). Runs before
     /// restoreFieldDayOperation, which overwrites the stamp — a shared

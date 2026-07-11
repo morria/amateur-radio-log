@@ -79,9 +79,14 @@ final class LogNavigationUITests: XCTestCase {
         XCTAssertTrue(projection.waitForExistence(timeout: 10), "map controls not found")
         XCTAssertEqual(projection.value as? String, "flat", "map did not start flat")
 
+        // Pinch the map element itself: pinching the whole app centers the
+        // gesture on the window, which on iPad straddles the split-view
+        // divider and barely zooms.
+        let surface: XCUIElement = app.maps.firstMatch.exists ? app.maps.firstMatch : app
+
         func pinchUntil(_ expected: String, scale: CGFloat, label: String) {
             for _ in 0..<6 {
-                app.pinch(withScale: scale, velocity: scale < 1 ? -0.6 : 0.6)
+                surface.pinch(withScale: scale, velocity: scale < 1 ? -0.6 : 0.6)
                 usleep(1_500_000) // let the camera settle so .onEnd fires
                 if projection.value as? String == expected { return }
             }
