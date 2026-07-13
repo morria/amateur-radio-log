@@ -211,6 +211,17 @@ struct LogEntryView: View {
                     if upper != v { call = upper }
                     scheduleLookup()
                 }
+                #if os(iOS)
+                // Callsigns interleave letters and digits, and the ASCII
+                // keyboard buries the number plane behind a mode switch. A
+                // dedicated 0–9 row above the keyboard keeps digit entry a
+                // single tap so a call can be keyed straight through.
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        if callFocused { digitRow }
+                    }
+                }
+                #endif
             if isLookingUp {
                 ProgressView().controlSize(.small)
             } else if !call.isEmpty {
@@ -224,6 +235,30 @@ struct LogEntryView: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary.opacity(0.5)))
     }
+
+    #if os(iOS)
+    /// A full-width 0–9 strip stitched above the keyboard while the callsign
+    /// field is focused. Each key appends its digit to the call (onChange then
+    /// uppercases the letters and refreshes the lookup), so a mixed call keys
+    /// through without ever leaving the letter plane.
+    private var digitRow: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<10, id: \.self) { digit in
+                Button {
+                    call.append(String(digit))
+                } label: {
+                    Text(String(digit))
+                        .font(.title3.monospacedDigit())
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("callsignDigit\(digit)")
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+    #endif
 
     // MARK: - Worked-before / confirmation status
 
