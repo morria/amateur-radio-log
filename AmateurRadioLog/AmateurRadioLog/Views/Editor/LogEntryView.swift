@@ -160,7 +160,11 @@ struct LogEntryView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        // A sheet's content starts at its rounded top edge with no navigation
+        // bar, so the controls need extra headroom to clear the corner
+        // instead of hugging it.
+        .padding(.top, presentedAsSheet ? 20 : 10)
+        .padding(.bottom, 10)
     }
     #else
     private var macOSSheetHeader: some View {

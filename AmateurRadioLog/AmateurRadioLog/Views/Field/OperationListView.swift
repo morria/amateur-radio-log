@@ -240,11 +240,21 @@ struct OperationDetailView: View {
                             .foregroundStyle(.green)
                     }
                 }
-                HStack {
-                    Text("QSOs")
-                    Spacer()
-                    Text("\(qsoCount)").bold()
+                Button(action: showQSOsInLog) {
+                    HStack {
+                        Text("QSOs")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("\(qsoCount)").bold()
+                            .foregroundStyle(.primary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .disabled(qsoCount == 0)
                 if let started = operation.startedAt {
                     HStack {
                         Text("Started")
@@ -264,12 +274,7 @@ struct OperationDetailView: View {
             }
 
             Section {
-                Button {
-                    appState.showLogFiltered(operationId: operation.uuid,
-                                             operationLabel: operation.displayTitle)
-                    appState.revealDetailColumn()
-                    onNavigateAway?()
-                } label: {
+                Button(action: showQSOsInLog) {
                     Label("Show QSOs in Log", systemImage: "list.bullet.rectangle")
                 }
                 .disabled(qsoCount == 0)
@@ -369,6 +374,15 @@ struct OperationDetailView: View {
     }
 
     // MARK: Data
+
+    /// Opens the main log filtered to this operation's QSOs, closing the
+    /// Operations sheet so the list is actually visible underneath.
+    private func showQSOsInLog() {
+        appState.showLogFiltered(operationId: operation.uuid,
+                                 operationLabel: operation.displayTitle)
+        appState.revealDetailColumn()
+        onNavigateAway?()
+    }
 
     private func operationQSOs() -> [QSO] {
         guard let uuid = operation.uuid else { return [] }
