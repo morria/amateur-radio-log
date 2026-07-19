@@ -786,6 +786,131 @@ final class AppState {
         return nil
     }
 
+    /// Whether a callbook (QRZ or HamQTH) is configured, so callsign lookups
+    /// can succeed. Drives whether the location backfill is worth running.
+    var canLookupCallsigns: Bool {
+        !KeychainManager.loadCredentials(for: .qrz).isEmpty
+            || !KeychainManager.loadCredentials(for: .hamqth).isEmpty
+    }
+
+    // MARK: - Location Backfill
+
+    /// Per-pass cap on callbook lookups, so a large log can't spam QRZ in one
+    /// go; the remainder is picked up on a later pass.
+    private static let locationBackfillLimit = 250
+
+    /// Guards against overlapping passes and against re-running the automatic
+    /// pass more than once per launch.
+    @ObservationIgnored private var isBackfillingLocations = false
+    @ObservationIgnored private var didAutoBackfillLocations = false
+
+    /// True while a location backfill is running — drives the map's
+    /// "Locating…" indicator.
+    var isLocatingContacts = false
+
+    /// Fills coordinates for contacts that have no location. A grid square is
+    /// resolved locally (Maidenhead → center); a contact with no grid at all
+    /// is placed from its callsign's QRZ (then HamQTH) record — the callbook
+    /// also backfills the grid so the fix persists. Deduplicates by callsign,
+    /// throttles the network, saves incrementally so pins fill in as it runs,
+    /// and caps the number of lookups per pass. No-op without a callbook.
+    ///
+    /// `auto` marks the once-per-launch pass kicked off when the map appears;
+    /// pass `false` for an explicit, user-initiated run.
+    func backfillMissingLocations(from qsos: [QSO], context: ModelContext, auto: Bool = true) async {
+        if auto && didAutoBackfillLocations { return }
+        if isBackfillingLocations { return }
+
+        // Cheap local pass first: most contacts just need their grid square
+        // turned into coordinates.
+        var localChanges = false
+        for qso in qsos where qso.latitude == nil {
+            qso.computeCoordinates()
+            if qso.latitude != nil { localChanges = true }
+        }
+
+        // Unique callsigns still missing a location and lacking any grid to
+        // derive one from — only the callbook can place these.
+        var seen = Set<String>()
+        var pending: [String] = []
+        for qso in qsos where qso.deletedAt == nil && qso.latitude == nil
+            && (qso.gridsquare ?? "").isEmpty {
+            let call = qso.call.uppercased()
+            if call.isEmpty || !seen.insert(call).inserted { continue }
+            pending.append(call)
+        }
+
+        // Only mark the automatic pass done once a callbook is actually
+        // configured, so adding QRZ later still triggers an auto pass.
+        if auto && canLookupCallsigns { didAutoBackfillLocations = true }
+
+        guard canLookupCallsigns, !pending.isEmpty else {
+            if localChanges {
+                try? context.save()
+                dataRevision += 1
+            }
+            return
+        }
+
+        isBackfillingLocations = true
+        isLocatingContacts = true
+        defer {
+            isBackfillingLocations = false
+            isLocatingContacts = false
+        }
+
+        var pendingSave = localChanges
+        var sinceSave = 0
+        for call in pending.prefix(Self.locationBackfillLimit) {
+            if Task.isCancelled { break }
+            guard let result = await lookupCallsign(call),
+                  let coord = Self.coordinate(from: result) else {
+                continue
+            }
+            // Apply to every contact with this callsign still missing a location.
+            for qso in qsos where qso.latitude == nil && qso.call.uppercased() == call {
+                qso.latitude = coord.lat
+                qso.longitude = coord.lon
+                if (qso.gridsquare ?? "").isEmpty, let grid = result.grid, !grid.isEmpty {
+                    qso.gridsquare = grid
+                }
+                if (qso.country ?? "").isEmpty, let v = result.country { qso.country = v }
+                if (qso.state ?? "").isEmpty, let v = result.state { qso.state = v }
+                qso.updatedAt = Date()
+                pendingSave = true
+            }
+            // Persist in small batches so partial progress survives and the
+            // map fills in without a save per lookup.
+            sinceSave += 1
+            if pendingSave && sinceSave >= 10 {
+                try? context.save()
+                dataRevision += 1
+                sinceSave = 0
+                pendingSave = false
+            }
+            // Be polite to the callbook between lookups.
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+
+        if pendingSave {
+            try? context.save()
+            dataRevision += 1
+        }
+    }
+
+    /// A lat/lon for a lookup result: its explicit coordinates, or the center
+    /// of its grid square. `nonisolated` so it can be unit-tested off the main
+    /// actor.
+    nonisolated static func coordinate(from result: CallsignLookupResult) -> (lat: Double, lon: Double)? {
+        if let lat = result.latitude, let lon = result.longitude {
+            return (lat, lon)
+        }
+        if let grid = result.grid, let coord = MaidenheadConverter.toCoordinate(grid: grid) {
+            return (coord.latitude, coord.longitude)
+        }
+        return nil
+    }
+
     // MARK: - Import
 
     /// Reads the ADIF file (inside its security scope), then classifies it

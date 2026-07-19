@@ -332,6 +332,36 @@ final class QSOEditDataTests: XCTestCase {
     }
 }
 
+// MARK: - Location Backfill Tests
+
+final class LocationBackfillTests: XCTestCase {
+    /// Explicit QRZ coordinates are used verbatim.
+    func testCoordinateFromExplicitLatLon() {
+        var result = CallsignLookupResult(callsign: "W1AW")
+        result.latitude = 41.7
+        result.longitude = -72.7
+        let coord = AppState.coordinate(from: result)
+        XCTAssertEqual(coord?.lat, 41.7)
+        XCTAssertEqual(coord?.lon, -72.7)
+    }
+
+    /// With no lat/lon, the grid square's center is used instead — this is
+    /// what lets a QSO with no grid get placed once QRZ supplies one.
+    func testCoordinateFallsBackToGrid() {
+        var result = CallsignLookupResult(callsign: "W1AW")
+        result.grid = "FN31pr"
+        let coord = AppState.coordinate(from: result)
+        XCTAssertNotNil(coord)
+        XCTAssertEqual(coord!.lat, 41.7, accuracy: 0.1)
+    }
+
+    /// No coordinates and no grid means the contact can't be placed.
+    func testCoordinateNilWhenNoLocation() {
+        let result = CallsignLookupResult(callsign: "W1AW")
+        XCTAssertNil(AppState.coordinate(from: result))
+    }
+}
+
 // MARK: - Date Formatter Tests
 
 final class DateFormatterTests: XCTestCase {

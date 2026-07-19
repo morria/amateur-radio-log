@@ -120,6 +120,7 @@ enum MapPalette {
 
 struct ContactMapView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     #if os(iOS)
     @Environment(\.dismiss) private var dismiss
@@ -258,10 +259,14 @@ struct ContactMapView: View {
         .onChange(of: appState.mapHighlightQSOId) { _, newId in
             handleHighlight(newId)
         }
+        // Backfill fills coordinates on the underlying QSOs without changing
+        // the pin-rebuild key (same count/filters), so nudge a rebuild here.
+        .onChange(of: appState.dataRevision) { _, _ in updatePins() }
         .onAppear {
             updatePins()
             restoreCamera()
             handleHighlight(appState.mapHighlightQSOId)
+            locateMissingContacts()
         }
     }
     #endif
@@ -292,10 +297,14 @@ struct ContactMapView: View {
             .onChange(of: appState.mapHighlightQSOId) { _, newId in
                 handleHighlight(newId)
             }
+            // Backfill fills coordinates on the underlying QSOs without
+            // changing the pin-rebuild key, so nudge a rebuild here.
+            .onChange(of: appState.dataRevision) { _, _ in updatePins() }
             .onAppear {
                 updatePins()
                 restoreCamera()
                 handleHighlight(appState.mapHighlightQSOId)
+                locateMissingContacts()
             }
     }
 
@@ -374,6 +383,14 @@ struct ContactMapView: View {
             )
         }
         recomputeClusters()
+    }
+
+    /// Kick off the QRZ location backfill for contacts with no coordinates.
+    /// `auto` is the once-per-launch pass on first appearance; the counts
+    /// pill re-runs it (auto: false) for contacts imported since.
+    private func locateMissingContacts(auto: Bool = true) {
+        guard !appState.isLocatingContacts else { return }
+        Task { await appState.backfillMissingLocations(from: qsos, context: modelContext, auto: auto) }
     }
 
     // MARK: - Clustering
@@ -564,16 +581,37 @@ struct ContactMapView: View {
         }
     }
 
-    /// "N mapped" plus, when some filtered QSOs have no coordinates, a
-    /// second line making the silently unmapped remainder visible.
+    /// "N mapped" plus, when some filtered QSOs have no coordinates, a second
+    /// line making the silently unmapped remainder visible. While a callbook
+    /// is configured the remainder is a button that looks the missing
+    /// locations up in QRZ; it shows live progress while running.
     private var countsPill: some View {
         let unlocated = visibleQSOs.count - pins.count
         return VStack(alignment: .trailing, spacing: 2) {
             Text("\(pins.count) mapped")
                 .bold()
-            if unlocated > 0 {
-                Text("\(unlocated) without location")
-                    .foregroundStyle(.secondary)
+            if appState.isLocatingContacts {
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.mini)
+                    Text("Locating from QRZ…")
+                }
+                .foregroundStyle(.secondary)
+            } else if unlocated > 0 {
+                if appState.canLookupCallsigns {
+                    Button {
+                        locateMissingContacts(auto: false)
+                    } label: {
+                        Text("\(unlocated) without location — locate")
+                            .foregroundStyle(.tint)
+                    }
+                    .buttonStyle(.plain)
+                    #if os(macOS)
+                    .help("Look up these contacts' locations in QRZ")
+                    #endif
+                } else {
+                    Text("\(unlocated) without location")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .font(.caption2)
