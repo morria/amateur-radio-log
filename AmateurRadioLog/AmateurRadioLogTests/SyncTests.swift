@@ -252,6 +252,82 @@ final class QSOIdentityBackfillTests: XCTestCase {
     }
 }
 
+// MARK: - Operation Identity Backfill Tests
+
+final class OperationIdentityBackfillTests: XCTestCase {
+    var container: ModelContainer!
+    var context: ModelContext!
+
+    override func setUp() {
+        super.setUp()
+        container = try! ModelContainer(for: Operation.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        context = ModelContext(container)
+    }
+
+    override func tearDown() {
+        container = nil; context = nil; super.tearDown()
+    }
+
+    @discardableResult
+    private func insertOperation(name: String, uuid: UUID?, kindRaw: String? = "pota",
+                                 reference: String? = nil,
+                                 createdAt: Date = Date()) -> Operation {
+        let op = Operation()
+        op.name = name
+        op.uuid = uuid
+        op.kindRaw = kindRaw
+        op.reference = reference
+        op.createdAt = createdAt
+        context.insert(op)
+        return op
+    }
+
+    func testAssignsUUIDsWhereMissing() throws {
+        insertOperation(name: "Field Day", uuid: nil)
+        insertOperation(name: "US-0001", uuid: nil, reference: "US-0001")
+        try context.save()
+
+        let result = try OperationIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.assigned, 2)
+
+        let all = try context.fetch(FetchDescriptor<Operation>())
+        XCTAssertTrue(all.allSatisfy { $0.uuid != nil })
+        XCTAssertEqual(Set(all.compactMap(\.uuid)).count, 2, "Assigned uuids must be distinct")
+    }
+
+    func testBackfillIsIdempotent() throws {
+        insertOperation(name: "US-0001", uuid: UUID(), reference: "US-0001")
+        try context.save()
+
+        _ = try OperationIdentityBackfill.backfill(context: context)
+        let second = try OperationIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(second.assigned, 0)
+        XCTAssertEqual(second.deleted, 0)
+    }
+
+    func testCollapsesDuplicateUUIDKeepingOldestAndMergingFields() throws {
+        let shared = UUID()
+        let older = insertOperation(name: "", uuid: shared, kindRaw: nil,
+                                    createdAt: Date(timeIntervalSinceNow: -3600))
+        // The newer duplicate carries metadata the (older) keeper is missing.
+        insertOperation(name: "US-0001", uuid: shared, kindRaw: "pota",
+                        reference: "US-0001", createdAt: Date())
+        try context.save()
+
+        let result = try OperationIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.deleted, 1)
+
+        let all = try context.fetch(FetchDescriptor<Operation>())
+        XCTAssertEqual(all.count, 1, "Duplicate rows collapse into one")
+        XCTAssertEqual(all[0].uuid, shared)
+        XCTAssertEqual(all[0].createdAt, older.createdAt, "The oldest row must survive")
+        XCTAssertEqual(all[0].name, "US-0001", "Empty keeper fields are filled from the duplicate")
+        XCTAssertEqual(all[0].reference, "US-0001")
+        XCTAssertEqual(all[0].kindRaw, "pota")
+    }
+}
+
 // MARK: - XML Response Parser Tests
 
 final class XMLResponseParserTests: XCTestCase {

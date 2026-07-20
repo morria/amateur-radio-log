@@ -20,9 +20,12 @@ struct AmateurRadioLogApp: App {
     }()
 
     init() {
-        // Idempotent identity backfill (assign missing uuids, repair
-        // duplicates) on a background context at every launch
+        // Idempotent identity backfills (assign missing uuids, repair
+        // CloudKit-introduced duplicates) on a background context at every
+        // launch — QSOs and Operations both sync through the same private
+        // iCloud store and get the same treatment.
         QSOIdentityBackfill.run(container: container)
+        OperationIdentityBackfill.run(container: container)
     }
 
     var body: some Scene {

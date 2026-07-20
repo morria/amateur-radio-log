@@ -40,6 +40,7 @@
 		4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */; };
 		555AF6B24AACEBD7F9D000A1 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908896B782E1C73A0E87D9C6 /* AppSettings.swift */; };
 		5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */; };
+		5D4080E307682659C67AF001 /* OperationIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390F001 /* OperationIdentityBackfill.swift */; };
 		61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */; };
 		6C13E0D8CCD6A444B34AA48D /* QSO.swift in Sources */ = {isa = PBXBuildFile; fileRef = D250A1822805EEF592F8859A /* QSO.swift */; };
 		6D4B29BC7BE79A4A39902BEF /* RigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3D08E9659DE390308579D2 /* RigService.swift */; };
@@ -137,6 +138,7 @@
 		192D4A21004CED7D40145A8E /* QRZService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRZService.swift; sourceTree = "<group>"; };
 		19D84EB4665CEBBF11DB3FD1 /* PreviewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
 		1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOIdentityBackfill.swift; sourceTree = "<group>"; };
+		1AE0AEE5D55F26BF0390F001 /* OperationIdentityBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationIdentityBackfill.swift; sourceTree = "<group>"; };
 		1C392899E4BC9EBF02D43E34 /* QSOListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOListView.swift; sourceTree = "<group>"; };
 		20DFBAA7796B37C46D0D9E15 /* GeoMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoMathTests.swift; sourceTree = "<group>"; };
 		2CD8C3278680F85D50E624F2 /* QuickEntryBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryBar.swift; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 				2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */,
 				192D4A21004CED7D40145A8E /* QRZService.swift */,
 				1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */,
+				1AE0AEE5D55F26BF0390F001 /* OperationIdentityBackfill.swift */,
 				0A437A6C9C6E52A8CD52B0F3 /* QSOMatcher.swift */,
 				445FF6EA45ED93E04E697D9C /* QSOStore.swift */,
 				B4D0C170A2ABFD25C8028769 /* ReplicationLog.swift */,
@@ -705,6 +708,7 @@
 				88916F5020FC16BDAB78A525 /* QSODetailView.swift in Sources */,
 				95687669ABD2CC5C6919295F /* QSOEditData.swift in Sources */,
 				5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */,
+				5D4080E307682659C67AF001 /* OperationIdentityBackfill.swift in Sources */,
 				95B96BB33A15A649D893EEEC /* QSOListView.swift in Sources */,
 				9788B752C9A09395D697C64E /* QSOMatcher.swift in Sources */,
 				767448C0D2F94AF89AFD3A06 /* QSORecord.swift in Sources */,
