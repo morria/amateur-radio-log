@@ -7,6 +7,11 @@ final class AppSettings {
     var myGridsquare: String = ""
     var defaultBand: String = "20m"
     var defaultMode: String = "SSB"
+
+    /// US license class (`LicenseClass` rawValue); nil = not set. Drives the
+    /// Spots "my privileges" filter. Optional so the CloudKit schema addition
+    /// is safe.
+    var licenseClass: String?
     var lastBand: String?
     var lastMode: String?
     var lastFreq: Double?

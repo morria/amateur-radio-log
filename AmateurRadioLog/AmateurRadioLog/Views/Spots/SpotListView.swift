@@ -39,6 +39,10 @@ struct SpotListView: View {
     /// section instead of by age.
     @AppStorage("spotsBandMapMode") private var bandMapMode = false
 
+    /// "My privileges" filter: show only spots the operator's license class
+    /// (from Settings) may transmit on.
+    @AppStorage("spotsPrivilegeFilter") private var privilegeFilter = false
+
     /// Sheet payload with UUID identity so consecutive spots re-present.
     @State private var editorItem: SpotEditorItem?
 
@@ -50,6 +54,11 @@ struct SpotListView: View {
     @State private var confirmationTask: Task<Void, Never>?
 
     private var store: SpotStore { appState.spotStore }
+
+    /// The operator's configured US license class, if any.
+    private var licenseClass: LicenseClass? {
+        appState.settings?.licenseClass.flatMap { LicenseClass(rawValue: $0) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -98,6 +107,8 @@ struct SpotListView: View {
         .onChange(of: filterBand) { _, _ in pushFilter() }
         .onChange(of: filterMode) { _, _ in pushFilter() }
         .onChange(of: enabledSources) { _, _ in pushFilter() }
+        .onChange(of: privilegeFilter) { _, _ in pushFilter() }
+        .onChange(of: licenseClass) { _, _ in pushFilter() }
         .sheet(item: $editorItem) { item in
             LogEntryView(prefill: item.data, presentedAsSheet: true) { qso in
                 workedCalls.insert(qso.call.uppercased())
@@ -121,6 +132,7 @@ struct SpotListView: View {
             Divider().frame(height: 16)
             bandPicker
             modePicker
+            if let licenseClass { privilegeChip(licenseClass) }
             Spacer(minLength: 0)
             presentationPicker
             statusView
@@ -150,12 +162,37 @@ struct SpotListView: View {
             HStack(spacing: 12) {
                 bandPicker
                 modePicker
+                if let licenseClass { privilegeChip(licenseClass) }
                 Spacer(minLength: 0)
                 statusView
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        #endif
+    }
+
+    /// Toggles the "my privileges" filter. Only shown once a license class is
+    /// set in Settings; labeled with that class so the applied band plan is
+    /// visible.
+    private func privilegeChip(_ licenseClass: LicenseClass) -> some View {
+        Button {
+            privilegeFilter.toggle()
+        } label: {
+            Label(licenseClass.shortName, systemImage: "checkmark.seal")
+                .font(.caption)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(privilegeFilter ? Color.accentColor.opacity(0.18) : Color.gray.opacity(0.10),
+                            in: Capsule())
+                .foregroundStyle(privilegeFilter ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Only frequencies I can transmit on"))
+        #if os(macOS)
+        .help("Only show spots you're licensed to transmit on (\(licenseClass.displayName))")
         #endif
     }
 
@@ -426,6 +463,10 @@ struct SpotListView: View {
         let available = Set(availableSources)
         if !available.isSubset(of: enabledSources) {
             filter.sources = enabledSources
+        }
+        // "My privileges": only meaningful once a license class is configured.
+        if privilegeFilter, let licenseClass {
+            filter.privileges = licenseClass
         }
         appState.applySpotFilter(filter)
     }

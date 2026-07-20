@@ -23,8 +23,12 @@ struct SettingsView: View {
         .frame(width: 450, height: 340)
         #else
         Form {
-            Section("My Station") {
+            Section {
                 GeneralSettingsView()
+            } header: {
+                Text("My Station")
+            } footer: {
+                Text("Your license class lets the Spots tab filter to frequencies you're allowed to transmit on (US band plan).")
             }
             Section("Defaults") {
                 GeneralDefaultsView()
@@ -102,6 +106,7 @@ struct GeneralSettingsView: View {
                         TextField("My Grid Square", text: $s.myGridsquare)
                         gpsButton(settings: settings)
                     }
+                    licenseClassPicker(selection: $s.licenseClass)
                 }
                 Section("Defaults") {
                     Picker("Default Band", selection: $s.defaultBand) {
@@ -131,7 +136,19 @@ struct GeneralSettingsView: View {
                     .textInputAutocapitalization(.characters)
                 gpsButton(settings: settings)
             }
+            licenseClassPicker(selection: $s.licenseClass)
             #endif
+        }
+    }
+
+    /// US license class, used by the Spots "my privileges" filter. "Not Set"
+    /// maps to nil.
+    private func licenseClassPicker(selection: Binding<String?>) -> some View {
+        Picker("License Class", selection: selection) {
+            Text("Not Set").tag(String?.none)
+            ForEach(LicenseClass.allCases) { lc in
+                Text(lc.displayName).tag(String?.some(lc.rawValue))
+            }
         }
     }
 

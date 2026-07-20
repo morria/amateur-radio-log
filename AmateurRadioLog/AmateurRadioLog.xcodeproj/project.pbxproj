@@ -84,6 +84,7 @@
 		D061A16E668E960C2AF332DF /* WSJTXListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */; };
 		D8CDB7723B7A99DBF5274B5B /* SpotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64DB756482B84405310EE7D0 /* SpotStore.swift */; };
 		D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDBE /* Band.swift */; };
+		D8E7A25459D88B3902EC4C29 /* BandPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */; };
 		DA46E8E6E05A5D244D025427 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D76E301651BC205642DEDC3 /* Assets.xcassets */; };
 		E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F106C61338C6F99B136BB883 /* FilterPerfTests.swift */; };
 		E3B147A925E44A654DF7598F /* TQSLLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */; };
@@ -176,6 +177,7 @@
 		761336091234E9F93ED4B666 /* UploadResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResult.swift; sourceTree = "<group>"; };
 		77F71B16C1D273164AC9A61F /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		78E3BA1BA315779F6F1BFDBE /* Band.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Band.swift; sourceTree = "<group>"; };
+		78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandPlan.swift; sourceTree = "<group>"; };
 		797C4DCC41A6E63706ECBAED /* QSODetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSODetailView.swift; sourceTree = "<group>"; };
 		7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigServiceTests.swift; sourceTree = "<group>"; };
 		8033725A8E1E4C16F0BE2576 /* WSJTXMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXMessage.swift; sourceTree = "<group>"; };
@@ -352,6 +354,7 @@
 			children = (
 				908896B782E1C73A0E87D9C6 /* AppSettings.swift */,
 				78E3BA1BA315779F6F1BFDBE /* Band.swift */,
+				78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */,
 				F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */,
 				2F44254B1312E8C10FAECED7 /* Mode.swift */,
 				D7B96575BF9DA100395A383A /* Operation.swift */,
@@ -677,6 +680,7 @@
 				9F0F3F636745D746F680608A /* AppState.swift in Sources */,
 				B6DCE35147163EBFD91F0269 /* AwardEngine.swift in Sources */,
 				D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */,
+				D8E7A25459D88B3902EC4C29 /* BandPlan.swift in Sources */,
 				4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */,
 				FFBAABCF5903E4496B9F3A4B /* ClusterLineParser.swift in Sources */,
 				61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */,

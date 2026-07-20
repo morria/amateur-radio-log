@@ -566,3 +566,95 @@ final class SpotEditDataTests: XCTestCase {
         XCTAssertEqual(data.mode, .cw)
     }
 }
+
+// MARK: - Band Plan (license-class privileges)
+
+final class BandPlanTests: XCTestCase {
+    private func can(_ lc: LicenseClass, _ freq: Double, _ mode: String?) -> Bool {
+        BandPlan.canTransmit(licenseClass: lc, frequencyMHz: freq, modeRaw: mode)
+    }
+
+    // The motivating example: a General on 20 m SSB can't work below 14.225.
+    func testGeneral20mPhoneEdge() {
+        XCTAssertFalse(can(.general, 14.200, "SSB"))
+        XCTAssertTrue(can(.general, 14.225, "SSB"))
+        XCTAssertTrue(can(.general, 14.300, "SSB"))
+    }
+
+    func testExtraAndAdvancedHaveMore20mPhone() {
+        XCTAssertTrue(can(.extra, 14.150, "SSB"))
+        XCTAssertFalse(can(.advanced, 14.150, "SSB"))
+        XCTAssertTrue(can(.advanced, 14.175, "SSB"))
+    }
+
+    // The 14.150–14.225 gap is Extra/Advanced-only: a General can't even run
+    // CW there, though CW below 14.150 is fine.
+    func testGeneral20mCWGap() {
+        XCTAssertTrue(can(.general, 14.030, "CW"))
+        XCTAssertFalse(can(.general, 14.180, "CW"))
+    }
+
+    func testTechnicianHasNo20m() {
+        XCTAssertFalse(can(.technician, 14.030, "CW"))
+        XCTAssertFalse(can(.technician, 14.300, "SSB"))
+    }
+
+    func testTechnician10mPhoneAndData() {
+        XCTAssertTrue(can(.technician, 28.100, "CW"))
+        XCTAssertTrue(can(.technician, 28.100, "FT8"))
+        XCTAssertTrue(can(.technician, 28.400, "SSB"))
+        XCTAssertFalse(can(.technician, 28.600, "SSB")) // above the Tech SSB edge
+    }
+
+    func testTechnicianHFCWSubBands() {
+        XCTAssertTrue(can(.technician, 7.100, "CW"))
+        XCTAssertFalse(can(.technician, 7.200, "SSB")) // no 40 m phone for Tech
+    }
+
+    // Everyone has full VHF/UHF privileges.
+    func testVHFOpenToAllClasses() {
+        XCTAssertTrue(can(.technician, 146.520, "FM"))
+        XCTAssertTrue(can(.technician, 446.000, "FM"))
+    }
+
+    // Data isn't allowed in a phone-only sub-band even where phone is.
+    func testDataModeBlockedInPhoneSegment() {
+        XCTAssertFalse(can(.general, 14.300, "FT8"))
+        XCTAssertTrue(can(.general, 14.070, "FT8"))
+    }
+
+    // Unknown mode stays lenient inside an authorized segment.
+    func testUnknownModeLenientWithinPrivileges() {
+        XCTAssertTrue(can(.general, 14.100, "WHAT"))
+        XCTAssertFalse(can(.general, 14.200, "WHAT")) // still outside every General segment
+    }
+}
+
+// MARK: - Spot privilege filter
+
+final class SpotPrivilegeFilterTests: XCTestCase {
+    func testFilterHidesSpotsBelowLicensePrivilege() {
+        var filter = SpotFilter()
+        filter.privileges = .general
+
+        let belowEdge = makeSpot(freq: 14.200, mode: "SSB")
+        let atEdge = makeSpot(freq: 14.225, mode: "SSB")
+        XCTAssertFalse(filter.matches(belowEdge))
+        XCTAssertTrue(filter.matches(atEdge))
+    }
+
+    func testNoPrivilegeFilterPassesEverything() {
+        let filter = SpotFilter()
+        XCTAssertTrue(filter.isEmpty)
+        XCTAssertTrue(filter.matches(makeSpot(freq: 14.200, mode: "SSB")))
+    }
+
+    func testPrivilegeCombinesWithBandAndMode() {
+        var filter = SpotFilter()
+        filter.privileges = .general
+        filter.modes = ["SSB"]
+        // Right mode but illegal frequency for a General → still filtered out.
+        XCTAssertFalse(filter.matches(makeSpot(freq: 14.200, mode: "SSB")))
+        XCTAssertTrue(filter.matches(makeSpot(freq: 14.250, mode: "SSB")))
+    }
+}

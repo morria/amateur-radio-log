@@ -104,8 +104,13 @@ struct SpotFilter: Sendable, Equatable {
     var modes: Set<String> = []
     /// Empty = all sources.
     var sources: Set<SpotSource> = []
+    /// When set, only spots the operator is licensed to transmit on (US band
+    /// plan) pass. nil = no privilege filtering.
+    var privileges: LicenseClass?
 
-    var isEmpty: Bool { bands.isEmpty && modes.isEmpty && sources.isEmpty }
+    var isEmpty: Bool {
+        bands.isEmpty && modes.isEmpty && sources.isEmpty && privileges == nil
+    }
 
     func matches(_ spot: Spot) -> Bool {
         if !bands.isEmpty {
@@ -115,6 +120,11 @@ struct SpotFilter: Sendable, Equatable {
             guard let mode = spot.mode, modes.contains(mode) else { return false }
         }
         if !sources.isEmpty, !sources.contains(spot.source) {
+            return false
+        }
+        if let privileges,
+           !BandPlan.canTransmit(licenseClass: privileges,
+                                 frequencyMHz: spot.frequencyMHz, modeRaw: spot.mode) {
             return false
         }
         return true
