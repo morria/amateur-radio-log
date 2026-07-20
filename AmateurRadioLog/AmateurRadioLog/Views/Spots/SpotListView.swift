@@ -49,6 +49,10 @@ struct SpotListView: View {
     // Worked-before / reference-needed lookup sets, rebuilt from allQSOs
     // once per change — never per-row SwiftData queries.
     @State private var workedCalls: Set<String> = []
+    /// Calls already logged under the current active operation — shown
+    /// struck through in the list so you don't work a dupe. Empty when no
+    /// operation is running.
+    @State private var operationWorkedCalls: Set<String> = []
 
     @State private var confirmation: String?
     @State private var confirmationTask: Task<Void, Never>?
@@ -104,6 +108,7 @@ struct SpotListView: View {
             }
         }
         .onChange(of: allQSOs.count) { _, _ in rebuildLookupSets() }
+        .onChange(of: appState.activeOperationId) { _, _ in rebuildLookupSets() }
         .onChange(of: filterBand) { _, _ in pushFilter() }
         .onChange(of: filterMode) { _, _ in pushFilter() }
         .onChange(of: enabledSources) { _, _ in pushFilter() }
@@ -111,7 +116,7 @@ struct SpotListView: View {
         .onChange(of: licenseClass) { _, _ in pushFilter() }
         .sheet(item: $editorItem) { item in
             LogEntryView(prefill: item.data, presentedAsSheet: true) { qso in
-                workedCalls.insert(qso.call.uppercased())
+                noteLogged(qso)
                 showConfirmation(String(localized: "Logged \(qso.call)"))
             }
         }
@@ -322,6 +327,7 @@ struct SpotListView: View {
                             spot: spot,
                             now: now,
                             workedBefore: isWorkedBefore(spot),
+                            workedThisOperation: isWorkedInOperation(spot),
                             onOpen: { openEditor(spot) },
                             onLogNow: { logNow(spot) })
                     }
@@ -360,15 +366,34 @@ struct SpotListView: View {
         return workedCalls.contains(call) || workedCalls.contains(Self.baseCallsign(call))
     }
 
-    /// Rebuilt once per QSO-set change; rows only do Set lookups.
+    /// Whether the spotted station is already logged under the running
+    /// operation (a dupe for this activation/session).
+    private func isWorkedInOperation(_ spot: Spot) -> Bool {
+        guard !operationWorkedCalls.isEmpty else { return false }
+        let call = spot.activatorCall.uppercased()
+        return operationWorkedCalls.contains(call)
+            || operationWorkedCalls.contains(Self.baseCallsign(call))
+    }
+
+    /// Rebuilt once per QSO-set (or active-operation) change; rows only do
+    /// Set lookups. Builds both the all-time worked set and the subset worked
+    /// under the current operation.
     private func rebuildLookupSets() {
+        let operationId = appState.activeOperationId
         var calls = Set<String>()
-        for qso in allQSOs {
+        var operationCalls = Set<String>()
+        for qso in allQSOs where qso.deletedAt == nil {
             let call = qso.call.uppercased()
+            let base = Self.baseCallsign(call)
             calls.insert(call)
-            calls.insert(Self.baseCallsign(call))
+            calls.insert(base)
+            if let operationId, qso.operationId == operationId {
+                operationCalls.insert(call)
+                operationCalls.insert(base)
+            }
         }
         workedCalls = calls
+        operationWorkedCalls = operationCalls
     }
 
     /// "EA8/W1AW/P" → "W1AW": the slash-separated segment that looks most
@@ -418,10 +443,23 @@ struct SpotListView: View {
         modelContext.insert(qso)
         appState.saveLastUsed(from: data)
 
-        workedCalls.insert(spot.activatorCall.uppercased())
+        noteLogged(qso)
 
         showConfirmation(String(localized: "Logged \(spot.activatorCall)"))
         backfill(qso, call: spot.activatorCall)
+    }
+
+    /// Immediately reflect a just-logged contact in the worked sets so its
+    /// spot updates without waiting for the @Query to refresh — including the
+    /// struck-through operation-dupe styling when it was logged under the
+    /// running operation.
+    private func noteLogged(_ qso: QSO) {
+        let call = qso.call.uppercased()
+        workedCalls.insert(call)
+        if let operationId = appState.activeOperationId, qso.operationId == operationId {
+            operationWorkedCalls.insert(call)
+            operationWorkedCalls.insert(Self.baseCallsign(call))
+        }
     }
 
     private func showConfirmation(_ message: String) {
@@ -488,6 +526,9 @@ private struct SpotRowView: View {
     let spot: Spot
     let now: Date
     let workedBefore: Bool
+    /// Already logged under the running operation: shown struck through and
+    /// dimmed so a dupe is obvious at a glance.
+    var workedThisOperation: Bool = false
     var onOpen: () -> Void
     var onLogNow: () -> Void
 
@@ -505,7 +546,19 @@ private struct SpotRowView: View {
                 HStack(spacing: 6) {
                     Text(spot.activatorCall)
                         .font(.system(.body, design: .monospaced).weight(.semibold))
-                    if workedBefore {
+                        .strikethrough(workedThisOperation)
+                        .foregroundStyle(workedThisOperation ? AnyShapeStyle(.secondary)
+                                                             : AnyShapeStyle(.primary))
+                    // A worked-this-operation dupe is already conveyed by the
+                    // strike-through; the green seal is for worked-before only.
+                    if workedThisOperation {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            #if os(macOS)
+                            .help("Already worked in this operation")
+                            #endif
+                    } else if workedBefore {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.caption)
                             .foregroundStyle(.green)
@@ -542,6 +595,9 @@ private struct SpotRowView: View {
                 .foregroundStyle(.secondary)
             }
         }
+        // Dim the whole row when it's a dupe for the running operation; taps
+        // still work (you can re-open or re-log if you really mean to).
+        .opacity(workedThisOperation ? 0.5 : 1)
         .contentShape(Rectangle())
         .onTapGesture(perform: onOpen)
         .contextMenu {
