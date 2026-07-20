@@ -31,6 +31,7 @@
 		28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */; };
 		2A025DF68A820CA19D11B48E /* FrequencyBandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */; };
 		2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C20 /* StationInfoCard.swift */; };
+		2F8B14644735D6CF62043A56 /* NumberKeyboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */; };
 		32AF577147893E10F915E91A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */; };
 		342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */; };
 		3E21A60E4FA3F089CC9385CA /* ADIFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */; };
@@ -149,6 +150,7 @@
 		32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactMapView.swift; sourceTree = "<group>"; };
 		33FF7077DF7629746C2915FC /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		364515BC2452FE33C5C76C20 /* StationInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationInfoCard.swift; sourceTree = "<group>"; };
+		364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberKeyboardRow.swift; sourceTree = "<group>"; };
 		3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TQSLLauncher.swift; sourceTree = "<group>"; };
 		3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXListener.swift; sourceTree = "<group>"; };
 		3D76E301651BC205642DEDC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -487,6 +489,7 @@
 			children = (
 				834B46C3E471F216FB58CCE9 /* ShareSheet.swift */,
 				364515BC2452FE33C5C76C20 /* StationInfoCard.swift */,
+				364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */,
 				DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */,
 				ADB96D32A2C761676B98BBD9 /* StatsView.swift */,
 			);
@@ -735,6 +738,7 @@
 				D8CDB7723B7A99DBF5274B5B /* SpotStore.swift in Sources */,
 				C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */,
 				2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */,
+				2F8B14644735D6CF62043A56 /* NumberKeyboardRow.swift in Sources */,
 				99C619B13EBF85303B7DE910 /* StatsSummary.swift in Sources */,
 				0744B0373BDD960A17D15078 /* StatsView.swift in Sources */,
 				27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */,

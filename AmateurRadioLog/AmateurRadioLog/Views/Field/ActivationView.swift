@@ -124,6 +124,7 @@ private struct ActivationSetupView: View {
     @State private var locationError: String?
     @State private var locationManager = LocationManager()
     @State private var parkLookupTask: Task<Void, Never>?
+    @FocusState private var callsignFocused: Bool
 
     private struct ParkSuggestion: Identifiable {
         let park: Park
@@ -162,6 +163,8 @@ private struct ActivationSetupView: View {
                             .textInputAutocapitalization(.characters)
                             .keyboardType(.asciiCapable)
                             #endif
+                            .focused($callsignFocused)
+                            .numberKeyboardRow(text: $callsign, isActive: callsignFocused)
                             .onChange(of: callsign) { _, v in
                                 let upper = v.uppercased()
                                 if upper != v { callsign = upper }
@@ -591,6 +594,7 @@ private struct ActivationLoggingView: View {
                 if upper != v { call = upper }
             }
             .onSubmit(logQSO)
+            .numberKeyboardRow(text: $call, isActive: callFocused)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)

@@ -215,6 +215,7 @@ struct LogEntryView: View {
                     if upper != v { call = upper }
                     scheduleLookup()
                 }
+                .numberKeyboardRow(text: $call, isActive: callFocused)
             if isLookingUp {
                 ProgressView().controlSize(.small)
             } else if !call.isEmpty {

@@ -17,6 +17,7 @@ struct OnboardingView: View {
 
     @State private var step = 0
     @State private var locationManager = LocationManager()
+    @FocusState private var callsignFocused: Bool
     @State private var showingImporter = false
     /// ADIF file chosen in step 2; the import (with its preview sheet)
     /// starts after onboarding dismisses so the sheets don't collide.
@@ -98,6 +99,8 @@ struct OnboardingView: View {
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         #endif
+                        .focused($callsignFocused)
+                        .numberKeyboardRow(text: $s.stationCallsign, isActive: callsignFocused)
                     TextField("Grid Square (e.g. FN31)", text: $s.myGridsquare)
                         .textFieldStyle(.roundedBorder)
                         #if os(iOS)
