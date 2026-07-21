@@ -261,3 +261,57 @@ final class AwardEngineTests: XCTestCase {
         XCTAssertEqual(all.count, 2)
     }
 }
+
+// MARK: - Award milestone detection
+
+final class AwardMilestoneTests: XCTestCase {
+    func testWorkedAllStatesAtFifty() {
+        var qsos = StatsSummary.allUSStates.map {
+            makeQSO(call: "US\($0)", country: "United States", state: $0)
+        }
+        XCTAssertTrue(AwardMilestone.completed(in: qsos).contains(.workedAllStates))
+        qsos.removeLast() // 49 states
+        XCTAssertFalse(AwardMilestone.completed(in: qsos).contains(.workedAllStates))
+    }
+
+    func testWorkedAllZonesAtForty() {
+        var qsos = (1...40).map { makeQSO(call: "Z\($0)", cqZone: $0) }
+        XCTAssertTrue(AwardMilestone.completed(in: qsos).contains(.workedAllZones))
+        qsos.removeLast() // 39 zones
+        XCTAssertFalse(AwardMilestone.completed(in: qsos).contains(.workedAllZones))
+    }
+
+    func testDXCCAtOneHundredEntities() {
+        var qsos = (1...100).map { makeQSO(call: "D\($0)", dxcc: $0, country: "E\($0)") }
+        XCTAssertTrue(AwardMilestone.completed(in: qsos).contains(.dxcc))
+        qsos.removeLast() // 99 entities
+        XCTAssertFalse(AwardMilestone.completed(in: qsos).contains(.dxcc))
+    }
+
+    func testWorkedAllContinents() {
+        var qsos = ["NA", "SA", "EU", "AF", "AS", "OC"].map { cont -> QSO in
+            let q = makeQSO(call: "C\(cont)", country: "X\(cont)")
+            q.continent = cont
+            return q
+        }
+        XCTAssertTrue(AwardMilestone.completed(in: qsos).contains(.workedAllContinents))
+        qsos.removeLast() // only five continents
+        XCTAssertFalse(AwardMilestone.completed(in: qsos).contains(.workedAllContinents))
+        // Antarctica doesn't count toward the six required.
+        let anQSO = makeQSO(call: "ANT", country: "Antarctica")
+        anQSO.continent = "AN"
+        qsos.append(anQSO)
+        XCTAssertFalse(AwardMilestone.completed(in: qsos).contains(.workedAllContinents))
+    }
+
+    func testTombstonedQSODoesNotCompleteMilestone() {
+        var qsos = StatsSummary.allUSStates.dropLast().map {
+            makeQSO(call: "US\($0)", country: "United States", state: $0)
+        }
+        // The 50th state is present but tombstoned → WAS stays incomplete.
+        let last = makeQSO(call: "USLAST", country: "United States",
+                           state: StatsSummary.allUSStates.last!, deletedAt: Date())
+        qsos.append(last)
+        XCTAssertFalse(AwardMilestone.completed(in: qsos).contains(.workedAllStates))
+    }
+}

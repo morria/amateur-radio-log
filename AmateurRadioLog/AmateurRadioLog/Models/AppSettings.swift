@@ -12,6 +12,13 @@ final class AppSettings {
     /// Spots "my privileges" filter. Optional so the CloudKit schema addition
     /// is safe.
     var licenseClass: String?
+
+    /// Award milestones already announced to the user (comma-separated
+    /// `AwardMilestone` rawValues). nil = never computed: the first pass
+    /// seeds this from the existing log silently, so pre-existing
+    /// achievements don't fire a burst of notifications. CloudKit-safe
+    /// optional, so the baseline is shared across the account's devices.
+    var announcedMilestones: String?
     var lastBand: String?
     var lastMode: String?
     var lastFreq: Double?

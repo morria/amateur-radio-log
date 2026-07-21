@@ -161,6 +161,10 @@ final class AppState {
     var statusMessage: String?
     var pendingImportURL: URL?
 
+    /// Newly-completed award milestones awaiting a celebratory banner (see
+    /// `checkAwardMilestones`). ContentView shows them one at a time.
+    var pendingMilestones: [AwardMilestone] = []
+
     /// Classified ADIF import awaiting user confirmation (drives the
     /// import preview sheet).
     var importPreview: ImportPreview?
@@ -911,6 +915,63 @@ final class AppState {
         return nil
     }
 
+    // MARK: - Award Milestones
+
+    /// Announced-milestone set from settings; nil when never computed
+    /// (unseeded), an empty set once seeded with nothing.
+    private func announcedMilestones() -> Set<AwardMilestone>? {
+        guard let raw = settings?.announcedMilestones else { return nil }
+        return Set(raw.split(separator: ",").compactMap { AwardMilestone(rawValue: String($0)) })
+    }
+
+    private func storeAnnouncedMilestones(_ set: Set<AwardMilestone>) {
+        settings?.announcedMilestones = set.map(\.rawValue).sorted().joined(separator: ",")
+        try? settings?.modelContext?.save()
+    }
+
+    /// Recomputes completed award milestones from the log and, for any newly
+    /// completed since last time, queues a celebratory banner. The first ever
+    /// call seeds the baseline silently so achievements earned before this
+    /// feature (or a bulk import) don't fire a burst of notifications.
+    /// Call after logging a QSO.
+    func checkAwardMilestones(context: ModelContext) {
+        guard settings != nil else { return }
+        // Once every milestone is announced there's nothing left to earn, so
+        // skip the log scan entirely on each subsequent QSO.
+        if let announced = announcedMilestones(),
+           Set(AwardMilestone.allCases).isSubset(of: announced) {
+            return
+        }
+        let qsos = (try? context.fetch(FetchDescriptor<QSO>())) ?? []
+        let completed = AwardMilestone.completed(in: qsos)
+
+        guard let announced = announcedMilestones() else {
+            storeAnnouncedMilestones(completed) // first run — seed, don't announce
+            return
+        }
+        let newly = completed.subtracting(announced)
+        guard !newly.isEmpty else { return }
+        storeAnnouncedMilestones(announced.union(newly))
+        // Present in a stable order (allCases) rather than Set iteration order.
+        pendingMilestones.append(contentsOf: AwardMilestone.allCases.filter { newly.contains($0) })
+    }
+
+    /// Silently reconciles the milestone baseline with the current log without
+    /// announcing anything — used after a bulk import so importing a
+    /// milestone-completing log doesn't fire a banner, while keeping the
+    /// baseline accurate so a later live QSO still can.
+    func refreshMilestoneBaseline(context: ModelContext) {
+        guard settings != nil else { return }
+        let qsos = (try? context.fetch(FetchDescriptor<QSO>())) ?? []
+        let completed = AwardMilestone.completed(in: qsos)
+        storeAnnouncedMilestones(announcedMilestones()?.union(completed) ?? completed)
+    }
+
+    /// Dismisses the current achievement banner, revealing the next queued one.
+    func dismissMilestone() {
+        if !pendingMilestones.isEmpty { pendingMilestones.removeFirst() }
+    }
+
     // MARK: - Import
 
     /// Reads the ADIF file (inside its security scope), then classifies it
@@ -979,6 +1040,9 @@ final class AppState {
             }
             statusMessage = parts.joined(separator: ", ")
             refreshAfterBackgroundChanges(context)
+            // Fold imported achievements into the baseline silently — a bulk
+            // import shouldn't fire a burst of milestone banners.
+            refreshMilestoneBaseline(context: context)
         } catch {
             isLoading = false
             statusMessage = nil

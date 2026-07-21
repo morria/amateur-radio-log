@@ -32,6 +32,7 @@
 		2A025DF68A820CA19D11B48E /* FrequencyBandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */; };
 		2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C20 /* StationInfoCard.swift */; };
 		2F8B14644735D6CF62043A56 /* NumberKeyboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */; };
+		2F8B14644735D6CF62043A57 /* AchievementBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C22 /* AchievementBanner.swift */; };
 		32AF577147893E10F915E91A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */; };
 		342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */; };
 		3E21A60E4FA3F089CC9385CA /* ADIFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */; };
@@ -86,6 +87,7 @@
 		D8CDB7723B7A99DBF5274B5B /* SpotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64DB756482B84405310EE7D0 /* SpotStore.swift */; };
 		D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDBE /* Band.swift */; };
 		D8E7A25459D88B3902EC4C29 /* BandPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */; };
+		D8E7A25459D88B3902EC4C30 /* AwardMilestone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDC1 /* AwardMilestone.swift */; };
 		DA46E8E6E05A5D244D025427 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D76E301651BC205642DEDC3 /* Assets.xcassets */; };
 		E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F106C61338C6F99B136BB883 /* FilterPerfTests.swift */; };
 		E3B147A925E44A654DF7598F /* TQSLLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */; };
@@ -151,6 +153,7 @@
 		33FF7077DF7629746C2915FC /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		364515BC2452FE33C5C76C20 /* StationInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationInfoCard.swift; sourceTree = "<group>"; };
 		364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberKeyboardRow.swift; sourceTree = "<group>"; };
+		364515BC2452FE33C5C76C22 /* AchievementBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AchievementBanner.swift; sourceTree = "<group>"; };
 		3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TQSLLauncher.swift; sourceTree = "<group>"; };
 		3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXListener.swift; sourceTree = "<group>"; };
 		3D76E301651BC205642DEDC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -180,6 +183,7 @@
 		77F71B16C1D273164AC9A61F /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		78E3BA1BA315779F6F1BFDBE /* Band.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Band.swift; sourceTree = "<group>"; };
 		78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandPlan.swift; sourceTree = "<group>"; };
+		78E3BA1BA315779F6F1BFDC1 /* AwardMilestone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwardMilestone.swift; sourceTree = "<group>"; };
 		797C4DCC41A6E63706ECBAED /* QSODetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSODetailView.swift; sourceTree = "<group>"; };
 		7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigServiceTests.swift; sourceTree = "<group>"; };
 		8033725A8E1E4C16F0BE2576 /* WSJTXMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXMessage.swift; sourceTree = "<group>"; };
@@ -357,6 +361,7 @@
 				908896B782E1C73A0E87D9C6 /* AppSettings.swift */,
 				78E3BA1BA315779F6F1BFDBE /* Band.swift */,
 				78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */,
+				78E3BA1BA315779F6F1BFDC1 /* AwardMilestone.swift */,
 				F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */,
 				2F44254B1312E8C10FAECED7 /* Mode.swift */,
 				D7B96575BF9DA100395A383A /* Operation.swift */,
@@ -490,6 +495,7 @@
 				834B46C3E471F216FB58CCE9 /* ShareSheet.swift */,
 				364515BC2452FE33C5C76C20 /* StationInfoCard.swift */,
 				364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */,
+				364515BC2452FE33C5C76C22 /* AchievementBanner.swift */,
 				DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */,
 				ADB96D32A2C761676B98BBD9 /* StatsView.swift */,
 			);
@@ -684,6 +690,7 @@
 				B6DCE35147163EBFD91F0269 /* AwardEngine.swift in Sources */,
 				D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */,
 				D8E7A25459D88B3902EC4C29 /* BandPlan.swift in Sources */,
+				D8E7A25459D88B3902EC4C30 /* AwardMilestone.swift in Sources */,
 				4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */,
 				FFBAABCF5903E4496B9F3A4B /* ClusterLineParser.swift in Sources */,
 				61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */,
@@ -739,6 +746,7 @@
 				C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */,
 				2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */,
 				2F8B14644735D6CF62043A56 /* NumberKeyboardRow.swift in Sources */,
+				2F8B14644735D6CF62043A57 /* AchievementBanner.swift in Sources */,
 				99C619B13EBF85303B7DE910 /* StatsSummary.swift in Sources */,
 				0744B0373BDD960A17D15078 /* StatsView.swift in Sources */,
 				27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */,

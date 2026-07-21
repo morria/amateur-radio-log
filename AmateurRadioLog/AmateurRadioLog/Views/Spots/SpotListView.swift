@@ -441,12 +441,14 @@ struct SpotListView: View {
 
         let qso = data.toQSO()
         modelContext.insert(qso)
+        try? modelContext.save()
         appState.saveLastUsed(from: data)
 
         noteLogged(qso)
 
         showConfirmation(String(localized: "Logged \(spot.activatorCall)"))
         backfill(qso, call: spot.activatorCall)
+        appState.checkAwardMilestones(context: modelContext)
     }
 
     /// Immediately reflect a just-logged contact in the worked sets so its

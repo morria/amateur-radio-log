@@ -682,6 +682,7 @@ struct LogEntryView: View {
         try? modelContext.save()
         // Lookup hadn't returned yet: backfill the inserted QSO once it does.
         if lookupResult == nil { backfill(qso, call: trimmed) }
+        appState.checkAwardMilestones(context: modelContext)
         onLogged?(qso)
 
         if presentedAsSheet {

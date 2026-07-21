@@ -122,6 +122,19 @@ struct ContentView: View {
                 OperationStatusBar(session: session)
             }
         }
+        // Celebratory banner when a QSO completes an award milestone. Hidden
+        // while the operation screen covers everything — ActivationView shows
+        // its own so exactly one banner is ever mounted for a given milestone.
+        .overlay(alignment: .top) {
+            if !appState.showOperationScreen, let milestone = appState.pendingMilestones.first {
+                AchievementBanner(milestone: milestone) { appState.dismissMilestone() }
+                    .id(milestone)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1)
+            }
+        }
+        .animation(.spring(duration: 0.35), value: appState.pendingMilestones.first)
         #if os(macOS)
         .frame(minWidth: 900, minHeight: 600)
         #endif
@@ -207,6 +220,9 @@ struct ContentView: View {
         .onAppear {
             let settings = AppSettings.shared(context: modelContext)
             appState.settings = settings
+            // Seed the milestone baseline (silent on first run) and catch any
+            // milestone completed by QSOs synced in while the app was closed.
+            appState.checkAwardMilestones(context: modelContext)
             #if DEBUG
             // Screenshot/UI-test hook: `-uiTab stats` opens a tab directly,
             // `-uiSkipOnboarding` suppresses first-run onboarding.

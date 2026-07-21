@@ -23,6 +23,18 @@ struct ActivationView: View {
         #if os(macOS)
         .frame(minWidth: 520, minHeight: 620)
         #endif
+        // This screen covers ContentView, so it hosts the achievement banner
+        // while it's up (ContentView suppresses its own meanwhile).
+        .overlay(alignment: .top) {
+            if let milestone = appState.pendingMilestones.first {
+                AchievementBanner(milestone: milestone) { appState.dismissMilestone() }
+                    .id(milestone)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1)
+            }
+        }
+        .animation(.spring(duration: 0.35), value: appState.pendingMilestones.first)
     }
 }
 
@@ -905,6 +917,7 @@ private struct ActivationLoggingView: View {
         modelContext.insert(qso)
         try? modelContext.save()
         appState.saveLastUsed(from: data)
+        appState.checkAwardMilestones(context: modelContext)
 
         call = ""
         theirPark = ""
