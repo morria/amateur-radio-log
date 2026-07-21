@@ -250,6 +250,21 @@ final class QSOIdentityBackfillTests: XCTestCase {
         let keeper = all.first { $0.call == "W1AW" }
         XCTAssertEqual(keeper?.uuid, shared, "Oldest record keeps the original uuid")
     }
+
+    func testExactCreatedAtTieKeepsBothToAvoidCrossDeviceOverDelete() throws {
+        let shared = UUID()
+        let t = Date(timeIntervalSince1970: 1_700_000_000)
+        let a = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000", createdAt: t)
+        a.uuid = shared
+        let b = insertLegacyQSO(call: "W1AW", date: "20260308", time: "143000", createdAt: t)
+        b.uuid = shared
+        try context.save()
+
+        let result = try QSOIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.deleted, 0,
+                       "Exact createdAt ties must not be deleted — the keeper would be fetch-order-dependent")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<QSO>()).count, 2)
+    }
 }
 
 // MARK: - Operation Identity Backfill Tests
@@ -325,6 +340,19 @@ final class OperationIdentityBackfillTests: XCTestCase {
         XCTAssertEqual(all[0].name, "US-0001", "Empty keeper fields are filled from the duplicate")
         XCTAssertEqual(all[0].reference, "US-0001")
         XCTAssertEqual(all[0].kindRaw, "pota")
+    }
+
+    func testExactCreatedAtTieIsNotCollapsed() throws {
+        let shared = UUID()
+        let t = Date(timeIntervalSince1970: 1_700_000_000)
+        insertOperation(name: "US-0001", uuid: shared, reference: "US-0001", createdAt: t)
+        insertOperation(name: "US-0001", uuid: shared, reference: "US-0001", createdAt: t)
+        try context.save()
+
+        let result = try OperationIdentityBackfill.backfill(context: context)
+        XCTAssertEqual(result.deleted, 0,
+                       "Exact createdAt ties must not be deleted — two devices could otherwise delete each other's row and lose the operation")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Operation>()).count, 2)
     }
 }
 

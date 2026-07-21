@@ -58,6 +58,14 @@ enum OperationIdentityBackfill {
             let sorted = group.sorted { $0.createdAt < $1.createdAt }
             let keeper = sorted[0]
             for duplicate in sorted.dropFirst() {
+                // Only collapse rows STRICTLY newer than the keeper. createdAt
+                // is replicated, so "oldest" is identical on every device when
+                // the timestamps differ — but on an exact tie the winner would
+                // depend on unspecified fetch order, and two devices picking
+                // different keepers would each delete the other's row and lose
+                // the operation entirely. Keeping an exact tie leaves a
+                // harmless duplicate instead of risking that data loss.
+                guard duplicate.createdAt > keeper.createdAt else { continue }
                 merge(duplicate, into: keeper)
                 context.delete(duplicate)
                 deleted += 1

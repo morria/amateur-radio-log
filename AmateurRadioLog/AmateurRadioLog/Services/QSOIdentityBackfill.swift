@@ -53,7 +53,12 @@ enum QSOIdentityBackfill {
             let keeper = sorted[0]
             for duplicate in sorted.dropFirst() {
                 if isSameLogicalQSO(duplicate, keeper) {
-                    // True duplicate row (e.g. re-imported export) — remove it
+                    // True duplicate row (e.g. re-imported export) — remove it,
+                    // but only when strictly newer than the keeper. On an exact
+                    // createdAt tie the keeper is fetch-order-dependent, so two
+                    // devices could pick different keepers and each delete the
+                    // other's row, losing the QSO. Keep exact ties instead.
+                    guard duplicate.createdAt > keeper.createdAt else { continue }
                     context.delete(duplicate)
                     deleted += 1
                 } else {
