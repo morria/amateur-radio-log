@@ -223,4 +223,41 @@ final class AwardEngineTests: XCTestCase {
         XCTAssertFalse(rows.contains { $0.slice.band == .band20m && $0.slice.modeGroup == nil })
         XCTAssertFalse(rows.contains { $0.slice.band == nil && $0.slice.modeGroup == .cw })
     }
+
+    // MARK: - Awards honor the stats filters (StatsSummary.filtered)
+
+    func testFilteredSubsetDrivesAwardProgress() {
+        let qsos = [
+            makeQSO(call: "A1", band: .band20m, dxcc: 1, country: "Alpha"),
+            makeQSO(call: "B1", band: .band40m, dxcc: 2, country: "Bravo"),
+        ]
+        // No filter → both entities count.
+        let all = StatsSummary.filtered(qsos: qsos, band: nil, mode: nil,
+                                        timeRange: .allTime, operationId: nil)
+        XCTAssertEqual(AwardEngine(qsos: all).dxccWorkedCount(), 2)
+
+        // Band filter → award progress reflects only the 20 m entity.
+        let twenty = StatsSummary.filtered(qsos: qsos, band: .band20m, mode: nil,
+                                           timeRange: .allTime, operationId: nil)
+        XCTAssertEqual(AwardEngine(qsos: twenty).dxccWorkedCount(), 1)
+    }
+
+    func testFilteredAppliesModeFilterAndExcludesTombstones() {
+        let qsos = [
+            makeQSO(call: "SSB1", band: .band20m, mode: .ssb, dxcc: 1, country: "Alpha"),
+            makeQSO(call: "CW1", band: .band20m, mode: .cw, dxcc: 2, country: "Bravo"),
+            makeQSO(call: "DEL", band: .band20m, mode: .cw, dxcc: 3, country: "Delta",
+                    deletedAt: Date()),
+        ]
+        // Mode filter keeps only the (non-tombstoned) CW entity.
+        let cwOnly = StatsSummary.filtered(qsos: qsos, band: nil, mode: .cw,
+                                           timeRange: .allTime, operationId: nil)
+        XCTAssertEqual(cwOnly.count, 1)
+        XCTAssertEqual(AwardEngine(qsos: cwOnly).dxccWorkedCount(), 1)
+
+        // Tombstones are dropped even with no filter.
+        let all = StatsSummary.filtered(qsos: qsos, band: nil, mode: nil,
+                                        timeRange: .allTime, operationId: nil)
+        XCTAssertEqual(all.count, 2)
+    }
 }

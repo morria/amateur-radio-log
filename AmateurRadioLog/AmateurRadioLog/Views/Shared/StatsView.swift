@@ -15,9 +15,9 @@ struct StatsView: View {
     // of once per chart per render
     @State private var summary = StatsSummary()
 
-    // DXCC/WAS/WAZ award progress (see AwardEngine). Kept separate from
-    // StatsSummary since it isn't affected by the band/mode/time-range
-    // filters above — award progress is always computed over the whole log.
+    // DXCC/WAS/WAZ award progress (see AwardEngine), computed over the same
+    // filtered QSO subset as the charts so award progress reflects the
+    // band/mode/time-range/operation filters set up top.
     @State private var awardEngine = AwardEngine(qsos: [])
 
     private struct SummaryKey: Hashable {
@@ -36,17 +36,22 @@ struct StatsView: View {
                    revision: appState.dataRevision)
     }
 
-    /// Award progress only needs recomputing when the QSO set actually
-    /// changes shape (count) or content (most recent edit timestamp) —
-    /// cheaper than a full StatsSummary key since there's no band/mode/time
-    /// filter to track.
+    /// Awards recompute when the QSO set changes shape (count) or content
+    /// (most recent edit timestamp), and — since they now honor the filters —
+    /// when any stats filter changes.
     private struct AwardsKey: Hashable {
         var count: Int
         var latestUpdate: Date?
+        var band: Band?
+        var mode: Mode?
+        var timeRange: MapTimeRange
+        var operationId: UUID?
     }
 
     private var awardsKey: AwardsKey {
-        AwardsKey(count: qsos.count, latestUpdate: qsos.map(\.updatedAt).max())
+        AwardsKey(count: qsos.count, latestUpdate: qsos.map(\.updatedAt).max(),
+                  band: statsBand, mode: statsMode, timeRange: statsTimeRange,
+                  operationId: appState.filterOperationId)
     }
 
     private func refreshSummary() {
@@ -61,7 +66,12 @@ struct StatsView: View {
     }
 
     private func refreshAwards() {
-        awardEngine = AwardEngine(qsos: qsos)
+        // Same filtered subset the charts aggregate, so award progress is
+        // shown within the active band/mode/time-range/operation filter.
+        let filtered = StatsSummary.filtered(
+            qsos: qsos, band: statsBand, mode: statsMode,
+            timeRange: statsTimeRange, operationId: appState.filterOperationId)
+        awardEngine = AwardEngine(qsos: filtered)
     }
 
     // MARK: - Body

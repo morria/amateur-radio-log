@@ -85,6 +85,36 @@ struct StatsSummary {
         ]
     ]
 
+    // MARK: - Filtering
+
+    /// Shared stats filter predicate: excludes tombstones and applies the
+    /// band / mode / time-range / operation filters. Used by both `compute`
+    /// and `filtered` so the charts and the awards never diverge.
+    static func passesFilters(_ qso: QSO, bandRaw: String?, modeRaw: String?,
+                              startKey: String?, operationId: UUID?) -> Bool {
+        if qso.deletedAt != nil { return false }
+        if let bandRaw, qso.bandRaw != bandRaw { return false }
+        if let modeRaw, qso.modeRaw != modeRaw { return false }
+        if let startKey,
+           MapTimeRange.qsoKey(qsoDate: qso.qsoDate, timeOn: qso.timeOn) < startKey { return false }
+        if let operationId, qso.operationId != operationId { return false }
+        return true
+    }
+
+    /// The QSOs matching the current stats filters — the same subset
+    /// `compute` aggregates, so award progress can be built over exactly
+    /// what the charts show.
+    static func filtered(qsos: [QSO], band: Band?, mode: Mode?,
+                         timeRange: MapTimeRange, operationId: UUID?) -> [QSO] {
+        let bandRaw = band?.rawValue
+        let modeRaw = mode?.rawValue
+        let startKey = timeRange.startDateKey
+        return qsos.filter {
+            passesFilters($0, bandRaw: bandRaw, modeRaw: modeRaw,
+                          startKey: startKey, operationId: operationId)
+        }
+    }
+
     // MARK: - Single-pass computation
 
     static func compute(qsos: [QSO],
@@ -123,15 +153,10 @@ struct StatsSummary {
         }
 
         for qso in qsos {
-            // Tombstoned QSOs (replicated deletions) never count.
-            if qso.deletedAt != nil { continue }
-            // Stats filters (band / mode / time range / operation)
-            if let bandRaw, qso.bandRaw != bandRaw { continue }
-            if let modeRaw, qso.modeRaw != modeRaw { continue }
-            if let startKey,
-               MapTimeRange.qsoKey(qsoDate: qso.qsoDate, timeOn: qso.timeOn) < startKey { continue }
-            if let operationId {
-                if qso.operationId != operationId { continue }
+            // Tombstones + band / mode / time-range / operation filters.
+            guard Self.passesFilters(qso, bandRaw: bandRaw, modeRaw: modeRaw,
+                                     startKey: startKey, operationId: operationId) else { continue }
+            if operationId != nil {
                 operatorCountsByCall[qso.operatorCallsign?.uppercased() ?? "?", default: 0] += 1
             }
 
