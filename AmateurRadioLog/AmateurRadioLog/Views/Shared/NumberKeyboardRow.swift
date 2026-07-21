@@ -24,10 +24,12 @@ private struct NumberKeyboardRow: ViewModifier {
 
     func body(content: Content) -> some View {
         content.toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                // Gated on focus so it never appears over the number-pad
-                // fields (frequency, RST) in the same screen.
-                if isActive {
+            // Gate the whole group, not just its body: an *empty*
+            // `.keyboard` ToolbarItemGroup still renders a blank accessory
+            // bar over the number-pad fields (frequency, RST) in the same
+            // screen, so emit nothing at all when the callsign isn't focused.
+            if isActive {
+                ToolbarItemGroup(placement: .keyboard) {
                     HStack(spacing: 4) {
                         ForEach(Self.keys, id: \.self) { key in
                             Button {
