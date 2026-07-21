@@ -42,7 +42,7 @@ struct SidebarView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(appState.activationSession == nil
-                                 ? "New Operation" : "Resume Operation")
+                                 ? "New Operation" : "Active Operation")
                             if let session = appState.activationSession {
                                 Text(session.title)
                                     .font(.caption)
@@ -67,7 +67,7 @@ struct SidebarView: View {
                             Label {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(appState.activeOperation == nil
-                                         ? "New Shared Operation" : "Operation Active")
+                                         ? "New Shared Operation" : "Active Operation")
                                     if let operation = appState.activeOperation {
                                         Text(operation.name)
                                             .font(.caption)
