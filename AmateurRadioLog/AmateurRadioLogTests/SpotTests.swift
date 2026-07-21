@@ -617,6 +617,15 @@ final class BandPlanTests: XCTestCase {
         XCTAssertTrue(can(.technician, 446.000, "FM"))
     }
 
+    // 4 m (70 MHz) has no US allocation — an international 4 m spot must not
+    // pass the privilege filter for any US class.
+    func testNoUSAllocationBandsBlockedForAllClasses() {
+        for lc in [LicenseClass.technician, .general, .advanced, .extra] {
+            XCTAssertFalse(can(lc, 70.200, "SSB"), "4 m should be blocked for \(lc)")
+            XCTAssertFalse(can(lc, 0.502, "CW"), "560 m should be blocked for \(lc)")
+        }
+    }
+
     // Data isn't allowed in a phone-only sub-band even where phone is.
     func testDataModeBlockedInPhoneSegment() {
         XCTAssertFalse(can(.general, 14.300, "FT8"))

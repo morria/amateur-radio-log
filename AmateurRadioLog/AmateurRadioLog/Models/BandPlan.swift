@@ -111,13 +111,19 @@ enum BandPlan {
     /// on that band.
     static func privileges(for licenseClass: LicenseClass, band: Band) -> [Segment] {
         switch band {
+        // No US amateur allocation — 4 m (70 MHz) and the 500 kHz "560 m"
+        // slot. A US operator can't transmit here at all, so an
+        // international 4 m spot must not pass the privilege filter.
+        case .band4m, .band560m:
+            return []
+
         // VHF and up: all US classes share full privileges.
-        case .band6m, .band4m, .band2m, .band1_25m, .band70cm, .band33cm,
+        case .band6m, .band2m, .band1_25m, .band70cm, .band33cm,
              .band23cm, .band13cm, .band9cm, .band6cm, .band3cm:
             return [fullBand(band, all)]
 
-        // MF/LF: lenient (CW/data). Rarely spotted; avoid false hides.
-        case .band2190m, .band630m, .band560m:
+        // MF/LF (2200 m / 630 m): lenient CW/data. Rarely spotted.
+        case .band2190m, .band630m:
             return [fullBand(band, cwData)]
 
         case .band160m:
