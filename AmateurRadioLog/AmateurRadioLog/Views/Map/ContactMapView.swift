@@ -130,7 +130,9 @@ struct ContactMapView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPin: QSOMapPin?
     @State private var showFilters = false
-    @State private var legendExpanded = true
+    // Collapsed by default: the legend is a small tappable pill until the
+    // user opens it, so it doesn't cover the map.
+    @State private var legendExpanded = false
     @State private var showCallsignSheet = false
 
     // Cached pin data, rebuilt only when the inputs actually change (see
@@ -910,16 +912,28 @@ struct ContactMapView: View {
 
     private var compactLegend: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // The whole header row is the toggle, with a comfortable touch
+            // target (the tiny chevron alone was very hard to hit).
             Button(action: { withAnimation { legendExpanded.toggle() } }) {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "list.bullet")
+                        .font(.caption2)
                     Text(appState.mapColorBy.localizedName)
-                        .font(.caption2).bold()
-                    Image(systemName: legendExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption).bold()
+                    Image(systemName: legendExpanded ? "chevron.down" : "chevron.up")
                         .font(.caption2)
                 }
                 .foregroundStyle(.primary)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(Text(legendExpanded ? "Hide legend" : "Show legend"))
+            #if os(macOS)
+            .help(legendExpanded ? "Hide legend" : "Show legend")
+            #endif
+
             if legendExpanded {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 2)], alignment: .leading, spacing: 2) {
                     ForEach(legendItems, id: \.name) { item in
@@ -934,12 +948,12 @@ struct ContactMapView: View {
                         }
                     }
                 }
-                .padding(.top, 2)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
             }
         }
-        .padding(8)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Pin Coloring
