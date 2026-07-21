@@ -76,6 +76,33 @@ final class HamQTHUploadResponseTests: XCTestCase {
         XCTAssertEqual(HamQTHService.classifyUploadResponse("QSO saved", statusCode: 200), .success)
     }
 
+    /// The live HamQTH success body — this is what was being misclassified as
+    /// a failure, so uploads "never succeeded".
+    func testLiveHamQTHSuccessBodyIsSuccess() {
+        XCTAssertEqual(
+            HamQTHService.classifyUploadResponse(
+                "QSO OK: QSO was successfully saved into database.", statusCode: 200),
+            .success)
+    }
+
+    /// A re-uploaded QSO comes back as an HTTP 400 rejection whose reason is
+    /// that it already exists — that's a duplicate (already synced), not a
+    /// failure.
+    func testAlreadyExistsRejectionIsDuplicate() {
+        XCTAssertEqual(
+            HamQTHService.classifyUploadResponse(
+                "QSO Rejected: QSO already exists in database", statusCode: 400),
+            .duplicate)
+    }
+
+    /// A genuine 400 rejection (not a duplicate) surfaces the server's reason.
+    func testOtherRejectionIsFailureWithReason() {
+        XCTAssertEqual(
+            HamQTHService.classifyUploadResponse(
+                "QSO Rejected: wrong band", statusCode: 400),
+            .failure(reason: "QSO Rejected: wrong band"))
+    }
+
     func testDuplicateBodyIsDuplicate() {
         XCTAssertEqual(HamQTHService.classifyUploadResponse("Dupe QSO", statusCode: 200), .duplicate)
         XCTAssertEqual(

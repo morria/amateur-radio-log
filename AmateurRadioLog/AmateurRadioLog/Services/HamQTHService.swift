@@ -94,28 +94,37 @@ actor HamQTHService {
         case failure(reason: String)
     }
 
-    /// Classifies a qso_realtime.php response. HamQTH returns errors in the
-    /// response body with HTTP status 200, so a 200 alone does not mean success.
+    /// Classifies a qso_realtime.php response. HamQTH returns the outcome as
+    /// an HTTP status plus a short message in the body:
+    ///   success  → HTTP 200, "QSO OK: QSO was successfully saved into database."
+    ///   rejected → HTTP 400, "QSO Rejected: ... (wrong band, already exists, …)"
+    ///   error    → HTTP 500, "Internal error: ..." (thrown upstream as 5xx)
     ///
-    /// Known response markers (not fully verified against the live API, so
-    /// unknown bodies are conservatively treated as failures rather than
-    /// falsely marking records as synced):
-    ///   success:   "OK", "QSO saved", "inserted"
-    ///   duplicate: "dupe", "duplicate", "already exist"
+    /// A rejection whose reason is that the QSO already exists is a duplicate
+    /// (the record is on HamQTH, so it counts as synced); any other body is a
+    /// failure surfaced with the server's own reason. A bare 200 is NOT
+    /// treated as success, since HamQTH also returns errors (e.g. bad
+    /// credentials) with status 200.
     static func classifyUploadResponse(_ body: String, statusCode: Int) -> UploadOutcome {
-        guard statusCode == 200 else {
-            return .failure(reason: "HTTP \(statusCode)")
-        }
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
-        if lower == "ok" || lower.hasPrefix("ok:") || lower.hasPrefix("ok ")
+
+        // "already exists in database" comes back as a 400 rejection but means
+        // the QSO is already logged — a duplicate, not a failure.
+        if lower.contains("already exist") || lower.contains("duplicate") || lower.contains("dupe") {
+            return .duplicate
+        }
+
+        // Real success is "QSO OK: ..." with HTTP 200; keep the older/plain
+        // markers too for resilience to wording changes.
+        if statusCode == 200,
+           lower.hasPrefix("qso ok") || lower.contains("successfully saved")
+            || lower == "ok" || lower.hasPrefix("ok:") || lower.hasPrefix("ok ")
             || lower.contains("qso saved") || lower.contains("inserted") {
             return .success
         }
-        if lower.contains("dupe") || lower.contains("duplicate") || lower.contains("already exist") {
-            return .duplicate
-        }
-        return .failure(reason: trimmed.isEmpty ? "Empty response from HamQTH" : String(trimmed.prefix(200)))
+
+        return .failure(reason: trimmed.isEmpty ? "HTTP \(statusCode)" : String(trimmed.prefix(200)))
     }
 
     /// Maximum in-flight insert requests during a batch upload.
