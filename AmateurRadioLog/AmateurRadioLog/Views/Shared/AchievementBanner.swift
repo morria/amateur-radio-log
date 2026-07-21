@@ -56,12 +56,8 @@ struct AchievementBanner: View {
         .accessibilityLabel(Text("\(milestone.title). \(milestone.detail)"))
         .sensoryFeedback(.success, trigger: shown)
         .onAppear { shown = true }
-        // Auto-dismiss; `.id(milestone)` at the call site restarts this per
-        // achievement so a queued next one gets its own full duration.
-        .task(id: milestone) {
-            try? await Task.sleep(for: .seconds(6))
-            guard !Task.isCancelled else { return }
-            onDismiss()
-        }
+        // Auto-dismiss is owned by AppState (tied to the milestone queue, not
+        // this view instance), so re-hosting the banner when the operation
+        // screen opens/closes doesn't restart the timer. Tap still dismisses.
     }
 }

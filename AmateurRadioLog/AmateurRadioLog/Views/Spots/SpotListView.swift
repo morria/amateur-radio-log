@@ -109,6 +109,10 @@ struct SpotListView: View {
         }
         .onChange(of: allQSOs.count) { _, _ in rebuildLookupSets() }
         .onChange(of: appState.activeOperationId) { _, _ in rebuildLookupSets() }
+        // In-place mutations (a tombstoned operation QSO, a synced edit) don't
+        // change allQSOs.count; dataRevision catches them so the worked sets
+        // (and the strike-through) don't go stale.
+        .onChange(of: appState.dataRevision) { _, _ in rebuildLookupSets() }
         .onChange(of: filterBand) { _, _ in pushFilter() }
         .onChange(of: filterMode) { _, _ in pushFilter() }
         .onChange(of: enabledSources) { _, _ in pushFilter() }

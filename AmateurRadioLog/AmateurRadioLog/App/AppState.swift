@@ -937,14 +937,29 @@ final class AppState {
     func checkAwardMilestones(context: ModelContext) {
         guard settings != nil else { return }
         // Once every milestone is announced there's nothing left to earn, so
-        // skip the log scan entirely on each subsequent QSO.
+        // skip the scan entirely on each subsequent QSO.
         if let announced = announcedMilestones(),
            Set(AwardMilestone.allCases).isSubset(of: announced) {
             return
         }
-        let qsos = (try? context.fetch(FetchDescriptor<QSO>())) ?? []
-        let completed = AwardMilestone.completed(in: qsos)
+        // The full-log fetch + AwardEngine build is O(n); run it off the main
+        // actor so rapid logging with a large log (mid-activation) never
+        // hitches the UI. Callers save the new QSO first, so a fresh
+        // background context sees it.
+        let container = context.container
+        Task.detached(priority: .utility) { [weak self] in
+            let bg = ModelContext(container)
+            let qsos = (try? bg.fetch(FetchDescriptor<QSO>())) ?? []
+            let completed = AwardMilestone.completed(in: qsos)
+            await MainActor.run { self?.announceNewMilestones(completed) }
+        }
+    }
 
+    /// Main-actor tail of `checkAwardMilestones`: seed silently on the first
+    /// pass, otherwise queue a banner for each newly-completed milestone.
+    /// Re-reads the announced set here so concurrent checks can't double-announce.
+    private func announceNewMilestones(_ completed: Set<AwardMilestone>) {
+        guard settings != nil else { return }
         guard let announced = announcedMilestones() else {
             storeAnnouncedMilestones(completed) // first run — seed, don't announce
             return
@@ -954,6 +969,23 @@ final class AppState {
         storeAnnouncedMilestones(announced.union(newly))
         // Present in a stable order (allCases) rather than Set iteration order.
         pendingMilestones.append(contentsOf: AwardMilestone.allCases.filter { newly.contains($0) })
+        scheduleMilestoneAutoDismiss()
+    }
+
+    @ObservationIgnored private var milestoneDismissTask: Task<Void, Never>?
+
+    /// Auto-dismiss the front banner after a few seconds. Owned here (not by
+    /// the banner view) so it survives the banner being re-hosted when the
+    /// operation screen opens/closes over it — otherwise the timer would
+    /// restart and the banner could linger.
+    private func scheduleMilestoneAutoDismiss() {
+        milestoneDismissTask?.cancel()
+        guard !pendingMilestones.isEmpty else { return }
+        milestoneDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            self?.dismissMilestone()
+        }
     }
 
     /// Silently reconciles the milestone baseline with the current log without
@@ -967,9 +999,12 @@ final class AppState {
         storeAnnouncedMilestones(announcedMilestones()?.union(completed) ?? completed)
     }
 
-    /// Dismisses the current achievement banner, revealing the next queued one.
+    /// Dismisses the current achievement banner, revealing the next queued one
+    /// (and arming its auto-dismiss).
     func dismissMilestone() {
-        if !pendingMilestones.isEmpty { pendingMilestones.removeFirst() }
+        guard !pendingMilestones.isEmpty else { return }
+        pendingMilestones.removeFirst()
+        scheduleMilestoneAutoDismiss()
     }
 
     // MARK: - Import
@@ -1709,6 +1744,11 @@ final class AppState {
             context.delete(qso)
         }
         try? context.save()
+        // A tombstone leaves the row in place (count unchanged), so bump the
+        // revision to nudge views keyed on it — e.g. the Spots list rebuilding
+        // its worked-in-operation set so a deleted contact stops showing
+        // struck through.
+        dataRevision += 1
     }
 
     /// Shared sync error handling: cancellation shows a neutral status;
