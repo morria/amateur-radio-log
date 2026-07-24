@@ -177,8 +177,17 @@ final class AppState {
     var dataRevision: Int = 0
 
     // MARK: - Navigation
-    var selectedTab: NavigationTab = .log
+    var selectedTab: NavigationTab = .log {
+        // Any tab change invalidates a recorded drill-in origin;
+        // showLogFiltered re-records it right after switching to the log.
+        didSet { logReturnTab = nil }
+    }
     var mapHighlightQSOId: String?
+    /// The tab a tapped drill-in (stats bar, map legend row) navigated to the
+    /// log from. While set, the log's iOS back button returns here instead of
+    /// dismissing to the sidebar, so Statistics → tapped item → filtered log →
+    /// back lands on Statistics again.
+    var logReturnTab: NavigationTab?
     /// Incremented to pop the iPhone detail navigation stack (a pushed QSO
     /// detail screen would otherwise stay on top when a tapped filter or
     /// "Show on Map" switches the tab underneath it).
@@ -192,7 +201,13 @@ final class AppState {
     /// selection when this fires.
     var detailRevealSignal = 0
 
-    func revealDetailColumn() { detailRevealSignal += 1 }
+    func revealDetailColumn() {
+        // Navigation came from a sheet over the sidebar, not from a tapped
+        // drill-in on the previously visible tab — back should return to the
+        // sidebar, so drop any origin showLogFiltered just recorded.
+        logReturnTab = nil
+        detailRevealSignal += 1
+    }
 
     // Log list visibility counts (maintained by QSOListView, shown by SearchBarView)
     var visibleQSOCount: Int?
@@ -753,7 +768,15 @@ final class AppState {
         filterCounty = county
         filterOperationId = operationId
         filterOperationLabel = operationLabel
+        let origin = selectedTab
         selectedTab = .log
+        // Stats and Map host tappable drill-ins into the log; back should
+        // return there. Other origins (log itself, sidebar sheets) keep the
+        // default back-to-sidebar behavior. Set after selectedTab: its didSet
+        // clears the origin.
+        if origin == .stats || origin == .map {
+            logReturnTab = origin
+        }
         popDetailStack()
     }
 
