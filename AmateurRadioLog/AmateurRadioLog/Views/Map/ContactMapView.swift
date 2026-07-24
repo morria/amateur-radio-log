@@ -495,7 +495,12 @@ struct ContactMapView: View {
             if horizontalSizeClass == .compact {
                 VStack {
                     HStack {
-                        Button(action: { dismiss() }) {
+                        Button(action: {
+                            // "Show on Map" from the log switched tabs to get
+                            // here — back returns to the log; otherwise
+                            // dismiss the detail column to the sidebar.
+                            if !appState.popReturnTab() { dismiss() }
+                        }) {
                             Image(systemName: "chevron.left")
                                 .font(.body.weight(.semibold))
                                 .padding(10)
@@ -754,11 +759,7 @@ struct ContactMapView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(qso.displayDate).font(.caption).foregroundStyle(.blue)
-                    .onTapGesture {
-                        appState.clearFilters()
-                        appState.searchText = qso.qsoDate
-                        appState.selectedTab = .log
-                    }
+                    .onTapGesture { appState.showLogSearch(qso.qsoDate) }
                 Spacer()
                 if let band = qso.band {
                     Text(band.displayName)

@@ -43,12 +43,7 @@ struct QSODetailView: View {
                         }
                     }
 
-                    Button(action: {
-                        appState.clearFilters()
-                        appState.searchText = qso.qsoDate
-                        appState.selectedTab = .log
-                        appState.popDetailStack()
-                    }) {
+                    Button(action: { appState.showLogSearch(qso.qsoDate) }) {
                         Text(qso.displayDate)
                             .foregroundStyle(.blue)
                     }
@@ -100,10 +95,8 @@ struct QSODetailView: View {
                 DetailSection(title: "QSO Details") {
                     clickableDetailRow(label: "Date", value: ADIFDateFormatter.displayDate(qso.qsoDate)) {
                         // Filter to same day
-                        appState.clearFilters()
-                        appState.searchText = qso.qsoDate.isEmpty ? "" : ADIFDateFormatter.displayDate(qso.qsoDate)
-                        appState.selectedTab = .log
-                        appState.popDetailStack()
+                        appState.showLogSearch(
+                            qso.qsoDate.isEmpty ? "" : ADIFDateFormatter.displayDate(qso.qsoDate))
                     }
                     DetailRow(label: "Frequency", value: qso.displayFrequency)
                     clickableDetailRow(label: "Band", value: qso.band?.displayName) {

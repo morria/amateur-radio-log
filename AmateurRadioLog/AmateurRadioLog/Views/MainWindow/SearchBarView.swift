@@ -20,14 +20,10 @@ struct SearchBarView: View {
             HStack(spacing: 12) {
                 #if os(iOS)
                 Button(action: {
-                    // A drill-in (stats bar, map legend) navigated here by
-                    // switching the tab — back returns to that tab. Otherwise
+                    // A drill-in (stats bar, map legend/callout) navigated
+                    // here by switching the tab — back retraces it. Otherwise
                     // dismiss the detail column to the sidebar.
-                    if let returnTab = appState.logReturnTab {
-                        appState.selectedTab = returnTab
-                    } else {
-                        dismiss()
-                    }
+                    if !appState.popReturnTab() { dismiss() }
                 }) {
                     Image(systemName: "chevron.left")
                         .font(.title2.weight(.semibold))

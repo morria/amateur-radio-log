@@ -178,16 +178,41 @@ final class AppState {
 
     // MARK: - Navigation
     var selectedTab: NavigationTab = .log {
-        // Any tab change invalidates a recorded drill-in origin;
-        // showLogFiltered re-records it right after switching to the log.
-        didSet { logReturnTab = nil }
+        // A direct write is user navigation (sidebar row, back button) and
+        // resets any drill-in history; navigate(to:) reinstates it after.
+        didSet { tabReturnStack = [] }
     }
     var mapHighlightQSOId: String?
-    /// The tab a tapped drill-in (stats bar, map legend row) navigated to the
-    /// log from. While set, the log's iOS back button returns here instead of
-    /// dismissing to the sidebar, so Statistics → tapped item → filtered log →
-    /// back lands on Statistics again.
-    var logReturnTab: NavigationTab?
+    /// Cross-tab drill-in history: the tab each programmatic navigation left
+    /// (stats bar → log, QSO → Show on Map, map callout → log, ...). The iOS
+    /// back button on the destination tab pops back through it — so
+    /// Statistics → tapped item → filtered log → back lands on Statistics —
+    /// and falls back to dismissing to the sidebar once it's empty.
+    var tabReturnStack: [NavigationTab] = []
+
+    /// Programmatic drill-in navigation: switches tabs while remembering
+    /// where the user came from. Same-tab navigation (a filter tapped inside
+    /// the log's own detail screen) keeps the history untouched, so back
+    /// still returns to wherever the drill-in journey started.
+    private func navigate(to tab: NavigationTab) {
+        var stack = tabReturnStack
+        if selectedTab != tab { stack.append(selectedTab) }
+        // Bound ping-ponging (map → log → map → ...) instead of growing an
+        // unlimited history.
+        if stack.count > 8 { stack.removeFirst(stack.count - 8) }
+        selectedTab = tab
+        tabReturnStack = stack
+    }
+
+    /// Back-button hook: returns to the tab the last drill-in came from.
+    /// False when there is no history — back should dismiss to the sidebar.
+    func popReturnTab() -> Bool {
+        guard let target = tabReturnStack.popLast() else { return false }
+        let remaining = tabReturnStack
+        selectedTab = target
+        tabReturnStack = remaining
+        return true
+    }
     /// Incremented to pop the iPhone detail navigation stack (a pushed QSO
     /// detail screen would otherwise stay on top when a tapped filter or
     /// "Show on Map" switches the tab underneath it).
@@ -204,8 +229,8 @@ final class AppState {
     func revealDetailColumn() {
         // Navigation came from a sheet over the sidebar, not from a tapped
         // drill-in on the previously visible tab — back should return to the
-        // sidebar, so drop any origin showLogFiltered just recorded.
-        logReturnTab = nil
+        // sidebar, so drop any history showLogFiltered just recorded.
+        tabReturnStack = []
         detailRevealSignal += 1
     }
 
@@ -741,12 +766,21 @@ final class AppState {
 
     func showOnMap(qso: QSO) {
         mapHighlightQSOId = "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)"
-        selectedTab = .map
+        navigate(to: .map)
         popDetailStack()
     }
 
     func showFilteredOnMap() {
-        selectedTab = .map
+        navigate(to: .map)
+        popDetailStack()
+    }
+
+    /// Date taps (QSO detail header/rows, map callout cards) drill into the
+    /// log via a search instead of a field filter.
+    func showLogSearch(_ text: String) {
+        clearFilters()
+        searchText = text
+        navigate(to: .log)
         popDetailStack()
     }
 
@@ -768,15 +802,7 @@ final class AppState {
         filterCounty = county
         filterOperationId = operationId
         filterOperationLabel = operationLabel
-        let origin = selectedTab
-        selectedTab = .log
-        // Stats and Map host tappable drill-ins into the log; back should
-        // return there. Other origins (log itself, sidebar sheets) keep the
-        // default back-to-sidebar behavior. Set after selectedTab: its didSet
-        // clears the origin.
-        if origin == .stats || origin == .map {
-            logReturnTab = origin
-        }
+        navigate(to: .log)
         popDetailStack()
     }
 

@@ -238,6 +238,9 @@ struct FieldDayView: View {
             Button {
                 appState.showLogFiltered(operationId: operation.id,
                                          operationLabel: operation.name)
+                // Sheet over the sidebar: push the detail column (compact
+                // width won't otherwise) and keep back-to-sidebar behavior.
+                appState.revealDetailColumn()
                 dismiss()
             } label: {
                 Label("Show in Log", systemImage: "list.bullet.rectangle")
