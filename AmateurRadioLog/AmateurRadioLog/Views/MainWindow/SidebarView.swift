@@ -103,9 +103,6 @@ struct SidebarView: View {
                                icon: "arrow.up.circle") {
                     showHamQTHSync = true
                 }
-            }
-
-            Section("Export") {
                 Button(action: { appState.requestLogExport() }) {
                     Label("Export Log…", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity, alignment: .leading)
