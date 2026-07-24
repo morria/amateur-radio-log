@@ -134,6 +134,7 @@ private struct ActivationSetupView: View {
     @State private var suggestions: [ParkSuggestion] = []
     @State private var isFindingParks = false
     @State private var locationError: String?
+    @State private var gridLocationError: String?
     @State private var locationManager = LocationManager()
     @State private var parkLookupTask: Task<Void, Never>?
     @FocusState private var callsignFocused: Bool
@@ -190,6 +191,12 @@ private struct ActivationSetupView: View {
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
                             #endif
+                        gridGPSButton
+                    }
+                    if let gridLocationError {
+                        Text(gridLocationError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
                 }
 
@@ -403,9 +410,34 @@ private struct ActivationSetupView: View {
         }
     }
 
+    /// Same GPS-to-grid affordance as Settings and Onboarding: a location
+    /// button beside the Grid field (spinner while the fix is in flight).
+    @ViewBuilder
+    private var gridGPSButton: some View {
+        if locationManager.isLocating {
+            ProgressView().controlSize(.small)
+        } else {
+            Button(action: {
+                Task {
+                    gridLocationError = nil
+                    if let located = await locationManager.locationToGrid() {
+                        grid = located
+                    } else {
+                        gridLocationError = locationManager.errorMessage
+                            ?? String(localized: "Could not determine location.")
+                    }
+                }
+            }) {
+                Image(systemName: "location")
+            }
+            .help("Set grid square from GPS")
+        }
+    }
+
     private func findNearbyParks() {
         isFindingParks = true
         locationError = nil
+        gridLocationError = nil
         Task {
             defer { isFindingParks = false }
             guard let location = await locationManager.currentLocation() else {
