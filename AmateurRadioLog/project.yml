@@ -7,6 +7,13 @@ options:
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
 
+packages:
+  CATBridgeKit:
+    url: git@github.com:morria/pocket-cat.git
+    # 1.1.0 added the typed power API (readPower/snapshot.power) this app
+    # uses; 1.0.0 would resolve but not compile.
+    from: 1.1.0
+
 settings:
   base:
     SWIFT_VERSION: "5.10"
@@ -20,6 +27,9 @@ targets:
     supportedDestinations: [macOS, iOS]
     sources:
       - AmateurRadioLog
+    dependencies:
+      - package: CATBridgeKit
+        product: CATBridgeKit
     settings:
       base:
         DEVELOPMENT_TEAM: 7Q2SS8772K
@@ -28,6 +38,8 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # iOS terminates the app on first CBCentralManager use without this.
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge."
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         GENERATE_INFOPLIST_FILE: YES
@@ -46,6 +58,8 @@ targets:
         com.apple.security.network.client: true
         # Incoming UDP from WSJT-X (and future multi-op Field Day peers)
         com.apple.security.network.server: true
+        # Sandboxed macOS build: CoreBluetooth is blocked without this.
+        com.apple.security.device.bluetooth: true
         com.apple.security.personal-information.location: true
         com.apple.developer.ubiquity-kvstore-identifier: "$(TeamIdentifierPrefix)$(CFBundleIdentifier)"
         com.apple.developer.icloud-container-identifiers:

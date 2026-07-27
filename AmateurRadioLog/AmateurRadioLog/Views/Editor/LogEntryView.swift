@@ -565,6 +565,11 @@ struct LogEntryView: View {
                 mode = prefill.mode ?? appState.lastMode
                 freq = prefill.freq ?? appState.lastFreq
                 power = prefill.txPower ?? appState.lastPower
+                // A spot carries no signal report, so the rig's S-meter is
+                // the only real measurement available for RST received.
+                rstRcvd = prefill.rstRcvd
+                    ?? appState.suggestedRSTReceived(for: mode)
+                    ?? ""
             }
             name = prefill.name ?? ""
             qth = prefill.qth ?? ""
@@ -583,12 +588,18 @@ struct LogEntryView: View {
             band = rig.band ?? appState.lastBand
             mode = rig.mode ?? appState.lastMode
             freq = rig.freqMHz ?? appState.lastFreq
+            // Only Pocket Cat reports power; the others fall through to the
+            // last-used value rather than blanking the field.
+            power = rig.powerWatts ?? appState.lastPower
         } else {
             band = appState.lastBand
             mode = appState.lastMode
             freq = appState.lastFreq
+            power = appState.lastPower
         }
-        power = appState.lastPower
+        // Left empty when no rig is heard, so `rstDefault` still supplies the
+        // conventional report at save time.
+        rstRcvd = appState.suggestedRSTReceived(for: mode) ?? ""
     }
 
     private func logQSO() {

@@ -1,0 +1,15 @@
+{
+  "originHash" : "ef94cb4da5683196b423710ea528658eeb07772f66ae774c0d4514bfba2329eb",
+  "pins" : [
+    {
+      "identity" : "pocket-cat",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:morria/pocket-cat.git",
+      "state" : {
+        "revision" : "0aa87634ce1bb31c9c07dd1153c7bdb9867d800b",
+        "version" : "1.1.1"
+      }
+    }
+  ],
+  "version" : 3
+}

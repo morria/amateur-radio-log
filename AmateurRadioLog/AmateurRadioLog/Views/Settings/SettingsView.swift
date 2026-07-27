@@ -58,7 +58,7 @@ struct SettingsView: View {
             } header: {
                 Text("Rig Control")
             } footer: {
-                Text("Reads frequency and mode read-only from rigctld (Hamlib) or FLRig over the network \u{2014} no commands are ever sent to the radio. Host and port are stored on this device only, so an iPad pointed at the shack Mac won't be overwritten by the Mac's own loopback setting.")
+                Text("Reads frequency and mode from rigctld (Hamlib) or FLRig over the network \u{2014} read-only, no commands are ever sent to the radio. Pocket Cat connects over Bluetooth instead and can tune the radio: tapping a spot sets the frequency and mode. Settings are stored on this device only, so an iPad pointed at the shack Mac won't be overwritten by the Mac's own loopback setting.")
             }
             Section {
                 SpotsSettingsView()
@@ -658,32 +658,40 @@ struct RigSettingsView: View {
                     adjustPortForProtocolChange(from: oldValue, to: newValue)
                     applyChanges()
                 }
-                TextField("Host", text: $host, prompt: Text(verbatim: RigPreferences.defaultHost))
-                    .onSubmit { applyChanges() }
-                TextField("Port", value: $port, format: .number.grouping(.never))
-                    .onSubmit { applyChanges() }
+                if rigProtocol.isNetwork {
+                    TextField("Host", text: $host, prompt: Text(verbatim: RigPreferences.defaultHost))
+                        .onSubmit { applyChanges() }
+                    TextField("Port", value: $port, format: .number.grouping(.never))
+                        .onSubmit { applyChanges() }
+                }
             }
-            Section {
-                HStack {
-                    Button("Test Connection") {
-                        Task { await testConnection() }
+            if rigProtocol.isNetwork {
+                Section {
+                    HStack {
+                        Button("Test Connection") {
+                            Task { await testConnection() }
+                        }
+                        .disabled(isTesting)
+
+                        if isTesting {
+                            ProgressView().controlSize(.small)
+                        }
                     }
-                    .disabled(isTesting)
 
-                    if isTesting {
-                        ProgressView().controlSize(.small)
+                    if !status.isEmpty {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(statusIsError ? .red : .green)
                     }
-                }
 
-                if !status.isEmpty {
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(statusIsError ? .red : .green)
+                    Text("Read-only: frequency and mode are polled once a second while connected; no commands are ever sent to the radio.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-
-                Text("Read-only: frequency and mode are polled once a second while connected; no commands are ever sent to the radio.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            } else {
+                Section("Pocket Cat Bridge") {
+                    PocketCatSettingsSection(enabled: enabled)
+                }
             }
         }
         .padding()
@@ -700,16 +708,20 @@ struct RigSettingsView: View {
             adjustPortForProtocolChange(from: oldValue, to: newValue)
             applyChanges()
         }
-        TextField("Host", text: $host, prompt: Text(verbatim: RigPreferences.defaultHost))
-            .autocorrectionDisabled()
-            .textInputAutocapitalization(.never)
-            .keyboardType(.URL)
-            .onSubmit { applyChanges() }
-        TextField("Port", value: $port, format: .number.grouping(.never))
-            .keyboardType(.numberPad)
-            .onSubmit { applyChanges() }
+        if rigProtocol.isNetwork {
+            TextField("Host", text: $host, prompt: Text(verbatim: RigPreferences.defaultHost))
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                .onSubmit { applyChanges() }
+            TextField("Port", value: $port, format: .number.grouping(.never))
+                .keyboardType(.numberPad)
+                .onSubmit { applyChanges() }
 
-        rigTestConnectionActions
+            rigTestConnectionActions
+        } else {
+            PocketCatSettingsSection(enabled: enabled)
+        }
         #endif
     }
 
@@ -744,11 +756,16 @@ struct RigSettingsView: View {
     private func adjustPortForProtocolChange(from oldValue: String, to newValue: String) {
         let old = RigProtocolChoice(rawValue: oldValue) ?? .rigctld
         let new = RigProtocolChoice(rawValue: newValue) ?? .rigctld
+        // Pocket Cat has no port. Leave the stored value alone so switching
+        // to it and back restores the host/port the user had configured.
+        guard old.isNetwork, new.isNetwork else { return }
         if port == old.defaultPort { port = new.defaultPort }
     }
 
     private func applyChanges() {
-        if !(1...65535).contains(port) { port = rigProtocol.defaultPort }
+        if rigProtocol.isNetwork, !(1...65535).contains(port) {
+            port = rigProtocol.defaultPort
+        }
         appState.restartRig()
     }
 
@@ -774,6 +791,141 @@ struct RigSettingsView: View {
             statusIsError = true
         }
         isTesting = false
+    }
+}
+
+// MARK: - Pocket Cat Settings
+
+/// Pocket Cat BLE bridge configuration: which bridge to pair with, live
+/// connection state, and the one timing option worth exposing.
+///
+/// Emits loose rows rather than its own `Section` so it drops into the iOS
+/// settings list (already inside a "Rig Control" section) unchanged; the
+/// macOS form wraps it in a section at the call site.
+///
+/// Scanning runs only while this view is on screen — a BLE scan is a real
+/// power draw, and once a bridge is paired its identifier is persisted so
+/// later launches reconnect without scanning at all.
+struct PocketCatSettingsSection: View {
+    let enabled: Bool
+
+    @Environment(AppState.self) private var appState
+    @AppStorage(PocketCatPreferences.autoInformationKey) private var autoInformation = false
+    @State private var savedBridgeName = PocketCatPreferences.bridgeName
+
+    private var service: PocketCatService { appState.pocketCat }
+
+    var body: some View {
+        pairingRows
+        statusRows
+
+        Toggle("Instant frequency updates", isOn: $autoInformation)
+            .onChange(of: autoInformation) { _, _ in
+                // Auto-Information is negotiated when the session starts, so
+                // it only takes effect on the next connection.
+                appState.restartRig()
+            }
+
+        Text("Pocket Cat talks to the radio over Bluetooth and can tune it: tapping a spot sets the frequency and mode. Instant updates ask the radio to push changes as you turn the dial (Yaesu Auto-Information) instead of waiting for the next poll \u{2014} leave it off if frequency readout becomes erratic.")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var pairingRows: some View {
+        if !savedBridgeName.isEmpty {
+            LabeledContent("Paired bridge", value: savedBridgeName)
+            Button("Forget This Bridge", role: .destructive) {
+                PocketCatPreferences.bridgeId = nil
+                PocketCatPreferences.bridgeName = ""
+                savedBridgeName = ""
+                appState.restartRig()
+            }
+        }
+
+        if service.isScanning {
+            HStack {
+                ProgressView().controlSize(.small)
+                Text("Scanning for bridges\u{2026}")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(service.discovered) { bridge in
+                Button {
+                    select(bridge)
+                } label: {
+                    HStack {
+                        Text(bridge.name ?? String(localized: "Unnamed bridge"))
+                        Spacer()
+                        Text("\(bridge.rssi) dBm")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                #if os(macOS)
+                .buttonStyle(.link)
+                #endif
+            }
+            if service.discovered.isEmpty {
+                Text("No bridges found yet. Make sure the bridge is powered and within range.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Stop Scanning") { service.stopScan() }
+        } else {
+            Button(savedBridgeName.isEmpty ? "Scan for Bridges" : "Choose a Different Bridge") {
+                service.startScan()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var statusRows: some View {
+        LabeledContent("Status") {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(service.isConnected ? Color.green : Color.secondary)
+                    .frame(width: 8, height: 8)
+                Text(service.phaseDescription)
+            }
+        }
+
+        if let radio = service.reading.radioName {
+            LabeledContent("Radio", value: radio)
+        }
+        if !service.reading.firmwareVersion.isEmpty {
+            LabeledContent("Bridge firmware", value: service.reading.firmwareVersion)
+        }
+        if let freq = service.reading.frequencyMHz {
+            LabeledContent("Frequency", value: String(format: "%.4f MHz", freq))
+        }
+        if let mode = service.reading.modeName {
+            LabeledContent("Mode", value: mode)
+        }
+        if let power = service.reading.powerWatts {
+            LabeledContent("Power", value: "\(Int(power)) W")
+        }
+        if let error = service.lastError, !service.isConnected {
+            Text(error)
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+
+        if !enabled {
+            Text("Turn on \u{201C}Enable rig control\u{201D} to connect.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func select(_ bridge: PocketCatService.BridgeInfo) {
+        PocketCatPreferences.bridgeId = bridge.id
+        let name = bridge.name ?? String(localized: "Pocket Cat bridge")
+        PocketCatPreferences.bridgeName = name
+        savedBridgeName = name
+        service.stopScan()
+        // Reconnect through AppState so `rigControlActive` and the mirrored
+        // `rigState` follow the new selection.
+        appState.restartRig()
     }
 }
 

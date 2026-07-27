@@ -12,6 +12,7 @@
 		0744B0373BDD960A17D15078 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB96D32A2C761676B98BBD9 /* StatsView.swift */; };
 		0756D0FDF747B7FCB0205031 /* WSJTXMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8033725A8E1E4C16F0BE2576 /* WSJTXMessage.swift */; };
 		08D2AB74CE36DC560BA277D2 /* OperationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F6D0CEE1122924B70B3FE6 /* OperationListView.swift */; };
+		0BF027C845D9193C72367C96 /* TabReturnStackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB8287FE642D71BCB719D0C /* TabReturnStackTests.swift */; };
 		0CAB53FC229703CA57C796DF /* QuickEntryBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD8C3278680F85D50E624F2 /* QuickEntryBar.swift */; };
 		0DF3F7CE365AEB412EEBFB37 /* ReplicationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D0C170A2ABFD25C8028769 /* ReplicationLog.swift */; };
 		102C3E048E5DB4CDCA05D7E0 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE906F1F502447279BDF9C8 /* DateFormatters.swift */; };
@@ -26,25 +27,24 @@
 		1EAC967CC8733795865AF197 /* SearchBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E81E8F81A3699300D8265B9 /* SearchBarView.swift */; };
 		1EC801B97EC58C6096119B34 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B96575BF9DA100395A383A /* Operation.swift */; };
 		1FEE73AA367F2CDA4E7DC43A /* LogNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */; };
+		20B883B9A60C53E8C1D9C0B1 /* AchievementBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62474014EC027A3A905A871 /* AchievementBanner.swift */; };
+		255AB7169165FD58A31175FF /* AwardMilestone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77DF41C9E83FA0027CB01630 /* AwardMilestone.swift */; };
 		26EF4116A34E2852176E8B59 /* Mode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F44254B1312E8C10FAECED7 /* Mode.swift */; };
 		27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FD889A4B81B4BF6623F368E /* SyncEngine.swift */; };
 		28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */; };
 		2A025DF68A820CA19D11B48E /* FrequencyBandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */; };
 		2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C20 /* StationInfoCard.swift */; };
-		2F8B14644735D6CF62043A56 /* NumberKeyboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */; };
-		2F8B14644735D6CF62043A57 /* AchievementBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C22 /* AchievementBanner.swift */; };
 		32AF577147893E10F915E91A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */; };
 		342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */; };
+		385945CEFE756082FF4AD316 /* StatsFilterScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6B5E7E0570C1C35282E94A /* StatsFilterScopeTests.swift */; };
 		3E21A60E4FA3F089CC9385CA /* ADIFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */; };
 		3E2D570DF678103C64D88A1D /* XMLResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5E74769E2B699BCAA597B7 /* XMLResponseParser.swift */; };
 		4682B3123A5EA6C94DA8F2A3 /* POTAExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */; };
 		48C8760B6FAB8E247FA7A80B /* SpotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733F41AD731BAB10F094E805 /* SpotTests.swift */; };
-		A1B2C3D40001F0A1B2C3D401 /* StatsFilterScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40002F0A1B2C3D402 /* StatsFilterScopeTests.swift */; };
-		A1B2C3D40003F0A1B2C3D403 /* TabReturnStackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40004F0A1B2C3D404 /* TabReturnStackTests.swift */; };
 		4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */; };
 		555AF6B24AACEBD7F9D000A1 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908896B782E1C73A0E87D9C6 /* AppSettings.swift */; };
 		5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */; };
-		5D4080E307682659C67AF001 /* OperationIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390F001 /* OperationIdentityBackfill.swift */; };
+		5D9929CA193FEB469925E323 /* PocketCatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91385BDA835FED00C748E4DD /* PocketCatTests.swift */; };
 		61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */; };
 		6C13E0D8CCD6A444B34AA48D /* QSO.swift in Sources */ = {isa = PBXBuildFile; fileRef = D250A1822805EEF592F8859A /* QSO.swift */; };
 		6D4B29BC7BE79A4A39902BEF /* RigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3D08E9659DE390308579D2 /* RigService.swift */; };
@@ -59,8 +59,11 @@
 		80FC2164F1A89D9F086A7B88 /* WSJTXMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A9E8083EEE13CBB5E48857 /* WSJTXMessageTests.swift */; };
 		827C05F8109EA014FEF89ECE /* HamLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD3D3B675492C35181C2CDD /* HamLogTests.swift */; };
 		831C8721E5310907EE3247C6 /* ActivationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E0FAE0EB2E4F8A07483995 /* ActivationTests.swift */; };
+		87C502B3EA661A3265D5CDF7 /* PocketCatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC266241ECB2A70B1C2E3A88 /* PocketCatService.swift */; };
 		88916F5020FC16BDAB78A525 /* QSODetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797C4DCC41A6E63706ECBAED /* QSODetailView.swift */; };
+		895570C7A86594308C5F071C /* BandPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D976AB39F6771F089E6ECB6 /* BandPlan.swift */; };
 		8B466B1D9B0866DDCD38561D /* pota_parks.csv.z in Resources */ = {isa = PBXBuildFile; fileRef = 08F0A30ECCE28BF637EFD2ED /* pota_parks.csv.z */; };
+		8E662F25B614D25384A4BC8D /* CATBridgeKit in Frameworks */ = {isa = PBXBuildFile; productRef = D5DD9B71681D36214FAB123A /* CATBridgeKit */; };
 		90D3D493854DFCF6B90A0E27 /* SOTASpotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCE36237C486A6263722A95 /* SOTASpotProvider.swift */; };
 		91D29D069A10377F0072EF0D /* TransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C48E5879F0405B6DCABF48 /* TransportTests.swift */; };
 		95687669ABD2CC5C6919295F /* QSOEditData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF5670E0813F619BAE3EA51 /* QSOEditData.swift */; };
@@ -73,7 +76,9 @@
 		9F0F3F636745D746F680608A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6FFF828976FE434255D0276 /* AppState.swift */; };
 		9FFAF59B4F7465E565A97F48 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B533A3F90ACF8E596A7C622 /* OnboardingView.swift */; };
 		A0B09F303E4E3B501249FB64 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9913A69C231F9A5283608B6 /* LocationManager.swift */; };
+		AE262ED979445F903E4FA4BB /* NumberKeyboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1527D8E47105464E926486 /* NumberKeyboardRow.swift */; };
 		AF8CC32FD9CBE8CB8D43409B /* GeoMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20DFBAA7796B37C46D0D9E15 /* GeoMathTests.swift */; };
+		B2B37FCAC5733CED03579BF7 /* OperationIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9AE7A788B8CEA526FE36C5 /* OperationIdentityBackfill.swift */; };
 		B34998BF85699C26C7DA09AA /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751E4D19CC969EC2263A7F5E /* KeychainManager.swift */; };
 		B63C02EC4C5B1D841CCEB3B5 /* ADIFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EBCDAD1FEEA1D174C9F87C /* ADIFParser.swift */; };
 		B6DCE35147163EBFD91F0269 /* AwardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0755D1B36432788FB86E9B30 /* AwardEngine.swift */; };
@@ -88,8 +93,6 @@
 		D061A16E668E960C2AF332DF /* WSJTXListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */; };
 		D8CDB7723B7A99DBF5274B5B /* SpotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64DB756482B84405310EE7D0 /* SpotStore.swift */; };
 		D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDBE /* Band.swift */; };
-		D8E7A25459D88B3902EC4C29 /* BandPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */; };
-		D8E7A25459D88B3902EC4C30 /* AwardMilestone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDC1 /* AwardMilestone.swift */; };
 		DA46E8E6E05A5D244D025427 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D76E301651BC205642DEDC3 /* Assets.xcassets */; };
 		E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F106C61338C6F99B136BB883 /* FilterPerfTests.swift */; };
 		E3B147A925E44A654DF7598F /* TQSLLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */; };
@@ -136,6 +139,7 @@
 		0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTests.swift; sourceTree = "<group>"; };
 		0BAB794A26A0412CE3C70471 /* AwardEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwardEngineTests.swift; sourceTree = "<group>"; };
 		0BD3D3B675492C35181C2CDD /* HamLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HamLogTests.swift; sourceTree = "<group>"; };
+		0D976AB39F6771F089E6ECB6 /* BandPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandPlan.swift; sourceTree = "<group>"; };
 		0E49C26E41522EC357E3A52D /* FieldDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldDayView.swift; sourceTree = "<group>"; };
 		0F92A9393C186928D96B2C35 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClusterParserTests.swift; sourceTree = "<group>"; };
@@ -144,7 +148,6 @@
 		192D4A21004CED7D40145A8E /* QRZService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRZService.swift; sourceTree = "<group>"; };
 		19D84EB4665CEBBF11DB3FD1 /* PreviewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
 		1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOIdentityBackfill.swift; sourceTree = "<group>"; };
-		1AE0AEE5D55F26BF0390F001 /* OperationIdentityBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationIdentityBackfill.swift; sourceTree = "<group>"; };
 		1C392899E4BC9EBF02D43E34 /* QSOListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOListView.swift; sourceTree = "<group>"; };
 		20DFBAA7796B37C46D0D9E15 /* GeoMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoMathTests.swift; sourceTree = "<group>"; };
 		2CD8C3278680F85D50E624F2 /* QuickEntryBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryBar.swift; sourceTree = "<group>"; };
@@ -154,11 +157,10 @@
 		32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactMapView.swift; sourceTree = "<group>"; };
 		33FF7077DF7629746C2915FC /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		364515BC2452FE33C5C76C20 /* StationInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationInfoCard.swift; sourceTree = "<group>"; };
-		364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberKeyboardRow.swift; sourceTree = "<group>"; };
-		364515BC2452FE33C5C76C22 /* AchievementBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AchievementBanner.swift; sourceTree = "<group>"; };
 		3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TQSLLauncher.swift; sourceTree = "<group>"; };
 		3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXListener.swift; sourceTree = "<group>"; };
 		3D76E301651BC205642DEDC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3E9AE7A788B8CEA526FE36C5 /* OperationIdentityBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationIdentityBackfill.swift; sourceTree = "<group>"; };
 		3FD5D37600BB476F93E0BEAA /* GeoMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoMath.swift; sourceTree = "<group>"; };
 		4358E0583762C64EA1F32B3A /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		445FF6EA45ED93E04E697D9C /* QSOStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOStore.swift; sourceTree = "<group>"; };
@@ -179,15 +181,12 @@
 		6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POTAExportSheet.swift; sourceTree = "<group>"; };
 		6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceCredentials.swift; sourceTree = "<group>"; };
 		733F41AD731BAB10F094E805 /* SpotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotTests.swift; sourceTree = "<group>"; };
-		A1B2C3D40002F0A1B2C3D402 /* StatsFilterScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsFilterScopeTests.swift; sourceTree = "<group>"; };
-		A1B2C3D40004F0A1B2C3D404 /* TabReturnStackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReturnStackTests.swift; sourceTree = "<group>"; };
 		73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogNavigationUITests.swift; sourceTree = "<group>"; };
 		751E4D19CC969EC2263A7F5E /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		761336091234E9F93ED4B666 /* UploadResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResult.swift; sourceTree = "<group>"; };
+		77DF41C9E83FA0027CB01630 /* AwardMilestone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwardMilestone.swift; sourceTree = "<group>"; };
 		77F71B16C1D273164AC9A61F /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		78E3BA1BA315779F6F1BFDBE /* Band.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Band.swift; sourceTree = "<group>"; };
-		78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandPlan.swift; sourceTree = "<group>"; };
-		78E3BA1BA315779F6F1BFDC1 /* AwardMilestone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwardMilestone.swift; sourceTree = "<group>"; };
 		797C4DCC41A6E63706ECBAED /* QSODetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSODetailView.swift; sourceTree = "<group>"; };
 		7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigServiceTests.swift; sourceTree = "<group>"; };
 		8033725A8E1E4C16F0BE2576 /* WSJTXMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXMessage.swift; sourceTree = "<group>"; };
@@ -196,6 +195,7 @@
 		8AF37FB1C38AF284AB4F6933 /* FieldDaySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldDaySession.swift; sourceTree = "<group>"; };
 		8BA8C2116BF90D70986F30FA /* ServiceError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceError.swift; sourceTree = "<group>"; };
 		908896B782E1C73A0E87D9C6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		91385BDA835FED00C748E4DD /* PocketCatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketCatTests.swift; sourceTree = "<group>"; };
 		93A962F6080E90AEB5E8199B /* LoTWService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoTWService.swift; sourceTree = "<group>"; };
 		9608DE44244D28AC40650023 /* SignalReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalReportTests.swift; sourceTree = "<group>"; };
 		99BDB2EDCBB5C0426D5F7FC9 /* QSOStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOStoreTests.swift; sourceTree = "<group>"; };
@@ -211,26 +211,42 @@
 		C5E0FAE0EB2E4F8A07483995 /* ActivationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationTests.swift; sourceTree = "<group>"; };
 		C6FFF828976FE434255D0276 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		C9913A69C231F9A5283608B6 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
+		CA6B5E7E0570C1C35282E94A /* StatsFilterScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsFilterScopeTests.swift; sourceTree = "<group>"; };
 		CC2483A64E690C0B3928EA6A /* ImportPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPreviewSheet.swift; sourceTree = "<group>"; };
 		D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ADIFWriter.swift; sourceTree = "<group>"; };
 		D250A1822805EEF592F8859A /* QSO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSO.swift; sourceTree = "<group>"; };
 		D5065C428C2F4027D8B9B9DD /* SpotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotService.swift; sourceTree = "<group>"; };
+		D62474014EC027A3A905A871 /* AchievementBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AchievementBanner.swift; sourceTree = "<group>"; };
 		D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncResultTests.swift; sourceTree = "<group>"; };
 		D7B96575BF9DA100395A383A /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
 		D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HamQTHService.swift; sourceTree = "<group>"; };
 		D8EBCDAD1FEEA1D174C9F87C /* ADIFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ADIFParser.swift; sourceTree = "<group>"; };
 		DC69A3DA9ED827733908D386 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		DD3D08E9659DE390308579D2 /* RigService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RigService.swift; sourceTree = "<group>"; };
+		DE1527D8E47105464E926486 /* NumberKeyboardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumberKeyboardRow.swift; sourceTree = "<group>"; };
 		DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsSummary.swift; sourceTree = "<group>"; };
 		E1C48E5879F0405B6DCABF48 /* TransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportTests.swift; sourceTree = "<group>"; };
 		E3A9E8083EEE13CBB5E48857 /* WSJTXMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXMessageTests.swift; sourceTree = "<group>"; };
 		E3F6D0CEE1122924B70B3FE6 /* OperationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationListView.swift; sourceTree = "<group>"; };
 		E4F9667B78E543487D4805B4 /* QuickEntryParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryParserTests.swift; sourceTree = "<group>"; };
 		E7DF4847F085D3453F05951F /* ActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationView.swift; sourceTree = "<group>"; };
+		EC266241ECB2A70B1C2E3A88 /* PocketCatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketCatService.swift; sourceTree = "<group>"; };
 		F106C61338C6F99B136BB883 /* FilterPerfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPerfTests.swift; sourceTree = "<group>"; };
 		F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignLookupResult.swift; sourceTree = "<group>"; };
 		F7C1963EF5268CDE6655022B /* AmateurRadioLogUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AmateurRadioLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAB8287FE642D71BCB719D0C /* TabReturnStackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReturnStackTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8C0240F2F6C1CB36F72A4798 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8E662F25B614D25384A4BC8D /* CATBridgeKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		1371E593FE18FD934DBAD2D9 /* App */ = {
@@ -272,10 +288,11 @@
 				751E4D19CC969EC2263A7F5E /* KeychainManager.swift */,
 				C9913A69C231F9A5283608B6 /* LocationManager.swift */,
 				93A962F6080E90AEB5E8199B /* LoTWService.swift */,
+				3E9AE7A788B8CEA526FE36C5 /* OperationIdentityBackfill.swift */,
 				2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */,
+				EC266241ECB2A70B1C2E3A88 /* PocketCatService.swift */,
 				192D4A21004CED7D40145A8E /* QRZService.swift */,
 				1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */,
-				1AE0AEE5D55F26BF0390F001 /* OperationIdentityBackfill.swift */,
 				0A437A6C9C6E52A8CD52B0F3 /* QSOMatcher.swift */,
 				445FF6EA45ED93E04E697D9C /* QSOStore.swift */,
 				B4D0C170A2ABFD25C8028769 /* ReplicationLog.swift */,
@@ -346,26 +363,18 @@
 				2E258D7135885E7B21273A2F /* Resources */,
 				346344B756B3CFFB03E21E1C /* Services */,
 				C4739EA8448913FCADC7F9D0 /* Utilities */,
-				69A49E4D541F19DBD7A1CA54 /* ViewModels */,
 				FD2CBBE7C3E79D4BF709AECA /* Views */,
 			);
 			path = AmateurRadioLog;
-			sourceTree = "<group>";
-		};
-		69A49E4D541F19DBD7A1CA54 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = ViewModels;
 			sourceTree = "<group>";
 		};
 		6E99847B5872FBE13455185D /* Models */ = {
 			isa = PBXGroup;
 			children = (
 				908896B782E1C73A0E87D9C6 /* AppSettings.swift */,
+				77DF41C9E83FA0027CB01630 /* AwardMilestone.swift */,
 				78E3BA1BA315779F6F1BFDBE /* Band.swift */,
-				78E3BA1BA315779F6F1BFDC0 /* BandPlan.swift */,
-				78E3BA1BA315779F6F1BFDC1 /* AwardMilestone.swift */,
+				0D976AB39F6771F089E6ECB6 /* BandPlan.swift */,
 				F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */,
 				2F44254B1312E8C10FAECED7 /* Mode.swift */,
 				D7B96575BF9DA100395A383A /* Operation.swift */,
@@ -405,16 +414,17 @@
 				0BD3D3B675492C35181C2CDD /* HamLogTests.swift */,
 				2EB492ACF4916E21FD7FDDC1 /* LoTWUploadTests.swift */,
 				33FF7077DF7629746C2915FC /* OnboardingTests.swift */,
+				91385BDA835FED00C748E4DD /* PocketCatTests.swift */,
 				99BDB2EDCBB5C0426D5F7FC9 /* QSOStoreTests.swift */,
 				E4F9667B78E543487D4805B4 /* QuickEntryParserTests.swift */,
 				7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */,
 				9608DE44244D28AC40650023 /* SignalReportTests.swift */,
 				733F41AD731BAB10F094E805 /* SpotTests.swift */,
-				A1B2C3D40002F0A1B2C3D402 /* StatsFilterScopeTests.swift */,
-				A1B2C3D40004F0A1B2C3D404 /* TabReturnStackTests.swift */,
+				CA6B5E7E0570C1C35282E94A /* StatsFilterScopeTests.swift */,
 				BDDCC7FE322839647F492A6A /* SyncEngineTests.swift */,
 				D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */,
 				0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */,
+				FAB8287FE642D71BCB719D0C /* TabReturnStackTests.swift */,
 				E1C48E5879F0405B6DCABF48 /* TransportTests.swift */,
 				E3A9E8083EEE13CBB5E48857 /* WSJTXMessageTests.swift */,
 			);
@@ -498,10 +508,10 @@
 		F6B0D938CDA823EC2899E98F /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				D62474014EC027A3A905A871 /* AchievementBanner.swift */,
+				DE1527D8E47105464E926486 /* NumberKeyboardRow.swift */,
 				834B46C3E471F216FB58CCE9 /* ShareSheet.swift */,
 				364515BC2452FE33C5C76C20 /* StationInfoCard.swift */,
-				364515BC2452FE33C5C76C21 /* NumberKeyboardRow.swift */,
-				364515BC2452FE33C5C76C22 /* AchievementBanner.swift */,
 				DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */,
 				ADB96D32A2C761676B98BBD9 /* StatsView.swift */,
 			);
@@ -544,6 +554,7 @@
 			buildPhases = (
 				E85C78FEE24BECC58D56F1F7 /* Sources */,
 				D19238B6F35292440D14E444 /* Resources */,
+				8C0240F2F6C1CB36F72A4798 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -551,6 +562,7 @@
 			);
 			name = AmateurRadioLog;
 			packageProductDependencies = (
+				D5DD9B71681D36214FAB123A /* CATBridgeKit */,
 			);
 			productName = AmateurRadioLog;
 			productReference = 6D213CB06684EA31D0ECBEB1 /* AmateurRadioLog.app */;
@@ -624,6 +636,9 @@
 			);
 			mainGroup = 211C1F16A9033D4B9C0AB295;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8AA44A5CD602F2B31F882BD7 /* XCRemoteSwiftPackageReference "pocket-cat" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F83FFE5BBAE2F3DD12F802A2 /* Products */;
 			projectDirPath = "";
@@ -671,16 +686,17 @@
 				827C05F8109EA014FEF89ECE /* HamLogTests.swift in Sources */,
 				7121DDD9A007CB4E7C9F580B /* LoTWUploadTests.swift in Sources */,
 				E8C00D5640295A3BE4864E1E /* OnboardingTests.swift in Sources */,
+				5D9929CA193FEB469925E323 /* PocketCatTests.swift in Sources */,
 				F059980F149451964C51B08D /* QSOStoreTests.swift in Sources */,
 				FD32C61E984441862952B66C /* QuickEntryParserTests.swift in Sources */,
 				EF2FA64B2211A14B1AB2E74C /* RigServiceTests.swift in Sources */,
 				19097C0389A3281BF52548B5 /* SignalReportTests.swift in Sources */,
 				48C8760B6FAB8E247FA7A80B /* SpotTests.swift in Sources */,
-				A1B2C3D40001F0A1B2C3D401 /* StatsFilterScopeTests.swift in Sources */,
-				A1B2C3D40003F0A1B2C3D403 /* TabReturnStackTests.swift in Sources */,
+				385945CEFE756082FF4AD316 /* StatsFilterScopeTests.swift in Sources */,
 				CF63EB88DA24FFF973E7CD44 /* SyncEngineTests.swift in Sources */,
 				28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */,
 				342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */,
+				0BF027C845D9193C72367C96 /* TabReturnStackTests.swift in Sources */,
 				91D29D069A10377F0072EF0D /* TransportTests.swift in Sources */,
 				80FC2164F1A89D9F086A7B88 /* WSJTXMessageTests.swift in Sources */,
 			);
@@ -692,13 +708,14 @@
 			files = (
 				B63C02EC4C5B1D841CCEB3B5 /* ADIFParser.swift in Sources */,
 				3E21A60E4FA3F089CC9385CA /* ADIFWriter.swift in Sources */,
+				20B883B9A60C53E8C1D9C0B1 /* AchievementBanner.swift in Sources */,
 				EF89B45C549AF43365AA91D8 /* ActivationView.swift in Sources */,
 				555AF6B24AACEBD7F9D000A1 /* AppSettings.swift in Sources */,
 				9F0F3F636745D746F680608A /* AppState.swift in Sources */,
 				B6DCE35147163EBFD91F0269 /* AwardEngine.swift in Sources */,
+				255AB7169165FD58A31175FF /* AwardMilestone.swift in Sources */,
 				D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */,
-				D8E7A25459D88B3902EC4C29 /* BandPlan.swift in Sources */,
-				D8E7A25459D88B3902EC4C30 /* AwardMilestone.swift in Sources */,
+				895570C7A86594308C5F071C /* BandPlan.swift in Sources */,
 				4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */,
 				FFBAABCF5903E4496B9F3A4B /* ClusterLineParser.swift in Sources */,
 				61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */,
@@ -718,19 +735,21 @@
 				C775845EEB2D4BDCBA864C4E /* LogEntryView.swift in Sources */,
 				F803FBB2B739CF4D92328E6F /* MaidenheadConverter.swift in Sources */,
 				26EF4116A34E2852176E8B59 /* Mode.swift in Sources */,
+				AE262ED979445F903E4FA4BB /* NumberKeyboardRow.swift in Sources */,
 				9FFAF59B4F7465E565A97F48 /* OnboardingView.swift in Sources */,
 				1EC801B97EC58C6096119B34 /* Operation.swift in Sources */,
+				B2B37FCAC5733CED03579BF7 /* OperationIdentityBackfill.swift in Sources */,
 				08D2AB74CE36DC560BA277D2 /* OperationListView.swift in Sources */,
 				4682B3123A5EA6C94DA8F2A3 /* POTAExportSheet.swift in Sources */,
 				1B36D089ADFDFAB2D9339696 /* POTASpotProvider.swift in Sources */,
 				C7F65F634CD8A87180F05398 /* ParkDatabase.swift in Sources */,
+				87C502B3EA661A3265D5CDF7 /* PocketCatService.swift in Sources */,
 				01144C3D5FFFEF3128DD2DD1 /* PreviewData.swift in Sources */,
 				77FD27672E7FA0EE35477972 /* QRZService.swift in Sources */,
 				6C13E0D8CCD6A444B34AA48D /* QSO.swift in Sources */,
 				88916F5020FC16BDAB78A525 /* QSODetailView.swift in Sources */,
 				95687669ABD2CC5C6919295F /* QSOEditData.swift in Sources */,
 				5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */,
-				5D4080E307682659C67AF001 /* OperationIdentityBackfill.swift in Sources */,
 				95B96BB33A15A649D893EEEC /* QSOListView.swift in Sources */,
 				9788B752C9A09395D697C64E /* QSOMatcher.swift in Sources */,
 				767448C0D2F94AF89AFD3A06 /* QSORecord.swift in Sources */,
@@ -753,8 +772,6 @@
 				D8CDB7723B7A99DBF5274B5B /* SpotStore.swift in Sources */,
 				C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */,
 				2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */,
-				2F8B14644735D6CF62043A56 /* NumberKeyboardRow.swift in Sources */,
-				2F8B14644735D6CF62043A57 /* AchievementBanner.swift in Sources */,
 				99C619B13EBF85303B7DE910 /* StatsSummary.swift in Sources */,
 				0744B0373BDD960A17D15078 /* StatsView.swift in Sources */,
 				27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */,
@@ -977,6 +994,7 @@
 				INFOPLIST_FILE = AmateurRadioLog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Amateur Radio Log";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -1012,6 +1030,7 @@
 				INFOPLIST_FILE = AmateurRadioLog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Amateur Radio Log";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -1092,6 +1111,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8AA44A5CD602F2B31F882BD7 /* XCRemoteSwiftPackageReference "pocket-cat" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "git@github.com:morria/pocket-cat.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D5DD9B71681D36214FAB123A /* CATBridgeKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8AA44A5CD602F2B31F882BD7 /* XCRemoteSwiftPackageReference "pocket-cat" */;
+			productName = CATBridgeKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B747FE01BF86B24E2DFB327E /* Project object */;
 }

@@ -421,10 +421,15 @@ struct SpotListView: View {
                            power: appState.lastPower)
     }
 
-    /// Tap: open the standard entry form prefilled from the spot; its lookup
-    /// fills name/location/grid (SOTA spots carry no grid) and pins the
-    /// station on the map.
+    /// Tap: tune the radio to the spot (when a tuning-capable rig is
+    /// connected) and open the standard entry form prefilled from the spot;
+    /// its lookup fills name/location/grid (SOTA spots carry no grid) and
+    /// pins the station on the map.
+    ///
+    /// Tuning is additive — the editor still opens exactly as it did before,
+    /// since tapping a spot is nearly always the prelude to working it.
     private func openEditor(_ spot: Spot) {
+        appState.tuneRig(toMHz: spot.frequencyMHz, spotMode: spot.mode)
         editorItem = SpotEditorItem(data: QSOEditData(from: spot, defaults: currentDefaults()))
     }
 
@@ -434,7 +439,9 @@ struct SpotListView: View {
         var data = QSOEditData(from: spot, defaults: currentDefaults())
         let rst = QuickEntryParser.defaultRST(for: data.mode)
         data.rstSent = rst
-        data.rstRcvd = rst
+        // Received is the one report we can actually measure — use the rig's
+        // S-meter when it heard something, else the conventional default.
+        data.rstRcvd = appState.suggestedRSTReceived(for: data.mode) ?? rst
 
         // Stamp operator/station identity from settings (same as
         // LogEntryView's save path).

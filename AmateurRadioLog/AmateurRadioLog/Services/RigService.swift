@@ -3,12 +3,16 @@ import Network
 
 // MARK: - Protocol Choice
 
-/// Which network CAT protocol the rig poller speaks.
+/// Which CAT transport the app uses to reach the radio.
 enum RigProtocolChoice: String, CaseIterable, Identifiable, Sendable {
     /// Hamlib `rigctld` TCP protocol (default port 4532). Covers 200+ rigs.
     case rigctld
     /// FLRig XML-RPC over HTTP (default port 12345).
     case flrig
+    /// Pocket Cat BLE↔USB bridge, spoken directly over Bluetooth by
+    /// CATBridgeKit. Unlike the other two this is not a network endpoint and
+    /// is not read-only — it is the transport that supports click-to-tune.
+    case pocketCat
 
     var id: String { rawValue }
 
@@ -16,15 +20,28 @@ enum RigProtocolChoice: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .rigctld: return "rigctld (Hamlib)"
         case .flrig: return "FLRig"
+        case .pocketCat: return "Pocket Cat (Bluetooth)"
         }
     }
 
+    /// True for the protocols configured by host + port. Pocket Cat is
+    /// addressed by paired Bluetooth device instead, so the settings form
+    /// hides the network fields and the port-following logic skips it.
+    var isNetwork: Bool { self != .pocketCat }
+
+    /// Meaningless for Pocket Cat; zero so a stored port is never silently
+    /// rewritten to a TCP default the user did not choose.
     var defaultPort: Int {
         switch self {
         case .rigctld: return 4532
         case .flrig: return 12345
+        case .pocketCat: return 0
         }
     }
+
+    /// Whether this transport can command the radio (set frequency/mode).
+    /// rigctld and FLRig are polled read-only by `RigService`.
+    var supportsTuning: Bool { self == .pocketCat }
 }
 
 // MARK: - Preferences
@@ -83,10 +100,20 @@ struct RigState: Equatable {
     /// Rig-native mode name (e.g. "USB", "PKTUSB"), shown verbatim in the
     /// toolbar chip.
     var rigModeRaw: String?
+    /// Current RF power in watts. Only Pocket Cat reports this (and only on
+    /// radios with RF power control); nil over rigctld/FLRig, which this app
+    /// polls for frequency and mode only.
+    var powerWatts: Double?
+    /// Set by transports that already know the mode as a typed value rather
+    /// than a rig-native string (Pocket Cat, via `PocketCatModeMapper`).
+    /// When nil the mode is derived from `rigModeRaw` instead.
+    var explicitMode: Mode?
 
     /// Lossy ADIF mode; nil for rig modes with no unambiguous log mode
     /// (data submodes — see `RigModeMapper`).
-    var mode: Mode? { rigModeRaw.flatMap(RigModeMapper.mode(fromRigModeName:)) }
+    var mode: Mode? {
+        explicitMode ?? rigModeRaw.flatMap(RigModeMapper.mode(fromRigModeName:))
+    }
     var band: Band? { frequencyMHz.flatMap { Band.from(frequencyMHz: $0) } }
 }
 
@@ -362,6 +389,12 @@ actor RigService {
         switch configuration.rigProtocol {
         case .rigctld: return try await pollRigctld()
         case .flrig: return try await pollFLRig()
+        case .pocketCat:
+            // Pocket Cat is a Bluetooth transport driven by
+            // `PocketCatService`, not a network endpoint this poller can
+            // reach. AppState routes it away from here; this guards against
+            // a stale configuration starting the wrong service.
+            throw RigError.invalidConfiguration
         }
     }
 

@@ -1542,25 +1542,80 @@ final class AppState {
     @ObservationIgnored
     private var rigLifecycleObserved = false
 
+    /// Pocket Cat BLE bridge. Created lazily on first use so the app never
+    /// touches CoreBluetooth — and never prompts for Bluetooth permission —
+    /// unless the user selects that protocol.
+    @ObservationIgnored
+    private var _pocketCat: PocketCatService?
+
+    var pocketCat: PocketCatService {
+        if let _pocketCat { return _pocketCat }
+        let service = PocketCatService()
+        _pocketCat = service
+        return service
+    }
+
+    /// True when Pocket Cat is the selected protocol and the radio is ready
+    /// to take commands. Gates click-to-tune in the Spots list.
+    var canTuneRig: Bool {
+        RigPreferences.enabled
+            && RigPreferences.rigProtocol.supportsTuning
+            && _pocketCat?.isConnected == true
+    }
+
     /// Unified live defaults for manual entry: the CAT rig wins when
     /// connected (it is the source of truth for the dial), then WSJT-X's
     /// last Status frame, else nil (callers fall back to last-used values).
-    var liveRigDefaults: (band: Band?, mode: Mode?, freqMHz: Double?)? {
+    ///
+    /// Power is only ever non-nil over Pocket Cat — rigctld/FLRig are polled
+    /// for frequency and mode alone, and WSJT-X Status frames carry no power.
+    var liveRigDefaults: (band: Band?, mode: Mode?, freqMHz: Double?, powerWatts: Double?)? {
         if rigState.connected {
-            return (rigState.band, rigState.mode, rigState.frequencyMHz)
+            return (rigState.band, rigState.mode, rigState.frequencyMHz,
+                    rigState.powerWatts)
         }
         if wsjtxRigState.connected {
             return (wsjtxRigState.band, wsjtxRigState.mode,
-                    wsjtxRigState.dialFrequencyMHz)
+                    wsjtxRigState.dialFrequencyMHz, nil)
         }
         return nil
+    }
+
+    /// Suggested RST received from the radio's S-meter, or nil when no
+    /// tuning-capable rig is connected, nothing was heard recently, or the
+    /// mode doesn't use RST-style reports. Callers fall back to the
+    /// conventional per-mode default.
+    func suggestedRSTReceived(for mode: Mode?) -> String? {
+        guard RigPreferences.enabled,
+              RigPreferences.rigProtocol.supportsTuning else { return nil }
+        return _pocketCat?.suggestedRSTReceived(for: mode)
+    }
+
+    /// Tunes the radio to a spot's frequency and mode when a tuning-capable
+    /// rig is connected. No-op otherwise, so callers can invoke it
+    /// unconditionally.
+    func tuneRig(toMHz mhz: Double, spotMode: String?) {
+        guard canTuneRig else { return }
+        pocketCat.tune(toMHz: mhz, spotMode: spotMode)
     }
 
     /// Starts the rig poller if the per-device preference is enabled.
     /// Called at launch (first `settings` assignment) and from Settings.
     func startRigIfEnabled() {
         observeRigLifecycle()
-        guard RigPreferences.enabled, rigService == nil else { return }
+        guard RigPreferences.enabled else { return }
+
+        // Pocket Cat is a Bluetooth session, not a poll loop — it owns its
+        // own connection lifecycle and reports through snapshots.
+        if RigPreferences.rigProtocol.supportsTuning {
+            rigControlActive = true
+            let service = pocketCat
+            service.connectToSavedBridge()
+            observePocketCat(service)
+            return
+        }
+
+        guard rigService == nil else { return }
         let service = RigService()
         rigService = service
         rigControlActive = true
@@ -1579,9 +1634,52 @@ final class AppState {
         rigService = nil
         rigControlActive = false
         rigState = RigState()
+        pocketCatObserver?.cancel()
+        pocketCatObserver = nil
+        _pocketCat?.disconnect()
         if let service {
             Task { await service.stop() }
         }
+    }
+
+    @ObservationIgnored
+    private var pocketCatObserver: Task<Void, Never>?
+
+    /// Mirrors the Pocket Cat service's live reading into `rigState`, so the
+    /// toolbar chip, editor prefill and quick-entry defaults work the same
+    /// regardless of which transport is selected.
+    private func observePocketCat(_ service: PocketCatService) {
+        pocketCatObserver?.cancel()
+        pocketCatObserver = Task { [weak self] in
+            // Observation has no AsyncSequence of changes; poll the
+            // @Observable at the same cadence the network poller publishes.
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.applyPocketCatReading(service)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func applyPocketCatReading(_ service: PocketCatService) {
+        guard rigControlActive else { return }
+        var state = RigState()
+        state.connected = service.isConnected
+        if state.connected {
+            state.frequencyMHz = service.reading.frequencyMHz
+            state.rigModeRaw = service.reading.modeName
+            state.explicitMode = service.reading.loggingMode
+            state.powerWatts = service.reading.powerWatts
+        }
+        guard state != rigState else { return }
+        rigState = state
+        guard state.connected else { return }
+        if let freq = state.frequencyMHz, freq > 0 {
+            lastFreq = freq
+            if let band = state.band { lastBand = band }
+        }
+        if let mode = state.mode { lastMode = mode }
+        if let power = state.powerWatts { lastPower = power }
     }
 
     /// Applies changed rig preferences (toggle, protocol, host, port).
