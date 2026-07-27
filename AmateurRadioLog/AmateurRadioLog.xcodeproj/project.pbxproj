@@ -39,6 +39,8 @@
 		3E2D570DF678103C64D88A1D /* XMLResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5E74769E2B699BCAA597B7 /* XMLResponseParser.swift */; };
 		4682B3123A5EA6C94DA8F2A3 /* POTAExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */; };
 		48C8760B6FAB8E247FA7A80B /* SpotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733F41AD731BAB10F094E805 /* SpotTests.swift */; };
+		A1B2C3D40001F0A1B2C3D401 /* StatsFilterScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40002F0A1B2C3D402 /* StatsFilterScopeTests.swift */; };
+		A1B2C3D40003F0A1B2C3D403 /* TabReturnStackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40004F0A1B2C3D404 /* TabReturnStackTests.swift */; };
 		4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */; };
 		555AF6B24AACEBD7F9D000A1 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908896B782E1C73A0E87D9C6 /* AppSettings.swift */; };
 		5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */; };
@@ -177,6 +179,8 @@
 		6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POTAExportSheet.swift; sourceTree = "<group>"; };
 		6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceCredentials.swift; sourceTree = "<group>"; };
 		733F41AD731BAB10F094E805 /* SpotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotTests.swift; sourceTree = "<group>"; };
+		A1B2C3D40002F0A1B2C3D402 /* StatsFilterScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsFilterScopeTests.swift; sourceTree = "<group>"; };
+		A1B2C3D40004F0A1B2C3D404 /* TabReturnStackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReturnStackTests.swift; sourceTree = "<group>"; };
 		73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogNavigationUITests.swift; sourceTree = "<group>"; };
 		751E4D19CC969EC2263A7F5E /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		761336091234E9F93ED4B666 /* UploadResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadResult.swift; sourceTree = "<group>"; };
@@ -406,6 +410,8 @@
 				7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */,
 				9608DE44244D28AC40650023 /* SignalReportTests.swift */,
 				733F41AD731BAB10F094E805 /* SpotTests.swift */,
+				A1B2C3D40002F0A1B2C3D402 /* StatsFilterScopeTests.swift */,
+				A1B2C3D40004F0A1B2C3D404 /* TabReturnStackTests.swift */,
 				BDDCC7FE322839647F492A6A /* SyncEngineTests.swift */,
 				D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */,
 				0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */,
@@ -670,6 +676,8 @@
 				EF2FA64B2211A14B1AB2E74C /* RigServiceTests.swift in Sources */,
 				19097C0389A3281BF52548B5 /* SignalReportTests.swift in Sources */,
 				48C8760B6FAB8E247FA7A80B /* SpotTests.swift in Sources */,
+				A1B2C3D40001F0A1B2C3D401 /* StatsFilterScopeTests.swift in Sources */,
+				A1B2C3D40003F0A1B2C3D403 /* TabReturnStackTests.swift in Sources */,
 				CF63EB88DA24FFF973E7CD44 /* SyncEngineTests.swift in Sources */,
 				28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */,
 				342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */,

@@ -682,6 +682,22 @@ final class AppState {
         return result
     }
 
+    /// Compact signature of every app-wide filter. Views that cache a
+    /// derived result (stats summaries, award progress, map pins) put this in
+    /// their cache key so the result is recomputed whenever any filter
+    /// changes — not just the few a view happens to read directly.
+    var filterSignature: String {
+        var parts = [
+            searchText,
+            filterBand?.rawValue ?? "",
+            filterMode?.rawValue ?? "",
+            filterTimeRange.rawValue,
+            filterGridPrefix
+        ]
+        parts += activeFieldFilters.map { "\($0.0)=\($0.1)" }
+        return parts.joined(separator: "|")
+    }
+
     func clearFilters() {
         searchText = ""
         filterBand = nil

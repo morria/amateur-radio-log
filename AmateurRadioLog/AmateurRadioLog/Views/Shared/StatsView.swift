@@ -16,47 +16,55 @@ struct StatsView: View {
     @State private var summary = StatsSummary()
 
     // DXCC/WAS/WAZ award progress (see AwardEngine), computed over the same
-    // filtered QSO subset as the charts so award progress reflects the
-    // band/mode/time-range/operation filters set up top.
+    // filtered QSO subset as everything else on this screen.
     @State private var awardEngine = AwardEngine(qsos: [])
+
+    /// The QSO set every statistic on this screen is computed from: the
+    /// app-wide filters the Log and Map also honor (search, callsign,
+    /// country, state, grid/grid prefix, CQ/ITU zone, continent, county,
+    /// operation, and the shared band/mode/time range), which the stats-local
+    /// band/mode/time pickers below then narrow further.
+    private var baseQSOs: [QSO] {
+        appState.filteredQSOs(from: qsos)
+    }
 
     private struct SummaryKey: Hashable {
         var count: Int
         var band: Band?
         var mode: Mode?
         var timeRange: MapTimeRange
-        var operationId: UUID?
+        var filters: String
         var revision: Int
     }
 
     private var summaryKey: SummaryKey {
         SummaryKey(count: qsos.count, band: statsBand, mode: statsMode,
                    timeRange: statsTimeRange,
-                   operationId: appState.filterOperationId,
+                   filters: appState.filterSignature,
                    revision: appState.dataRevision)
     }
 
     /// Awards recompute when the QSO set changes shape (count) or content
-    /// (most recent edit timestamp), and — since they now honor the filters —
-    /// when any stats filter changes.
+    /// (most recent edit timestamp), and — since they honor the filters —
+    /// when any stats-local picker or app-wide filter changes.
     private struct AwardsKey: Hashable {
         var count: Int
         var latestUpdate: Date?
         var band: Band?
         var mode: Mode?
         var timeRange: MapTimeRange
-        var operationId: UUID?
+        var filters: String
     }
 
     private var awardsKey: AwardsKey {
         AwardsKey(count: qsos.count, latestUpdate: qsos.map(\.updatedAt).max(),
                   band: statsBand, mode: statsMode, timeRange: statsTimeRange,
-                  operationId: appState.filterOperationId)
+                  filters: appState.filterSignature)
     }
 
     private func refreshSummary() {
         summary = StatsSummary.compute(
-            qsos: qsos,
+            qsos: baseQSOs,
             band: statsBand,
             mode: statsMode,
             timeRange: statsTimeRange,
@@ -67,9 +75,9 @@ struct StatsView: View {
 
     private func refreshAwards() {
         // Same filtered subset the charts aggregate, so award progress is
-        // shown within the active band/mode/time-range/operation filter.
+        // shown within the active filters.
         let filtered = StatsSummary.filtered(
-            qsos: qsos, band: statsBand, mode: statsMode,
+            qsos: baseQSOs, band: statsBand, mode: statsMode,
             timeRange: statsTimeRange, operationId: appState.filterOperationId)
         awardEngine = AwardEngine(qsos: filtered)
     }
@@ -78,6 +86,60 @@ struct StatsView: View {
 
     private var hasStatsFilters: Bool {
         statsBand != nil || statsMode != nil || statsTimeRange != .allTime
+    }
+
+    /// Either the local pickers or an app-wide filter is narrowing the
+    /// numbers — so the Clear affordance is offered and the applied app
+    /// filters are named.
+    private var hasAnyFilters: Bool {
+        hasStatsFilters || appState.hasActiveFilters
+    }
+
+    /// Clears both the stats-local pickers and the app-wide filters, so
+    /// "Clear" here always restores whole-log statistics.
+    private func clearAllFilters() {
+        statsBand = nil
+        statsMode = nil
+        statsTimeRange = .allTime
+        appState.clearFilters()
+    }
+
+    /// The app-wide filters currently narrowing these statistics, named so a
+    /// small (or empty) set of numbers is never a mystery. The stats-local
+    /// band/mode/time pickers are already visible as controls, so only the
+    /// app-wide ones are listed.
+    private var appliedFilterSummary: String? {
+        var parts: [String] = []
+        if !appState.searchText.isEmpty {
+            parts.append(String(localized: "Search “\(appState.searchText)”"))
+        }
+        if let band = appState.filterBand { parts.append(band.displayName) }
+        if let mode = appState.filterMode { parts.append(mode.displayName) }
+        parts += appState.activeFieldFilters.map { "\($0.0): \($0.1)" }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Banner naming the app-wide filters in force, with a one-tap escape.
+    @ViewBuilder
+    private var appliedFiltersBanner: some View {
+        if let applied = appliedFilterSummary {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                    .foregroundStyle(.tint)
+                Text("Filtered — \(applied)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                Button("Clear") { clearAllFilters() }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        }
     }
 
     var body: some View {
@@ -147,13 +209,9 @@ struct StatsView: View {
                                 .background(.quaternary)
                                 .clipShape(Capsule())
                         }
-                        if hasStatsFilters {
-                            Button("Clear") {
-                                statsBand = nil
-                                statsMode = nil
-                                statsTimeRange = .allTime
-                            }
-                            .font(.subheadline)
+                        if hasAnyFilters {
+                            Button("Clear") { clearAllFilters() }
+                                .font(.subheadline)
                         }
                     }
                 }
@@ -192,19 +250,20 @@ struct StatsView: View {
                         }
                         .frame(maxWidth: 140)
 
-                        if hasStatsFilters {
-                            Button("Clear") {
-                                statsBand = nil
-                                statsMode = nil
-                                statsTimeRange = .allTime
-                            }
-                            .controlSize(.small)
+                        if hasAnyFilters {
+                            Button("Clear") { clearAllFilters() }
+                                .controlSize(.small)
                         }
 
                         Spacer()
                     }
                 }
                 #endif
+
+                // Names the app-wide filters (search, country, operation, …)
+                // narrowing every number below — on both platforms, since
+                // those filters have no control on this screen.
+                appliedFiltersBanner
 
                 // Summary cards
                 #if os(iOS)
