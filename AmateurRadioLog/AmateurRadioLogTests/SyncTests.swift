@@ -2,6 +2,11 @@ import XCTest
 import SwiftData
 @testable import AmateurRadioLog
 
+/// The app's SwiftData `Operation` model collides with `Foundation.Operation`,
+/// which XCTest drags into scope here — an unqualified `Operation` is
+/// ambiguous. Pin it to the model for this file.
+private typealias Operation = AmateurRadioLog.Operation
+
 // MARK: - Deduplication Tests
 
 final class DeduplicationTests: XCTestCase {
