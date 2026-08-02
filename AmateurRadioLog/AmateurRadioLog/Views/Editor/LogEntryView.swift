@@ -402,8 +402,13 @@ struct LogEntryView: View {
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
+                        // Only *follow* the frequency into a band. A value
+                        // that lands in no band (mid-typing "14", a rig
+                        // reporting in the wrong unit) used to clear the
+                        // band outright, exporting FREQ with no BAND at all
+                        // — a record QRZ and LoTW both refuse.
                         .onChange(of: freq) { _, f in
-                            if let f { band = Band.from(frequencyMHz: f) }
+                            if let f, let b = Band.from(frequencyMHz: f) { band = b }
                         }
                 }
                 labeledField("Power (W)") {

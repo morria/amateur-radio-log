@@ -155,3 +155,44 @@ final class RigServiceTests: XCTestCase {
         XCTAssertNil(XMLRPC.scalarValue(from: "<?xml version=\"1.0\"?><methodResponse></methodResponse>"))
     }
 }
+
+// MARK: - Rig State
+
+final class RigStateTests: XCTestCase {
+    func testLoggableFrequencyPassesAnInBandReading() {
+        var state = RigState()
+        state.connected = true
+        state.frequencyMHz = 14.266
+        XCTAssertEqual(state.loggableFrequencyMHz, 14.266)
+        XCTAssertEqual(state.band, .band20m)
+    }
+
+    /// A transport reading 14.266 MHz out of 100 Hz steps as if they were Hz
+    /// reports 0.14266: positive, finite, and in no band. It must not become
+    /// the editor's frequency, or every QSO of the run carries it.
+    func testLoggableFrequencyRejectsMisscaledReading() {
+        var state = RigState()
+        state.connected = true
+        state.frequencyMHz = 0.14266
+        XCTAssertNil(state.loggableFrequencyMHz)
+        XCTAssertNil(state.band)
+        // The raw reading survives for the toolbar chip.
+        XCTAssertEqual(state.frequencyMHz, 0.14266)
+    }
+
+    func testLoggableFrequencyRejectsMissingAndZeroReadings() {
+        XCTAssertNil(RigState().loggableFrequencyMHz)
+        var zero = RigState()
+        zero.frequencyMHz = 0
+        XCTAssertNil(zero.loggableFrequencyMHz)
+    }
+
+    func testWSJTXLoggableFrequencyAppliesTheSameRule() {
+        var state = WSJTXRigState()
+        state.connected = true
+        state.dialFrequencyMHz = 14.074
+        XCTAssertEqual(state.loggableFrequencyMHz, 14.074)
+        state.dialFrequencyMHz = 0.14074
+        XCTAssertNil(state.loggableFrequencyMHz)
+    }
+}

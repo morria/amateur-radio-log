@@ -44,6 +44,11 @@ struct WSJTXRigState: Equatable {
 
     var mode: Mode? { modeRaw.flatMap { Mode(rawValue: $0.uppercased()) } }
     var band: Band? { dialFrequencyMHz.flatMap { Band.from(frequencyMHz: $0) } }
+
+    /// The dial frequency only when it lands in an amateur band — the same
+    /// rule `RigState` applies, so a bad Status frame can't seed the editor
+    /// with a frequency no band covers.
+    var loggableFrequencyMHz: Double? { band == nil ? nil : dialFrequencyMHz }
 }
 
 // MARK: - Listener
