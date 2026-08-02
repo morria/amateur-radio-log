@@ -772,11 +772,20 @@ struct LogEntryView: View {
                                                       excluding: prefill?.id,
                                                       in: modelContext)
                 .filter { $0.deletedAt == nil }
+
+            // The bundled FCC database answers most US calls right here — no
+            // network, no spinner, no second pause before the answer lands.
+            if let local = await appState.localCallsignLookup(callsign) {
+                guard !Task.isCancelled else { return }
+                withAnimation { lookupResult = local }
+                return
+            }
+
             // Short extra pause before hitting the network.
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             isLookingUp = true
-            let result = await appState.lookupCallsign(callsign)
+            let result = await appState.remoteCallsignLookup(callsign)
             guard !Task.isCancelled else {
                 isLookingUp = false
                 return

@@ -17,6 +17,7 @@
 		0DF3F7CE365AEB412EEBFB37 /* ReplicationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D0C170A2ABFD25C8028769 /* ReplicationLog.swift */; };
 		102C3E048E5DB4CDCA05D7E0 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE906F1F502447279BDF9C8 /* DateFormatters.swift */; };
 		11C12A584CB095A674DB0A5F /* Spot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087D1F0DEF0FA202D373B18C /* Spot.swift */; };
+		13BCD976A5089898456E9B95 /* CallsignDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305A4264EB5CA3C419EDFE5D /* CallsignDatabase.swift */; };
 		18276D484E7860B588CB07B8 /* TelnetSpotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB30C201474DD0B54952DF65 /* TelnetSpotProvider.swift */; };
 		189835AEC87A7447B263578F /* HamLogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCB77FA9F3DABD4C7583C81 /* HamLogApp.swift */; };
 		1899490A04DB2E9F33C7B02C /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B71B030D5949195AE3D8F1 /* ServiceProtocols.swift */; };
@@ -46,7 +47,9 @@
 		5D4080E307682659C67A37D7 /* QSOIdentityBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE0AEE5D55F26BF0390E48B /* QSOIdentityBackfill.swift */; };
 		5D9929CA193FEB469925E323 /* PocketCatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91385BDA835FED00C748E4DD /* PocketCatTests.swift */; };
 		61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */; };
+		6B280631217027F777CCA6F3 /* CallsignDatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC49A19BE5156304FF4A8139 /* CallsignDatabaseTests.swift */; };
 		6C13E0D8CCD6A444B34AA48D /* QSO.swift in Sources */ = {isa = PBXBuildFile; fileRef = D250A1822805EEF592F8859A /* QSO.swift */; };
+		6C5526E9E5C488EA661F0D9E /* callsigns.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = A3A7ACED9679566806F00105 /* callsigns.sqlite */; };
 		6D4B29BC7BE79A4A39902BEF /* RigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3D08E9659DE390308579D2 /* RigService.swift */; };
 		6EBB0910BC79CD6DB4DDFA91 /* SpotListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46FD8BBA8F7F9A3576C3069 /* SpotListView.swift */; };
 		7121DDD9A007CB4E7C9F580B /* LoTWUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB492ACF4916E21FD7FDDC1 /* LoTWUploadTests.swift */; };
@@ -88,6 +91,7 @@
 		C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1606C15DE6AFF14E21D041DB /* SpotSubmitter.swift */; };
 		C775845EEB2D4BDCBA864C4E /* LogEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D602CAA8FEA9D6503701EF /* LogEntryView.swift */; };
 		C7F65F634CD8A87180F05398 /* ParkDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */; };
+		CB8DABB969701A2C75E357AD /* CallsignFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15457F4FB3CA8FA5A78839BD /* CallsignFormat.swift */; };
 		CC84B2F8FBAB6BC81293AEDB /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 4358E0583762C64EA1F32B3A /* Localizable.xcstrings */; };
 		CF63EB88DA24FFF973E7CD44 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDDCC7FE322839647F492A6A /* SyncEngineTests.swift */; };
 		D061A16E668E960C2AF332DF /* WSJTXListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */; };
@@ -144,6 +148,7 @@
 		0F92A9393C186928D96B2C35 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClusterParserTests.swift; sourceTree = "<group>"; };
 		143FDB332171E9BFB0D89DDC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		15457F4FB3CA8FA5A78839BD /* CallsignFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignFormat.swift; sourceTree = "<group>"; };
 		1606C15DE6AFF14E21D041DB /* SpotSubmitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotSubmitter.swift; sourceTree = "<group>"; };
 		192D4A21004CED7D40145A8E /* QRZService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRZService.swift; sourceTree = "<group>"; };
 		19D84EB4665CEBBF11DB3FD1 /* PreviewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
@@ -154,6 +159,7 @@
 		2EB492ACF4916E21FD7FDDC1 /* LoTWUploadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoTWUploadTests.swift; sourceTree = "<group>"; };
 		2F44254B1312E8C10FAECED7 /* Mode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mode.swift; sourceTree = "<group>"; };
 		2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParkDatabase.swift; sourceTree = "<group>"; };
+		305A4264EB5CA3C419EDFE5D /* CallsignDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignDatabase.swift; sourceTree = "<group>"; };
 		32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactMapView.swift; sourceTree = "<group>"; };
 		33FF7077DF7629746C2915FC /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		364515BC2452FE33C5C76C20 /* StationInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationInfoCard.swift; sourceTree = "<group>"; };
@@ -201,6 +207,7 @@
 		99BDB2EDCBB5C0426D5F7FC9 /* QSOStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOStoreTests.swift; sourceTree = "<group>"; };
 		9BE906F1F502447279BDF9C8 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		9D1CC7D81F61D1D8E2B1476E /* AmateurRadioLog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AmateurRadioLog.entitlements; sourceTree = "<group>"; };
+		A3A7ACED9679566806F00105 /* callsigns.sqlite */ = {isa = PBXFileReference; path = callsigns.sqlite; sourceTree = "<group>"; };
 		ADB96D32A2C761676B98BBD9 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		AEF5670E0813F619BAE3EA51 /* QSOEditData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOEditData.swift; sourceTree = "<group>"; };
 		B46FD8BBA8F7F9A3576C3069 /* SpotListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotListView.swift; sourceTree = "<group>"; };
@@ -213,6 +220,7 @@
 		C9913A69C231F9A5283608B6 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		CA6B5E7E0570C1C35282E94A /* StatsFilterScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsFilterScopeTests.swift; sourceTree = "<group>"; };
 		CC2483A64E690C0B3928EA6A /* ImportPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPreviewSheet.swift; sourceTree = "<group>"; };
+		CC49A19BE5156304FF4A8139 /* CallsignDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignDatabaseTests.swift; sourceTree = "<group>"; };
 		D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ADIFWriter.swift; sourceTree = "<group>"; };
 		D250A1822805EEF592F8859A /* QSO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSO.swift; sourceTree = "<group>"; };
 		D5065C428C2F4027D8B9B9DD /* SpotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotService.swift; sourceTree = "<group>"; };
@@ -273,6 +281,7 @@
 			isa = PBXGroup;
 			children = (
 				3D76E301651BC205642DEDC3 /* Assets.xcassets */,
+				A3A7ACED9679566806F00105 /* callsigns.sqlite */,
 				4358E0583762C64EA1F32B3A /* Localizable.xcstrings */,
 				08F0A30ECCE28BF637EFD2ED /* pota_parks.csv.z */,
 			);
@@ -283,6 +292,7 @@
 			isa = PBXGroup;
 			children = (
 				0755D1B36432788FB86E9B30 /* AwardEngine.swift */,
+				305A4264EB5CA3C419EDFE5D /* CallsignDatabase.swift */,
 				8AF37FB1C38AF284AB4F6933 /* FieldDaySession.swift */,
 				D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */,
 				751E4D19CC969EC2263A7F5E /* KeychainManager.swift */,
@@ -407,6 +417,7 @@
 			children = (
 				C5E0FAE0EB2E4F8A07483995 /* ActivationTests.swift */,
 				0BAB794A26A0412CE3C70471 /* AwardEngineTests.swift */,
+				CC49A19BE5156304FF4A8139 /* CallsignDatabaseTests.swift */,
 				1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */,
 				87F2547788F423DBE3731308 /* FieldDayReplicationTests.swift */,
 				F106C61338C6F99B136BB883 /* FilterPerfTests.swift */,
@@ -467,6 +478,7 @@
 		C4739EA8448913FCADC7F9D0 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				15457F4FB3CA8FA5A78839BD /* CallsignFormat.swift */,
 				9BE906F1F502447279BDF9C8 /* DateFormatters.swift */,
 				6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */,
 				3FD5D37600BB476F93E0BEAA /* GeoMath.swift */,
@@ -657,6 +669,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DA46E8E6E05A5D244D025427 /* Assets.xcassets in Resources */,
+				6C5526E9E5C488EA661F0D9E /* callsigns.sqlite in Resources */,
 				CC84B2F8FBAB6BC81293AEDB /* Localizable.xcstrings in Resources */,
 				8B466B1D9B0866DDCD38561D /* pota_parks.csv.z in Resources */,
 			);
@@ -679,6 +692,7 @@
 			files = (
 				831C8721E5310907EE3247C6 /* ActivationTests.swift in Sources */,
 				715AFD07BDA920635300BEB5 /* AwardEngineTests.swift in Sources */,
+				6B280631217027F777CCA6F3 /* CallsignDatabaseTests.swift in Sources */,
 				BECEB011F784065020BCCD6E /* ClusterParserTests.swift in Sources */,
 				767BED956B3CD1CE8D2FD2E2 /* FieldDayReplicationTests.swift in Sources */,
 				E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */,
@@ -716,6 +730,8 @@
 				255AB7169165FD58A31175FF /* AwardMilestone.swift in Sources */,
 				D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */,
 				895570C7A86594308C5F071C /* BandPlan.swift in Sources */,
+				13BCD976A5089898456E9B95 /* CallsignDatabase.swift in Sources */,
+				CB8DABB969701A2C75E357AD /* CallsignFormat.swift in Sources */,
 				4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */,
 				FFBAABCF5903E4496B9F3A4B /* ClusterLineParser.swift in Sources */,
 				61980F3A2EB371BB8338AB2E /* ContactMapView.swift in Sources */,

@@ -447,6 +447,7 @@ final class AppState {
     // MARK: - Services
     let qrzService = QRZService()
     let hamQTHService = HamQTHService()
+    let callsignDatabase = CallsignDatabase.shared
     let lotwService = LoTWService()
 
     // MARK: - Spots
@@ -831,7 +832,23 @@ final class AppState {
 
     // MARK: - Callsign Lookup
 
+    /// The bundled FCC database first, then a callbook. The offline hit costs
+    /// no network and no wait, so it is what the entry screen shows for the
+    /// vast majority of US contacts; QRZ/HamQTH only see the calls it misses.
     func lookupCallsign(_ callsign: String) async -> CallsignLookupResult? {
+        if let local = await localCallsignLookup(callsign) { return local }
+        return await remoteCallsignLookup(callsign)
+    }
+
+    /// Offline lookup against the bundled FCC license snapshot: first name and
+    /// 4-character grid for any active US callsign. Returns nil for anything
+    /// it doesn't carry — non-US calls, and calls licensed since the snapshot.
+    func localCallsignLookup(_ callsign: String) async -> CallsignLookupResult? {
+        await callsignDatabase.lookupResult(callsign: callsign)
+    }
+
+    /// Callbook lookup: QRZ if configured, otherwise (or on failure) HamQTH.
+    func remoteCallsignLookup(_ callsign: String) async -> CallsignLookupResult? {
         let qrzCreds = KeychainManager.loadCredentials(for: .qrz)
         if !qrzCreds.isEmpty {
             do {
@@ -855,9 +872,18 @@ final class AppState {
         return nil
     }
 
-    /// Whether a callbook (QRZ or HamQTH) is configured, so callsign lookups
-    /// can succeed. Drives whether the location backfill is worth running.
+    /// Whether any callsign source is available — the bundled FCC database, or
+    /// a configured callbook. Drives whether the location backfill is worth
+    /// running.
     var canLookupCallsigns: Bool {
+        CallsignDatabase.isBundled
+            || !KeychainManager.loadCredentials(for: .qrz).isEmpty
+            || !KeychainManager.loadCredentials(for: .hamqth).isEmpty
+    }
+
+    /// True once a callbook is configured, so the backfill knows whether a
+    /// local miss is worth a network round trip at all.
+    private var hasCallbook: Bool {
         !KeychainManager.loadCredentials(for: .qrz).isEmpty
             || !KeychainManager.loadCredentials(for: .hamqth).isEmpty
     }
@@ -930,10 +956,26 @@ final class AppState {
 
         var pendingSave = localChanges
         var sinceSave = 0
-        for call in pending.prefix(Self.locationBackfillLimit) {
+        var callbookLookups = 0
+        // The cap counts callbook requests only — the bundled FCC database is
+        // free to query, so an offline pass can place the whole log at once
+        // and only the calls it misses are rationed.
+        for call in pending {
             if Task.isCancelled { break }
-            guard let result = await lookupCallsign(call),
-                  let coord = Self.coordinate(from: result) else {
+
+            var result = await localCallsignLookup(call)
+            let usedCallbook = result == nil && hasCallbook
+                && callbookLookups < Self.locationBackfillLimit
+            if usedCallbook {
+                callbookLookups += 1
+                result = await remoteCallsignLookup(call)
+                // Be polite to the callbook between requests. A local hit
+                // never earned a wait, which is what makes an offline pass
+                // over a large log finish in one go.
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+
+            guard let result, let coord = Self.coordinate(from: result) else {
                 continue
             }
             // Apply to every contact with this callsign still missing a location.
@@ -957,8 +999,6 @@ final class AppState {
                 sinceSave = 0
                 pendingSave = false
             }
-            // Be polite to the callbook between lookups.
-            try? await Task.sleep(for: .milliseconds(200))
         }
 
         if pendingSave {
