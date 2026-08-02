@@ -1524,9 +1524,9 @@ final class AppState {
 
         // Feed the last-used editor defaults so a manually opened editor is
         // pre-filled with live rig state.
-        if freqMHz > 0 {
-            lastFreq = freqMHz
-            if let band = Band.from(frequencyMHz: freqMHz) { lastBand = band }
+        if let freq = state.loggableFrequencyMHz {
+            lastFreq = freq
+            if let band = state.band { lastBand = band }
         }
         if let mode = state.mode { lastMode = mode }
 
@@ -1624,12 +1624,12 @@ final class AppState {
     /// for frequency and mode alone, and WSJT-X Status frames carry no power.
     var liveRigDefaults: (band: Band?, mode: Mode?, freqMHz: Double?, powerWatts: Double?)? {
         if rigState.connected {
-            return (rigState.band, rigState.mode, rigState.frequencyMHz,
+            return (rigState.band, rigState.mode, rigState.loggableFrequencyMHz,
                     rigState.powerWatts)
         }
         if wsjtxRigState.connected {
             return (wsjtxRigState.band, wsjtxRigState.mode,
-                    wsjtxRigState.dialFrequencyMHz, nil)
+                    wsjtxRigState.loggableFrequencyMHz, nil)
         }
         return nil
     }
@@ -1727,7 +1727,7 @@ final class AppState {
         guard state != rigState else { return }
         rigState = state
         guard state.connected else { return }
-        if let freq = state.frequencyMHz, freq > 0 {
+        if let freq = state.loggableFrequencyMHz {
             lastFreq = freq
             if let band = state.band { lastBand = band }
         }
@@ -1777,7 +1777,7 @@ final class AppState {
             rigState = state
             // Feed the last-used editor defaults so a manually opened
             // editor is pre-filled with live rig state (same as WSJT-X).
-            if let freq = state.frequencyMHz, freq > 0 {
+            if let freq = state.loggableFrequencyMHz {
                 lastFreq = freq
                 if let band = state.band { lastBand = band }
             }

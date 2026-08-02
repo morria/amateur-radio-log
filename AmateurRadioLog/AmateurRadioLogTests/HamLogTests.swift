@@ -91,6 +91,19 @@ final class ADIFParserTests: XCTestCase {
         XCTAssertEqual(qsos[0].band, .band20m)
     }
 
+    /// `Double("nan")` and `Double("inf")` both succeed, so a bad value from
+    /// another logger would otherwise be stored and re-exported verbatim.
+    func testRejectsNonFiniteNumbers() throws {
+        let adif = "<EOH>\n<CALL:4>TEST <QSO_DATE:8>20260101 <TIME_ON:4>1200 "
+            + "<FREQ:3>nan <FREQ_RX:3>inf <TX_PWR:3>nan <ANT_AZ:9>-infinity <EOR>"
+        let qsos = parser.recordsToQSOs(try parser.parse(string: adif).records)
+        XCTAssertNil(qsos[0].freq)
+        XCTAssertNil(qsos[0].freqRx)
+        XCTAssertNil(qsos[0].txPower)
+        XCTAssertNil(qsos[0].antAz)
+        XCTAssertNil(qsos[0].band)
+    }
+
     func testExtraFieldsPreserved() throws {
         let adif = "<EOH>\n<CALL:4>TEST <QSO_DATE:8>20260101 <TIME_ON:4>1200 <APP_CUSTOM:5>hello <EOR>"
         let qsos = parser.recordsToQSOs(try parser.parse(string: adif).records)
@@ -238,6 +251,64 @@ final class ADIFWriterTests: XCTestCase {
         XCTAssertEqual(parsed[0].qth, "São Paulo")
         XCTAssertEqual(parsed[0].comment, "Спасибо — 73!")
         XCTAssertEqual(parsed[0].country, "España")
+    }
+
+    // MARK: Numeric fields
+
+    /// 21074000 Hz reaches us as 21.073999999999998 from any source that
+    /// scales by 1e-6 instead of dividing; `String(Double)` would export all
+    /// 17 digits, which strict logbook APIs reject.
+    func testFrequencyDropsBinaryArtifacts() {
+        let qso = QSO(call: "K9ICP", qsoDate: "20260308", timeOn: "143000")
+        qso.band = .band15m
+        qso.freq = 21_074_000 * 1e-6
+        let output = writer.write(qsos: [qso])
+        XCTAssertTrue(output.contains("<FREQ:6>21.074"), output)
+        XCTAssertFalse(output.contains("21.0739"), output)
+    }
+
+    func testFrequencyKeepsHertzResolution() {
+        let qso = QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000")
+        qso.freq = 14.074123
+        qso.freqRx = 0.1357
+        let output = writer.write(qsos: [qso])
+        XCTAssertTrue(output.contains("<FREQ:9>14.074123"), output)
+        XCTAssertTrue(output.contains("<FREQ_RX:6>0.1357"), output)
+    }
+
+    /// A non-finite or zero frequency costs the whole record at upload time;
+    /// BAND still carries the QSO, so the field is dropped instead.
+    func testFrequencyOmittedWhenNotUsable() {
+        for bad in [Double.nan, .infinity, -.infinity, 0, -14.074] {
+            let qso = QSO(call: "K7TSD", qsoDate: "20260308", timeOn: "143000")
+            qso.band = .band20m
+            qso.freq = bad
+            let output = writer.write(qsos: [qso])
+            XCTAssertFalse(output.contains("<FREQ:"), "\(bad): \(output)")
+            XCTAssertTrue(output.contains("<BAND:3>20m"), "\(bad): \(output)")
+        }
+    }
+
+    func testPowerAndAnglesWrittenAsPlainDecimals() {
+        let qso = QSO(call: "KF4WZ", qsoDate: "20260308", timeOn: "143000")
+        qso.txPower = 5.000000000000001
+        qso.antAz = 123.456789
+        qso.antEl = .nan
+        let output = writer.write(qsos: [qso])
+        XCTAssertTrue(output.contains("<TX_PWR:1>5"), output)
+        XCTAssertTrue(output.contains("<ANT_AZ:7>123.457"), output)
+        XCTAssertFalse(output.contains("<ANT_EL:"), output)
+    }
+
+    /// The exported record must survive a round trip through any parser —
+    /// including ours, which is what a QRZ download feeds back in.
+    func testNoisyFrequencyRoundTrips() throws {
+        let qso = QSO(call: "KK7WYG", qsoDate: "20260308", timeOn: "143000")
+        qso.freq = 50_313_000 * 1e-6
+        let parsed = try ADIFParser().recordsToQSOs(
+            ADIFParser().parse(string: writer.write(qsos: [qso])).records)
+        XCTAssertEqual(parsed[0].freq, 50.313)
+        XCTAssertEqual(parsed[0].band, .band6m)
     }
 }
 
