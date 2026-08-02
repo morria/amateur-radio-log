@@ -401,6 +401,33 @@ final class QSOEditDataTests: XCTestCase {
         XCTAssertEqual(qso.call, "NEW")
         XCTAssertEqual(qso.country, "Japan")
     }
+
+    // MARK: Band derivation
+
+    /// A rig supplies a frequency and no band of its own; a QSO with FREQ
+    /// and no BAND is refused by QRZ and LoTW alike.
+    func testBandFollowsTheFrequencyWhenUnset() {
+        var data = QSOEditData()
+        data.call = "K4OTJ"
+        data.freq = 14.266
+        XCTAssertEqual(data.resolvedBand, .band20m)
+        XCTAssertEqual(data.toQSO().band, .band20m)
+    }
+
+    func testChosenBandWinsOverTheFrequency() {
+        var data = QSOEditData()
+        data.band = .band40m
+        data.freq = 14.266
+        XCTAssertEqual(data.resolvedBand, .band40m)
+    }
+
+    func testBandStaysNilWhenNothingResolves() {
+        var data = QSOEditData()
+        XCTAssertNil(data.resolvedBand)
+        data.freq = 0.14266    // no band covers it
+        XCTAssertNil(data.resolvedBand)
+        XCTAssertNil(data.toQSO().band)
+    }
 }
 
 // MARK: - Location Backfill Tests

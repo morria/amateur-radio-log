@@ -824,7 +824,7 @@ final class AppState {
     }
 
     func saveLastUsed(from data: QSOEditData) {
-        if let b = data.band { lastBand = b }
+        if let b = data.resolvedBand { lastBand = b }
         if let m = data.mode { lastMode = m }
         if let f = data.freq { lastFreq = f }
         if let p = data.txPower { lastPower = p }

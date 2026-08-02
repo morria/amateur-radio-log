@@ -130,6 +130,14 @@ struct QSOEditData: Identifiable {
         txPower = defaults.power
     }
 
+    /// The band to log: the one chosen in the form, or failing that the one
+    /// the frequency falls in. A rig hands the editor a frequency and no
+    /// band of its own, and a record with FREQ and no BAND is refused by
+    /// QRZ and LoTW alike — so the derivation lives here, once, rather than
+    /// in each entry path. nil only when the frequency is missing too, or
+    /// lands outside every band the app knows.
+    var resolvedBand: Band? { band ?? freq.flatMap { Band.from(frequencyMHz: $0) } }
+
     func apply(to qso: QSO) {
         qso.call = call
         qso.qsoDate = qsoDate
@@ -137,7 +145,7 @@ struct QSOEditData: Identifiable {
         qso.timeOff = timeOff
         qso.freq = freq
         qso.freqRx = freqRx
-        qso.band = band
+        qso.band = resolvedBand
         qso.bandRx = bandRx
         qso.mode = mode
         qso.submode = submode
