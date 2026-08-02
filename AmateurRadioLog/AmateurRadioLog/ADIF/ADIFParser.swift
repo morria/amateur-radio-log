@@ -160,8 +160,8 @@ final class ADIFParser {
 
         var qso = QSORecord(call: call.uppercased(), qsoDate: date, timeOn: time)
         qso.timeOff = f["TIME_OFF"]
-        qso.freq = f["FREQ"].flatMap { Double($0) }
-        qso.freqRx = f["FREQ_RX"].flatMap { Double($0) }
+        qso.freq = number(f["FREQ"])
+        qso.freqRx = number(f["FREQ_RX"])
         qso.bandRaw = (f["BAND"].flatMap { Band(rawValue: $0.lowercased()) }
             ?? qso.freq.flatMap { Band.from(frequencyMHz: $0) })?.rawValue
         qso.bandRxRaw = f["BAND_RX"].flatMap { Band(rawValue: $0.lowercased()) }?.rawValue
@@ -180,10 +180,10 @@ final class ADIFParser {
         qso.ituZone = f["ITUZ"].flatMap { Int($0) }
         qso.continent = f["CONT"]
         qso.iota = f["IOTA"]
-        qso.txPower = f["TX_PWR"].flatMap { Double($0) }
-        qso.rxPower = f["RX_PWR"].flatMap { Double($0) }
-        qso.antAz = f["ANT_AZ"].flatMap { Double($0) }
-        qso.antEl = f["ANT_EL"].flatMap { Double($0) }
+        qso.txPower = number(f["TX_PWR"])
+        qso.rxPower = number(f["RX_PWR"])
+        qso.antAz = number(f["ANT_AZ"])
+        qso.antEl = number(f["ANT_EL"])
         qso.qslSent = f["QSL_SENT"]
         qso.qslSentVia = f["QSL_SENT_VIA"]
         qso.qslRcvd = f["QSL_RCVD"]
@@ -262,9 +262,18 @@ final class ADIFParser {
         return qso
     }
 
+    /// ADIF numeric field → Double. `Double(_: String)` also accepts "nan",
+    /// "inf" and hex floats, so without the finiteness check a bad value from
+    /// another logger — or from one of our own pre-fix exports — lands in the
+    /// database and is written straight back out on the next upload.
+    private func number(_ value: String?) -> Double? {
+        guard let value, let parsed = Double(value), parsed.isFinite else { return nil }
+        return parsed
+    }
+
     private func parseLatLon(_ str: String) -> Double? {
         // ADIF lat/lon can be decimal or XDDD MM.MMM format
-        if let val = Double(str) { return val }
+        if let val = number(str) { return val }
 
         let trimmed = str.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2 else { return nil }
@@ -274,8 +283,8 @@ final class ADIFParser {
         let parts = numPart.split(separator: " ")
 
         guard parts.count >= 2,
-              let degrees = Double(parts[0]),
-              let minutes = Double(parts[1]) else { return nil }
+              let degrees = number(String(parts[0])),
+              let minutes = number(String(parts[1])) else { return nil }
 
         var value = degrees + minutes / 60.0
         if direction == "S" || direction == "W" { value = -value }
