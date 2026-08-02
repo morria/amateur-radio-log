@@ -33,4 +33,35 @@ struct CallsignLookupResult: Sendable {
         case (nil, nil): return nil
         }
     }
+
+    /// Overlays a richer result on top of this one: every field `overlay`
+    /// supplies wins, and this result fills the gaps.
+    ///
+    /// Used to enrich the bundled FCC answer with a callbook's. The callbook
+    /// wins on conflict because its data is self-reported and generally both
+    /// finer-grained — a 6-character grid, not a ZIP centroid rounded to 4 —
+    /// and more current than a snapshot taken at build time.
+    func enriched(with overlay: CallsignLookupResult) -> CallsignLookupResult {
+        CallsignLookupResult(
+            callsign: overlay.callsign.isEmpty ? callsign : overlay.callsign,
+            firstName: overlay.firstName ?? firstName,
+            lastName: overlay.lastName ?? lastName,
+            address: overlay.address ?? address,
+            city: overlay.city ?? city,
+            state: overlay.state ?? state,
+            zipCode: overlay.zipCode ?? zipCode,
+            country: overlay.country ?? country,
+            grid: overlay.grid ?? grid,
+            latitude: overlay.latitude ?? latitude,
+            longitude: overlay.longitude ?? longitude,
+            county: overlay.county ?? county,
+            email: overlay.email ?? email,
+            qslVia: overlay.qslVia ?? qslVia,
+            cqZone: overlay.cqZone ?? cqZone,
+            ituZone: overlay.ituZone ?? ituZone,
+            dxcc: overlay.dxcc ?? dxcc,
+            lotw: overlay.lotw ?? lotw,
+            eqsl: overlay.eqsl ?? eqsl,
+            continent: overlay.continent ?? continent)
+    }
 }

@@ -14,10 +14,15 @@ struct CallsignRecord: Sendable, Equatable {
 /// `tools/build-callsign-db.py`; see `tools/README-callsign-db.md`.
 ///
 /// This is the first stop for a callsign lookup: it answers in microseconds
-/// with no network, and only a miss (a non-US call, or one licensed since the
-/// bundled snapshot) falls through to QRZ/HamQTH. The file is opened read-only
-/// and lazily on first query, and SQLite reads just the handful of B-tree
-/// pages a lookup touches rather than the whole 16 MB.
+/// with no network, so the entry screen can fill in a US contact before any
+/// callbook request is made. QRZ/HamQTH then enrich that answer with the
+/// fields the FCC doesn't publish, and carry the lookup alone for the calls
+/// this database doesn't have — non-US stations, and licenses granted since
+/// the bundled snapshot.
+///
+/// The file is opened read-only and lazily on first query, and SQLite reads
+/// just the handful of B-tree pages a lookup touches rather than the whole
+/// 16 MB.
 actor CallsignDatabase {
     static let shared = CallsignDatabase()
 

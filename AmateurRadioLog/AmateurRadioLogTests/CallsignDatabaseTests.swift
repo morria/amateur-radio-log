@@ -233,6 +233,81 @@ final class CallsignDatabaseTests: XCTestCase {
     }
 }
 
+// MARK: - Local-then-callbook enrichment
+
+/// The entry screen shows the offline FCC answer immediately and then layers
+/// the callbook's on top of it. These cover that merge.
+final class CallsignLookupEnrichmentTests: XCTestCase {
+
+    /// What the bundled database produces: a callsign, a first name, a
+    /// 4-character grid, and nothing else.
+    private var local: CallsignLookupResult {
+        CallsignLookupResult(callsign: "W1AW", firstName: "Hiram", grid: "FN31")
+    }
+
+    func testCallbookFillsInEverythingTheFCCDoesNotPublish() {
+        let remote = CallsignLookupResult(
+            callsign: "W1AW", lastName: "Maxim", city: "Newington",
+            state: "CT", country: "United States", county: "Hartford",
+            cqZone: 5, ituZone: 8, dxcc: 291, lotw: true)
+        let merged = local.enriched(with: remote)
+
+        XCTAssertEqual(merged.firstName, "Hiram")   // kept from the FCC
+        XCTAssertEqual(merged.grid, "FN31")         // kept from the FCC
+        XCTAssertEqual(merged.lastName, "Maxim")
+        XCTAssertEqual(merged.county, "Hartford")
+        XCTAssertEqual(merged.dxcc, 291)
+        XCTAssertEqual(merged.cqZone, 5)
+        XCTAssertEqual(merged.ituZone, 8)
+        XCTAssertEqual(merged.lotw, true)
+        XCTAssertEqual(merged.fullName, "Hiram Maxim")
+    }
+
+    /// A callbook grid is self-reported and usually finer-grained than a ZIP
+    /// centroid rounded to four characters, so it wins.
+    func testCallbookWinsWhereBothKnowAField() {
+        let remote = CallsignLookupResult(
+            callsign: "W1AW", firstName: "Hi", grid: "FN31pr",
+            latitude: 41.714, longitude: -72.727)
+        let merged = local.enriched(with: remote)
+
+        XCTAssertEqual(merged.firstName, "Hi")
+        XCTAssertEqual(merged.grid, "FN31pr")
+        XCTAssertEqual(merged.latitude, 41.714)
+        XCTAssertEqual(merged.longitude, -72.727)
+    }
+
+    /// A callbook that knows the call but returns little must not blank out
+    /// what the offline lookup already established.
+    func testASparseCallbookAnswerErasesNothing() {
+        let merged = local.enriched(with: CallsignLookupResult(callsign: "W1AW"))
+        XCTAssertEqual(merged.callsign, "W1AW")
+        XCTAssertEqual(merged.firstName, "Hiram")
+        XCTAssertEqual(merged.grid, "FN31")
+    }
+
+    func testCallbookCallsignWinsUnlessItIsEmpty() {
+        let canonical = local.enriched(with: CallsignLookupResult(callsign: "W1AW/4"))
+        XCTAssertEqual(canonical.callsign, "W1AW/4")
+
+        let blank = local.enriched(with: CallsignLookupResult(callsign: ""))
+        XCTAssertEqual(blank.callsign, "W1AW")
+    }
+
+    /// The merged result still has to place a pin — from the callbook's
+    /// coordinates when it has them, from the FCC grid when it doesn't.
+    func testMergedResultStillResolvesToACoordinate() throws {
+        let gridOnly = try XCTUnwrap(AppState.coordinate(from: local))
+        XCTAssertEqual(gridOnly.lat, 41.5, accuracy: 0.5)
+
+        let precise = local.enriched(with: CallsignLookupResult(
+            callsign: "W1AW", latitude: 41.714, longitude: -72.727))
+        let exact = try XCTUnwrap(AppState.coordinate(from: precise))
+        XCTAssertEqual(exact.lat, 41.714, accuracy: 0.0001)
+        XCTAssertEqual(exact.lon, -72.727, accuracy: 0.0001)
+    }
+}
+
 // MARK: - Callsign normalization
 
 final class CallsignFormatTests: XCTestCase {

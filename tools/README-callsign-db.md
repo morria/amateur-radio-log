@@ -3,8 +3,13 @@
 `AmateurRadioLog/AmateurRadioLog/Resources/callsigns.sqlite` maps every active
 US amateur callsign to the licensee's first name and 4-character Maidenhead
 grid square. The app consults it before any callbook, so entering a US
-callsign fills in the operator and pins the map with no network and no wait;
-QRZ/HamQTH are only consulted for the calls it misses.
+callsign fills in the operator and pins the map with no network and no wait.
+QRZ/HamQTH then enrich that answer in the background with the fields the FCC
+doesn't publish — county, DXCC, zones, LoTW/eQSL participation, precise
+coordinates — and win wherever the two disagree, since callbook data is
+self-reported and generally finer-grained and more current. For the calls this
+database doesn't have, the callbook carries the lookup on its own exactly as
+before.
 
 It is a build artifact, produced by `tools/build-callsign-db.py` and committed
 so a clean checkout builds a complete app.

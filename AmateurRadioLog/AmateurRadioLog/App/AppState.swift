@@ -832,12 +832,21 @@ final class AppState {
 
     // MARK: - Callsign Lookup
 
-    /// The bundled FCC database first, then a callbook. The offline hit costs
-    /// no network and no wait, so it is what the entry screen shows for the
-    /// vast majority of US contacts; QRZ/HamQTH only see the calls it misses.
+    /// The bundled FCC database first, then the callbook layered on top of it.
+    ///
+    /// The offline hit answers instantly and offline; the callbook then fills
+    /// in everything the FCC doesn't publish — county, DXCC, zones, LoTW/eQSL
+    /// participation, precise coordinates — and wins wherever the two
+    /// disagree. With no callbook configured, or when one fails, the offline
+    /// answer stands on its own.
+    ///
+    /// Callers that want the answer on screen before the network returns
+    /// should use `localCallsignLookup` and `remoteCallsignLookup` directly
+    /// and merge with `enriched(with:)`, as the entry screen does.
     func lookupCallsign(_ callsign: String) async -> CallsignLookupResult? {
-        if let local = await localCallsignLookup(callsign) { return local }
-        return await remoteCallsignLookup(callsign)
+        let local = await localCallsignLookup(callsign)
+        guard let remote = await remoteCallsignLookup(callsign) else { return local }
+        return local?.enriched(with: remote) ?? remote
     }
 
     /// Offline lookup against the bundled FCC license snapshot: first name and
@@ -960,6 +969,10 @@ final class AppState {
         // The cap counts callbook requests only — the bundled FCC database is
         // free to query, so an offline pass can place the whole log at once
         // and only the calls it misses are rationed.
+        //
+        // Deliberately not `lookupCallsign`: this pass only needs a
+        // coordinate, and enriching every offline hit from the callbook would
+        // put the whole log back on the network for no gain here.
         for call in pending {
             if Task.isCancelled { break }
 
