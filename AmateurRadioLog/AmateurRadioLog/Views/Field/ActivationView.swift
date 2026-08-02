@@ -901,10 +901,9 @@ private struct ActivationLoggingView: View {
         data.call = trimmedCall
         data.band = band
         data.mode = mode
+        // A missing band follows from the frequency — `QSOEditData` owns
+        // that rule now, for every entry path.
         data.freq = currentFrequency()
-        if data.band == nil, let f = data.freq {
-            data.band = Band.from(frequencyMHz: f)
-        }
         // Empty RST = the usual report for this mode (what the ghost
         // text promised); nil for modes without RST-style reports.
         let rstDefault = QuickEntryParser.defaultRST(for: data.mode)
