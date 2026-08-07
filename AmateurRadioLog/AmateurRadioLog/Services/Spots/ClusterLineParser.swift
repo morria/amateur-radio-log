@@ -145,8 +145,17 @@ enum ClusterLineParser {
     /// would land more than 5 minutes in the future (spot from just before
     /// UTC midnight read just after it).
     private static func resolveTime(_ token: String, now: Date) -> Date? {
-        guard let hour = Int(token.prefix(2)), let minute = Int(token.dropFirst(2).prefix(2)),
-              hour < 24, minute < 60 else { return nil }
+        guard let hour = Int(token.prefix(2)), let minute = Int(token.dropFirst(2).prefix(2)) else {
+            return nil
+        }
+        return resolveUTCTime(hour: hour, minute: minute, now: now)
+    }
+
+    /// Attaches the receiving day to a bare UTC "hhmm", rolling back over
+    /// midnight. Shared with the ON4KST chat parser, whose lines carry the
+    /// same date-less time stamp.
+    static func resolveUTCTime(hour: Int, minute: Int, now: Date) -> Date? {
+        guard hour < 24, minute < 60, hour >= 0, minute >= 0 else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         var components = calendar.dateComponents([.year, .month, .day], from: now)
@@ -166,9 +175,15 @@ enum ClusterLineParser {
 /// - strips telnet IAC negotiation sequences (0xFF ...), including
 ///   subnegotiation blocks and sequences split across chunks,
 /// - drops \r, NUL, and BEL/control noise,
-/// - splits on \n, buffering the trailing partial line.
+/// - splits on \n, buffering the trailing partial line,
+/// - decodes UTF-8, falling back to ISO-8859-1 (which cannot fail) so one
+///   malformed byte in an operator's name never tears down a session,
+/// - discards the buffer past `maxBufferBytes` so a stream with no newlines
+///   can't grow without bound.
 struct TelnetLineAssembler: Sendable {
     private enum IACState { case none, iac, option, subnegotiation, subnegotiationIAC }
+
+    static let maxBufferBytes = 64 * 1024
 
     private var pending: [UInt8] = []
     private var state: IACState = .none
@@ -200,15 +215,31 @@ struct TelnetLineAssembler: Sendable {
 
         var lines: [String] = []
         while let newline = pending.firstIndex(of: 0x0A) {
-            lines.append(String(decoding: pending[..<newline], as: UTF8.self))
+            lines.append(Self.decode(Array(pending[..<newline])))
             pending.removeSubrange(...newline)
         }
+        if pending.count > Self.maxBufferBytes { pending.removeAll(keepingCapacity: false) }
         return lines
     }
 
-    /// The buffered partial line — where a "login:" prompt (sent without a
-    /// newline) shows up.
+    /// The buffered partial line — where an unterminated prompt ("login:",
+    /// "Password:", "Your choice           :") shows up.
     var pendingText: String {
-        String(decoding: pending, as: UTF8.self)
+        Self.decode(pending)
+    }
+
+    /// Drops the buffered partial line. Used between login steps so a prompt
+    /// already answered can't be matched a second time from stale bytes.
+    mutating func resetPending() {
+        pending.removeAll(keepingCapacity: true)
+    }
+
+    /// UTF-8 first, ISO-8859-1 on failure. Servers in this family have been
+    /// seen emitting high-bit bytes that are not UTF-8 (colrdx maps CP437
+    /// 128–159 for display), and Latin-1 decoding cannot fail.
+    private static func decode(_ bytes: [UInt8]) -> String {
+        let data = Data(bytes)
+        if let text = String(data: data, encoding: .utf8) { return text }
+        return String(data: data, encoding: .isoLatin1) ?? ""
     }
 }

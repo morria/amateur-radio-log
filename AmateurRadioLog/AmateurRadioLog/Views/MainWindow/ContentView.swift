@@ -7,6 +7,7 @@ enum NavigationTab: String, CaseIterable, Identifiable {
     case entry = "New QSO"
     case map = "Map"
     case spots = "Spots"
+    case chat = "Chat"
     case stats = "Statistics"
 
     var id: String { rawValue }
@@ -19,6 +20,7 @@ enum NavigationTab: String, CaseIterable, Identifiable {
         case .entry: return String(localized: "New QSO")
         case .map: return String(localized: "Map")
         case .spots: return String(localized: "Spots")
+        case .chat: return String(localized: "Chat")
         case .stats: return String(localized: "Statistics")
         }
     }
@@ -29,6 +31,7 @@ enum NavigationTab: String, CaseIterable, Identifiable {
         case .entry: return "square.and.pencil"
         case .map: return "map"
         case .spots: return "dot.radiowaves.left.and.right"
+        case .chat: return "bubble.left.and.bubble.right"
         case .stats: return "chart.bar"
         }
     }
@@ -47,8 +50,9 @@ struct ContentView: View {
     @State private var showingOnboarding = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
     #if os(iOS)
-    /// Pushed QSO details in the detail column (see detailPopSignal).
-    @State private var iosDetailPath: [PersistentIdentifier] = []
+    /// Pushed screens in the detail column (see detailPopSignal): QSO details
+    /// keyed by PersistentIdentifier, and ON4KST chat rooms.
+    @State private var iosDetailPath = NavigationPath()
     #endif
 
     #if os(macOS)
@@ -91,12 +95,16 @@ struct ContentView: View {
                                 .navigationBarTitleDisplayMode(.inline)
                         }
                     }
+                    .navigationDestination(for: ON4KSTRoom.self) { room in
+                        ChatRoomView(room: room)
+                            .toolbar(.visible, for: .navigationBar)
+                    }
             }
             // Navigation actions (tapped filters, Show on Map) switch the
             // tab *underneath* a pushed detail screen — pop it so the
             // destination is actually visible.
             .onChange(of: appState.detailPopSignal) { _, _ in
-                iosDetailPath.removeAll()
+                iosDetailPath = NavigationPath()
             }
             #else
             Group {
@@ -107,6 +115,7 @@ struct ContentView: View {
                 case .entry: LogEntryView()
                 case .map: ContactMapView(qsos: allQSOs)
                 case .spots: SpotListView(allQSOs: allQSOs)
+                case .chat: ChatRoomListView()
                 case .stats: StatsView(qsos: allQSOs)
                 }
             }
@@ -233,6 +242,7 @@ struct ContentView: View {
                 case "entry": appState.selectedTab = .entry
                 case "map": appState.selectedTab = .map
                 case "spots": appState.selectedTab = .spots
+                case "chat": appState.selectedTab = .chat
                 case "stats": appState.selectedTab = .stats
                 default: break
                 }
@@ -309,6 +319,7 @@ struct ContentView: View {
     @State private var hasShownEntry = false
     @State private var hasShownMap = false
     @State private var hasShownSpots = false
+    @State private var hasShownChat = false
     @State private var hasShownStats = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -333,6 +344,11 @@ struct ContentView: View {
                         SpotListView(allQSOs: allQSOs)
                             .opacity(appState.selectedTab == .spots ? 1 : 0)
                             .allowsHitTesting(appState.selectedTab == .spots)
+                    }
+                    if hasShownChat {
+                        ChatRoomListView()
+                            .opacity(appState.selectedTab == .chat ? 1 : 0)
+                            .allowsHitTesting(appState.selectedTab == .chat)
                     }
                     if hasShownStats {
                         StatsView(qsos: allQSOs)
@@ -362,6 +378,7 @@ struct ContentView: View {
             if tab == .entry { hasShownEntry = true }
             if tab == .map { hasShownMap = true }
             if tab == .spots { hasShownSpots = true }
+            if tab == .chat { hasShownChat = true }
             if tab == .stats { hasShownStats = true }
         }
     }

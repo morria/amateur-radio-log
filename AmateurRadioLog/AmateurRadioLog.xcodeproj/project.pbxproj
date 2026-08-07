@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		43401A32081AD3CC4083909D /* ON4KSTClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B225182A08373A8B7C2044D /* ON4KSTClient.swift */; };
+		23BD86708AAADB9C89195AF0 /* ON4KSTMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5886C20A8CB4A7F79F6646 /* ON4KSTMessage.swift */; };
+		7C9AF5B9C4CE42FC2FB1036A /* ON4KSTProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF7910CC42410E21D3C0F443 /* ON4KSTProtocol.swift */; };
+		D3997D7B3075D4CCB4A1EF6A /* ON4KSTSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C6814BF21C77C0D5615B6B9 /* ON4KSTSession.swift */; };
+		4C41F89B7872CA1BC6CA949D /* ChatRoomListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9862234443C704DD98757B46 /* ChatRoomListView.swift */; };
+		CCC1FEB52B20EB1AD51FCF09 /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D63CEF75BAEF55E863E33B /* ChatRoomView.swift */; };
+		EFF9FAE7CD38D06BDDC1FC0D /* ChatSupportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D26485CD0F7AB98A4C4256 /* ChatSupportViews.swift */; };
+		7158C90577B785DBE40E99DD /* ON4KSTProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233446CCE3133A5DF5A43518 /* ON4KSTProtocolTests.swift */; };
 		01144C3D5FFFEF3128DD2DD1 /* PreviewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D84EB4665CEBBF11DB3FD1 /* PreviewData.swift */; };
 		020E886940961C819FC2D034 /* FieldDaySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF37FB1C38AF284AB4F6933 /* FieldDaySession.swift */; };
 		0744B0373BDD960A17D15078 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB96D32A2C761676B98BBD9 /* StatsView.swift */; };
@@ -133,6 +141,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		9B225182A08373A8B7C2044D /* ON4KSTClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ON4KSTClient.swift; sourceTree = "<group>"; };
+		9A5886C20A8CB4A7F79F6646 /* ON4KSTMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ON4KSTMessage.swift; sourceTree = "<group>"; };
+		DF7910CC42410E21D3C0F443 /* ON4KSTProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ON4KSTProtocol.swift; sourceTree = "<group>"; };
+		4C6814BF21C77C0D5615B6B9 /* ON4KSTSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ON4KSTSession.swift; sourceTree = "<group>"; };
+		9862234443C704DD98757B46 /* ChatRoomListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomListView.swift; sourceTree = "<group>"; };
+		62D63CEF75BAEF55E863E33B /* ChatRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
+		14D26485CD0F7AB98A4C4256 /* ChatSupportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSupportViews.swift; sourceTree = "<group>"; };
+		233446CCE3133A5DF5A43518 /* ON4KSTProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ON4KSTProtocolTests.swift; sourceTree = "<group>"; };
 		0510701E4652985EC2569789 /* SpotProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotProvider.swift; sourceTree = "<group>"; };
 		05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		0755D1B36432788FB86E9B30 /* AwardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwardEngine.swift; sourceTree = "<group>"; };
@@ -257,6 +273,27 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C0C91CD90932E8F28B3F4C03 /* ON4KST */ = {
+			isa = PBXGroup;
+			children = (
+				9B225182A08373A8B7C2044D /* ON4KSTClient.swift */,
+				9A5886C20A8CB4A7F79F6646 /* ON4KSTMessage.swift */,
+				DF7910CC42410E21D3C0F443 /* ON4KSTProtocol.swift */,
+				4C6814BF21C77C0D5615B6B9 /* ON4KSTSession.swift */,
+			);
+			path = ON4KST;
+			sourceTree = "<group>";
+		};
+		03A6835874A40F985192A7A2 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				9862234443C704DD98757B46 /* ChatRoomListView.swift */,
+				62D63CEF75BAEF55E863E33B /* ChatRoomView.swift */,
+				14D26485CD0F7AB98A4C4256 /* ChatSupportViews.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
 		1371E593FE18FD934DBAD2D9 /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -316,6 +353,7 @@
 				8033725A8E1E4C16F0BE2576 /* WSJTXMessage.swift */,
 				4F5E74769E2B699BCAA597B7 /* XMLResponseParser.swift */,
 				A07703DC81BE1E8544EC88E4 /* Spots */,
+				C0C91CD90932E8F28B3F4C03 /* ON4KST */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -438,6 +476,7 @@
 				FAB8287FE642D71BCB719D0C /* TabReturnStackTests.swift */,
 				E1C48E5879F0405B6DCABF48 /* TransportTests.swift */,
 				E3A9E8083EEE13CBB5E48857 /* WSJTXMessageTests.swift */,
+				233446CCE3133A5DF5A43518 /* ON4KSTProtocolTests.swift */,
 			);
 			path = AmateurRadioLogTests;
 			sourceTree = "<group>";
@@ -553,6 +592,7 @@
 				4AF5E0F01790D8C55152ED64 /* Settings */,
 				F6B0D938CDA823EC2899E98F /* Shared */,
 				508E2A639159BE0426EDE1D3 /* Spots */,
+				03A6835874A40F985192A7A2 /* Chat */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -713,6 +753,7 @@
 				0BF027C845D9193C72367C96 /* TabReturnStackTests.swift in Sources */,
 				91D29D069A10377F0072EF0D /* TransportTests.swift in Sources */,
 				80FC2164F1A89D9F086A7B88 /* WSJTXMessageTests.swift in Sources */,
+				7158C90577B785DBE40E99DD /* ON4KSTProtocolTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -797,6 +838,13 @@
 				D061A16E668E960C2AF332DF /* WSJTXListener.swift in Sources */,
 				0756D0FDF747B7FCB0205031 /* WSJTXMessage.swift in Sources */,
 				3E2D570DF678103C64D88A1D /* XMLResponseParser.swift in Sources */,
+				43401A32081AD3CC4083909D /* ON4KSTClient.swift in Sources */,
+				23BD86708AAADB9C89195AF0 /* ON4KSTMessage.swift in Sources */,
+				7C9AF5B9C4CE42FC2FB1036A /* ON4KSTProtocol.swift in Sources */,
+				D3997D7B3075D4CCB4A1EF6A /* ON4KSTSession.swift in Sources */,
+				4C41F89B7872CA1BC6CA949D /* ChatRoomListView.swift in Sources */,
+				CCC1FEB52B20EB1AD51FCF09 /* ChatRoomView.swift in Sources */,
+				EFF9FAE7CD38D06BDDC1FC0D /* ChatSupportViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

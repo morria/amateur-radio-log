@@ -19,6 +19,8 @@ struct SettingsView: View {
                 .tabItem { Label("Rig Control", systemImage: "radio") }
             SpotsSettingsView()
                 .tabItem { Label("Spots", systemImage: "dot.radiowaves.up.forward") }
+            ON4KSTSettingsView()
+                .tabItem { Label("ON4KST", systemImage: "bubble.left.and.bubble.right") }
         }
         .frame(width: 450, height: 340)
         #else
@@ -66,6 +68,13 @@ struct SettingsView: View {
                 Text("DX Cluster & RBN")
             } footer: {
                 Text("Live DX spots on the Spots tab. Cluster login uses your station callsign. The Reverse Beacon Network is high-volume; spots below the minimum SNR are dropped, and repeats of the same station on a band are suppressed.")
+            }
+            Section {
+                ON4KSTSettingsView()
+            } header: {
+                Text("ON4KST Chat")
+            } footer: {
+                Text("Sked chat for VHF, UHF, microwave and the low bands, on the Chat tab. Register free at on4kst.org. The service offers no encrypted connection and echoes your password back during sign-in, so use a password you don't use anywhere else \u{2014} it is stored in your Keychain and never written anywhere else.")
             }
             Section {
                 BetaSettingsView()
@@ -926,6 +935,102 @@ struct PocketCatSettingsSection: View {
         // Reconnect through AppState so `rigControlActive` and the mirrored
         // `rigState` follow the new selection.
         appState.restartRig()
+    }
+}
+
+// MARK: - ON4KST Chat Settings
+
+/// ON4KST sign-in. Credentials live in the Keychain (never in AppSettings —
+/// that record syncs through CloudKit and this password crosses the network
+/// in cleartext). Saving reloads the live session, which drops any connection
+/// running under the old login.
+struct ON4KSTSettingsView: View {
+    @Environment(AppState.self) private var appState
+
+    @State private var callsign = ""
+    @State private var password = ""
+    @State private var status = ""
+    @State private var statusIsError = false
+
+    var body: some View {
+        #if os(macOS)
+        Form {
+            Section("ON4KST Account") {
+                TextField("Callsign", text: $callsign)
+                    .autocorrectionDisabled()
+                SecureField("ON4KST Password", text: $password)
+            }
+            Section {
+                HStack {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                    Spacer()
+                    Button("Sign Out") { signOut() }
+                        .disabled(callsign.isEmpty && password.isEmpty)
+                }
+                if !status.isEmpty {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(statusIsError ? .red : .green)
+                }
+                Text("The service has no encrypted connection and echoes your password back during sign-in. Use a password you don't use anywhere else.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .onAppear { load() }
+        #else
+        Group {
+            TextField("Callsign", text: $callsign)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.characters)
+                .textContentType(.username)
+            SecureField("ON4KST Password", text: $password)
+                .textContentType(.password)
+            Button("Save ON4KST Sign-In") { save() }
+                .disabled(!canSave)
+            if !callsign.isEmpty || !password.isEmpty {
+                Button("Sign Out of ON4KST", role: .destructive) { signOut() }
+            }
+            if !status.isEmpty {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(statusIsError ? .red : .green)
+            }
+        }
+        .onAppear { load() }
+        #endif
+    }
+
+    private var canSave: Bool {
+        !callsign.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty
+    }
+
+    private func load() {
+        let credentials = KeychainManager.loadCredentials(for: .on4kst)
+        callsign = credentials.username
+        password = credentials.password
+    }
+
+    private func save() {
+        do {
+            try appState.on4kstSession.saveCredentials(callsign: callsign, password: password)
+            callsign = appState.on4kstSession.callsign
+            status = String(localized: "Saved")
+            statusIsError = false
+        } catch {
+            status = String(localized: "Save failed: \(error.localizedDescription)")
+            statusIsError = true
+        }
+    }
+
+    private func signOut() {
+        appState.on4kstSession.signOut()
+        callsign = ""
+        password = ""
+        status = String(localized: "Signed out")
+        statusIsError = false
     }
 }
 

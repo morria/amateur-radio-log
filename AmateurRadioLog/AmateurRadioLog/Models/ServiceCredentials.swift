@@ -11,4 +11,5 @@ enum ServiceType: String, CaseIterable, Sendable {
     case qrz = "QRZ.com"
     case hamqth = "HamQTH.com"
     case lotw = "LoTW"
+    case on4kst = "ON4KST"
 }

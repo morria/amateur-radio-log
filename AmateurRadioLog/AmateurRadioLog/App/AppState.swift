@@ -450,6 +450,13 @@ final class AppState {
     let callsignDatabase = CallsignDatabase.shared
     let lotwService = LoTWService()
 
+    // MARK: - ON4KST Chat
+
+    /// The ON4KST telnet chat session. Foreground-only (iOS suspends the
+    /// process and the socket dies with it) and lazy about the Keychain: it
+    /// costs nothing until the Chat tab is opened.
+    let on4kstSession = ON4KSTSession()
+
     // MARK: - Spots
 
     /// Main-actor snapshot store the Spots tab renders from.

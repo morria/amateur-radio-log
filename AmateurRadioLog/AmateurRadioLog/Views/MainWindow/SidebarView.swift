@@ -37,6 +37,10 @@ struct SidebarView: View {
             Section("Operations") {
                 viewsRow(.entry)
                 viewsRow(.spots)
+                // Unread ON4KST traffic is worth surfacing outside the tab:
+                // a directed sked offer is time-sensitive.
+                viewsRow(.chat)
+                    .badge(appState.on4kstSession.unreadCount)
 
                 Button(action: { appState.showOperationScreen = true }) {
                     Label {
