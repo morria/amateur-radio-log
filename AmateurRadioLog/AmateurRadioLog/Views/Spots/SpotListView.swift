@@ -83,9 +83,13 @@ struct SpotListView: View {
             }
         }
         .onAppear {
-            rebuildLookupSets()
+            // Filter first (it only builds a struct), then get the fetches in
+            // flight, and only then walk the log for the worked-before sets —
+            // that scan touches every QSO on the main actor, and there is no
+            // reason for the network to queue behind it.
             pushFilter()
             appState.startSpotPolling()
+            rebuildLookupSets()
         }
         .onDisappear { appState.stopSpotPolling() }
         // iOS keeps this view mounted (opacity 0) across tab switches, so
@@ -102,7 +106,7 @@ struct SpotListView: View {
             case .active where appState.selectedTab == .spots:
                 appState.startSpotPolling()
             case .background:
-                appState.stopSpotPolling()
+                appState.stopSpotPolling(force: true)
             default:
                 break
             }
@@ -333,7 +337,12 @@ struct SpotListView: View {
                             workedBefore: isWorkedBefore(spot),
                             workedThisOperation: isWorkedInOperation(spot),
                             onOpen: { openEditor(spot) },
-                            onLogNow: { logNow(spot) })
+                            onLogNow: { logNow(spot) },
+                            onTune: appState.canTuneRig ? { tune(spot) } : nil,
+                            isOnFrequency: isOnFrequency(spot))
+                        .listRowBackground(isOnFrequency(spot)
+                                           ? Color.accentColor.opacity(0.12)
+                                           : nil)
                     }
                 }
             }
@@ -364,6 +373,21 @@ struct SpotListView: View {
     }
 
     // MARK: - Badges
+
+    /// Whether the radio is currently sitting on this spot's frequency.
+    ///
+    /// The tolerance is 200 Hz. A spot's frequency is only ever quoted to the
+    /// nearest 0.1 kHz, an operator zero-beating SSB or hunting a CW note
+    /// lands tens of hertz off, and the dial reads back exactly — so an
+    /// equality test would essentially never match. Wide enough to survive
+    /// that, narrow enough not to claim two spots on the same band.
+    private static let onFrequencyToleranceMHz = 0.0002
+
+    private func isOnFrequency(_ spot: Spot) -> Bool {
+        guard appState.rigState.connected,
+              let dial = appState.rigState.frequencyMHz, dial > 0 else { return false }
+        return abs(dial - spot.frequencyMHz) <= Self.onFrequencyToleranceMHz
+    }
 
     private func isWorkedBefore(_ spot: Spot) -> Bool {
         let call = spot.activatorCall.uppercased()
@@ -431,6 +455,14 @@ struct SpotListView: View {
     private func openEditor(_ spot: Spot) {
         appState.tuneRig(toMHz: spot.frequencyMHz, spotMode: spot.mode)
         editorItem = SpotEditorItem(data: QSOEditData(from: spot, defaults: currentDefaults()))
+    }
+
+    /// Swipe-right: tune the radio to the spot without opening the editor,
+    /// for working down a band without committing to log each station.
+    private func tune(_ spot: Spot) {
+        appState.tuneRig(toMHz: spot.frequencyMHz, spotMode: spot.mode)
+        let freq = String(format: "%.3f", spot.frequencyMHz)
+        showConfirmation(String(localized: "Tuned to \(freq) MHz"))
     }
 
     /// Context-menu / swipe "Log Now": insert directly with mode-appropriate
@@ -544,15 +576,28 @@ private struct SpotRowView: View {
     var workedThisOperation: Bool = false
     var onOpen: () -> Void
     var onLogNow: () -> Void
+    /// nil when no tuning-capable rig is connected, which is what hides the
+    /// swipe action rather than offering one that would silently do nothing.
+    var onTune: (() -> Void)?
+    /// The radio is sitting on this spot's frequency right now.
+    var isOnFrequency: Bool = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: spot.source.icon)
-                .foregroundStyle(spot.source.tint)
+            // On-frequency swaps the source glyph for a transmitting antenna,
+            // so the cue survives for anyone who can't rely on the tint alone.
+            Image(systemName: isOnFrequency
+                  ? "antenna.radiowaves.left.and.right"
+                  : spot.source.icon)
+                .foregroundStyle(isOnFrequency ? AnyShapeStyle(.tint)
+                                               : AnyShapeStyle(spot.source.tint))
                 .font(.callout)
                 .frame(width: 22)
+                .symbolEffect(.pulse, isActive: isOnFrequency)
                 #if os(macOS)
-                .help(spot.source.displayName)
+                .help(isOnFrequency
+                      ? String(localized: "The radio is tuned to this spot")
+                      : spot.source.displayName)
                 #endif
 
             VStack(alignment: .leading, spacing: 2) {
@@ -627,6 +672,17 @@ private struct SpotRowView: View {
                 Label("Log Now", systemImage: "bolt.fill")
             }
             .tint(.green)
+        }
+        // Dragging a row to the right tunes the radio to it. Only offered
+        // when a rig that accepts commands is connected — the network
+        // protocols are polled read-only.
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if let onTune {
+                Button(action: onTune) {
+                    Label("Tune", systemImage: "dial.medium")
+                }
+                .tint(.blue)
+            }
         }
         #endif
     }

@@ -19,6 +19,17 @@ actor SpotService {
     private var lastPublish: Date = .distantPast
     private(set) var isRunning = false
 
+    /// True once at least one provider has delivered a batch — even an empty
+    /// one.
+    ///
+    /// Until then the store's `lastUpdated` stays nil, which is what lets the
+    /// UI tell "still loading" apart from "loaded, and nothing matched".
+    /// Without this, applying the filter at tab-appear publishes an empty
+    /// snapshot before any network call has returned, and the list claims
+    /// "No spots match the current filters" while it is in fact still
+    /// waiting — indistinguishable, to the operator, from loading forever.
+    private var didReceiveAnyBatch = false
+
     init(store: SpotStore? = nil,
          providers: [any SpotProvider] = [],
          minPublishInterval: TimeInterval = 1.0,
@@ -90,7 +101,11 @@ actor SpotService {
     /// - otherwise the newest timestamp wins.
     func ingest(_ batch: [Spot]) {
         let reference = now()
-        var changed = false
+        // The first batch always publishes, even when it is empty or every
+        // spot in it is filtered out: that transition is what clears the
+        // loading indicator.
+        var changed = !didReceiveAnyBatch
+        didReceiveAnyBatch = true
         for spot in batch {
             guard !spot.isExpired(at: reference) else { continue }
             let key = spot.dedupeKey
@@ -152,9 +167,13 @@ actor SpotService {
         lastPublish = now()
         guard let store else { return }
         let snap = snapshot()
+        // Only stamp `lastUpdated` once a source has actually reported —
+        // a filter change on its own must not make an empty list look
+        // settled while the first fetches are still in flight.
+        let loaded = didReceiveAnyBatch
         await MainActor.run {
             store.spots = snap
-            store.lastUpdated = Date()
+            if loaded { store.lastUpdated = Date() }
         }
     }
 }

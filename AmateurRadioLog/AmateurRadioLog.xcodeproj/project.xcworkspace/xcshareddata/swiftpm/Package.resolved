@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "git@github.com:morria/pocket-cat.git",
       "state" : {
-        "revision" : "0aa87634ce1bb31c9c07dd1153c7bdb9867d800b",
-        "version" : "1.1.1"
+        "revision" : "1cb77feff0baa3eda86ef636792b2819199e75a9",
+        "version" : "3.1.0"
       }
     }
   ],

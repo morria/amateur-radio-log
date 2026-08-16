@@ -112,6 +112,7 @@ final class QSO {
     var qrzLogId: String?
     var qrzSynced: Bool = false
     var hamqthSynced: Bool = false
+    var wavelogSynced: Bool = false
     var lotwStatus: String = "none"
 
     // Overflow ADIF fields as JSON string

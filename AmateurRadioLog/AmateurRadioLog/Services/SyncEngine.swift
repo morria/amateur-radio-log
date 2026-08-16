@@ -92,6 +92,12 @@ struct SyncEngine: Sendable {
         try await uploadUnsynced(to: remote, service: .hamqth, onPhase: onPhase, progress: progress)
     }
 
+    func syncWavelog(remote: some QSOUploader,
+                     onPhase: SyncPhaseHandler? = nil,
+                     progress: SyncProgressHandler? = nil) async throws -> UploadSyncSummary {
+        try await uploadUnsynced(to: remote, service: .wavelog, onPhase: onPhase, progress: progress)
+    }
+
     // MARK: LoTW (download-only)
 
     func syncLoTW(remote: some LoTWRemote,

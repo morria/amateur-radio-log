@@ -7,6 +7,7 @@ struct SidebarView: View {
     @State private var showQRZSync = false
     @State private var showLoTWSync = false
     @State private var showHamQTHSync = false
+    @AppStorage(WavelogPreferences.enabledKey) private var wavelogEnabled = false
     @State private var showSettings = false
     @State private var showFieldDay = false
     @State private var showOperationList = false
@@ -30,7 +31,6 @@ struct SidebarView: View {
             // The log, three ways — no header needed.
             Section {
                 viewsRow(.log)
-                viewsRow(.map)
                 viewsRow(.stats)
             }
 
@@ -102,6 +102,18 @@ struct SidebarView: View {
                 SidebarSyncRow(service: .hamqth, title: "Upload to HamQTH",
                                icon: "arrow.up.circle") {
                     showHamQTHSync = true
+                }
+                // Shown as soon as Wavelog is switched on. Read through
+                // @AppStorage rather than WavelogPreferences: a direct
+                // UserDefaults read inside the body creates no SwiftUI
+                // dependency, so the row would not appear until something
+                // else happened to invalidate the sidebar. If the URL, key
+                // or profile is still missing, the sync itself says which.
+                if wavelogEnabled {
+                    SidebarSyncRow(service: .wavelog, title: "Sync Wavelog",
+                                   icon: "arrow.up.circle") {
+                        appState.startSync(.wavelog, context: modelContext)
+                    }
                 }
                 Button(action: { appState.requestLogExport() }) {
                     Label("Export Log…", systemImage: "square.and.arrow.up")

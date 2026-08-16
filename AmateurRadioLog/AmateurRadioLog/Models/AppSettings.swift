@@ -34,6 +34,7 @@ final class AppSettings {
     var lastQRZSync: Date?
     var lastLoTWSync: Date?
     var lastHamQTHSync: Date?
+    var lastWavelogSync: Date?
 
     /// DX cluster / RBN telnet spot sources. Non-optional with defaults so
     /// the CloudKit schema addition is safe (the cluster login identity is

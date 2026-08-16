@@ -2,6 +2,9 @@ import SwiftUI
 
 struct SearchBarView: View {
     @Environment(AppState.self) private var appState
+    /// The log sheet sits inside the globe screen, which already shows a back
+    /// button over the map — a second one would be two ways out stacked.
+    var showsBackButton = true
     #if os(iOS)
     @Environment(\.dismiss) private var dismiss
     #endif
@@ -19,6 +22,7 @@ struct SearchBarView: View {
         VStack(spacing: 6) {
             HStack(spacing: 12) {
                 #if os(iOS)
+                if showsBackButton {
                 Button(action: {
                     // A drill-in (stats bar, map legend/callout) navigated
                     // here by switching the tab — back retraces it. Otherwise
@@ -32,6 +36,7 @@ struct SearchBarView: View {
                 }
                 .accessibilityLabel(Text("Back"))
                 .accessibilityIdentifier("logBackButton")
+                }
                 #endif
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)

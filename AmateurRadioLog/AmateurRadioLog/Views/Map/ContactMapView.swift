@@ -19,7 +19,16 @@ struct QSOMapPin: Identifiable, Hashable {
 
 /// A grid-cell bucket of pins rendered as a single count badge when the map
 /// is showing more pins than can be usefully drawn individually.
-private struct MapCluster: Identifiable {
+private struct MapCluster: Identifiable, Equatable {
+    /// Compared by identity and contents, not by `region` (which
+    /// `MKCoordinateRegion` cannot compare and which is derived from the same
+    /// pins anyway). Equatability is what stops a re-cluster that produced an
+    /// identical result from invalidating the view.
+    static func == (a: MapCluster, b: MapCluster) -> Bool {
+        a.id == b.id && a.count == b.count
+            && a.latitude == b.latitude && a.longitude == b.longitude
+    }
+
     let id: String
     let latitude: Double
     let longitude: Double
@@ -127,7 +136,21 @@ struct ContactMapView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
     let qsos: [QSO]
-    @State private var cameraPosition: MapCameraPosition = .automatic
+    /// Hides every overlay except the back button. The merged log screen puts
+    /// the filters, the legend and the counts into its sheet, so leaving them
+    /// floating over the globe as well would duplicate the controls.
+    var chromeless = false
+    /// Starts on a fixed globe camera rather than `.automatic`.
+    ///
+    /// `.automatic` re-frames itself to fit the annotations. With the map now
+    /// mounted on the launch tab and a full log's worth of pins, that couples
+    /// the camera to the annotation set: re-framing fires
+    /// `onMapCameraChange`, which re-clusters, which changes the annotations,
+    /// which re-frames. A fixed camera breaks that coupling, and "the whole
+    /// globe" is the right opening view for a log anyway.
+    @State private var cameraPosition: MapCameraPosition = .camera(
+        MapCamera(centerCoordinate: CLLocationCoordinate2D(latitude: 20, longitude: -40),
+                  distance: ContactMapView.globeCameraDistance))
     @State private var selectedPin: QSOMapPin?
     @State private var showFilters = false
     // Collapsed by default: the legend is a small tappable pill until the
@@ -148,62 +171,24 @@ struct ContactMapView: View {
     private static let clusteringThreshold = 500
     /// Number of grid cells across the visible camera span.
     private static let clusterGridDivisions = 12.0
-
-    // MARK: Globe mode
-    //
-    // The standard (Mercator) style clamps zoom-out at "world fills the
-    // viewport"; imagery keeps going and turns into a 3D globe. So when the
-    // camera reaches the flat map's limit we swap the style to imagery and
-    // let the user keep pulling back; zooming back in swaps Mercator back.
-    // Pin annotations are depth-occluded on the far side of the globe
-    // automatically (verified), so the pin layer needs no changes.
-
-    /// Whether the map is currently rendering as a globe (standard style
-    /// swapped for imagery at far zoom).
-    @State private var globeMode = false
-    /// Enter the globe at the flat map's zoom-out clamp. Which axis hits the
-    /// clamp depends on viewport aspect: tall viewports fill the world's
-    /// height first, wide ones its width. Measured spans AT the clamp:
-    /// iPhone portrait lat≈152, iPad 11" portrait lat≈150 — so the
-    /// thresholds sit well below with margin (a ±65°-latitude view is
-    /// world-scale anyway; the globe is the right rendering there).
-    private static let globeEnterLonDegrees = 260.0
-    private static let globeEnterLatDegrees = 130.0
-    /// Leave it once the camera is back below this distance (meters) — well
-    /// under the ~14,000-20,000 km where viewports hit the clamp, so the
-    /// boundary doesn't flap.
-    private static let globeExitDistance = 10_000_000.0
-    /// Zoom-to-fit switches to the globe for logs wider than this.
+    /// Zoom-to-fit frames the whole globe for logs wider than this.
     private static let globeFitSpanDegrees = 240.0
 
-    #if DEBUG
-    /// Last camera values, surfaced through the fit button's accessibility
-    /// value so simulator UI runs can see why globe mode did(n't) engage.
-    @State private var debugCamera = ""
-    #endif
+    // MARK: Globe
+    //
+    // The map is always a globe. It used to render flat (Mercator) and swap
+    // to imagery once the camera passed the flat projection's zoom-out clamp,
+    // which meant the projection changed under the operator mid-gesture and
+    // needed threshold tuning per viewport aspect. A log is a world-scale
+    // thing; a globe is simply the right rendering for it, all the time.
+    //
+    // Pin annotations are depth-occluded on the far side of the globe
+    // automatically, so the pin layer needs no changes.
 
-    private var projectionDebugValue: String {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-uiMapDebug") {
-            return (globeMode ? "globe " : "flat ") + debugCamera
-        }
-        #endif
-        return globeMode ? "globe" : "flat"
-    }
-
-    private func updateGlobeMode(_ context: MapCameraUpdateContext) {
-        let span = context.region.span
-        #if DEBUG
-        debugCamera = "lat=\(Int(span.latitudeDelta)) lon=\(Int(span.longitudeDelta)) d=\(Int(context.camera.distance / 1000))km"
-        #endif
-        if !globeMode,
-           span.longitudeDelta >= Self.globeEnterLonDegrees
-            || span.latitudeDelta >= Self.globeEnterLatDegrees {
-            globeMode = true
-        } else if globeMode, context.camera.distance < Self.globeExitDistance {
-            globeMode = false
-        }
-    }
+    /// Far enough out that MapKit renders the Earth as a globe, but close
+    /// enough that the globe fills the frame rather than sitting as a small
+    /// disc in a field of black.
+    static let globeCameraDistance: CLLocationDistance = 26_000_000
 
     /// Composite key describing every input that affects which pins exist.
     /// Color-by is included so legend/pin styling inputs stay in sync, and the
@@ -336,13 +321,11 @@ struct ContactMapView: View {
             cameraPosition = .camera(MapCamera(
                 centerCoordinate: CLLocationCoordinate2D(latitude: 30, longitude: -40),
                 distance: distance))
-            globeMode = distance > Self.globeExitDistance
             return
         }
         #endif
         if let camera = appState.lastMapCamera {
             cameraPosition = .camera(camera)
-            globeMode = camera.distance > Self.globeExitDistance
         }
     }
 
@@ -400,7 +383,7 @@ struct ContactMapView: View {
     private func recomputeClusters() {
         guard pins.count > Self.clusteringThreshold else {
             if !clusters.isEmpty { clusters = [] }
-            if displayPins.count != pins.count { displayPins = pins }
+            if displayPins != pins { displayPins = pins }
             return
         }
 
@@ -453,15 +436,26 @@ struct ContactMapView: View {
             ))
         }
 
-        displayPins = singles
-        clusters = grouped.sorted { $0.id < $1.id }
+        // Assign only on a real change.
+        //
+        // These used to be written every pass. Because the values feed the
+        // map's annotations, and an `.automatic` camera re-frames itself to
+        // fit them, an unconditional write closed a loop: cluster -> annotations
+        // change -> camera re-frames -> onMapCameraChange -> cluster again.
+        // With a few hundred pins that was invisible; with a real log it pinned
+        // the CPU and never drew a frame.
+        let sorted = grouped.sorted { $0.id < $1.id }
+        if displayPins != singles { displayPins = singles }
+        if clusters != sorted { clusters = sorted }
     }
 
     // MARK: - Shared Map Content
 
     private var mapContent: some View {
         ZStack(alignment: .topTrailing) {
-            Map(position: $cameraPosition, selection: $selectedPin) {
+            Map(position: $cameraPosition,
+                interactionModes: .all,
+                selection: $selectedPin) {
                 ForEach(displayPins) { pin in
                     Annotation(pin.callsign, coordinate: pin.coordinate) {
                         pinView(for: pin)
@@ -482,7 +476,6 @@ struct ContactMapView: View {
                 // being unmounted on tab switches (macOS)
                 appState.lastMapCamera = context.camera
                 currentSpan = context.region.span
-                updateGlobeMode(context)
                 recomputeClusters()
             }
             .onChange(of: pinRebuildKey) { _, _ in
@@ -516,6 +509,7 @@ struct ContactMapView: View {
             #endif
 
             // Top-right: filter + zoom-to-fit buttons
+            if !chromeless {
             VStack {
                 HStack {
                     Spacer()
@@ -561,7 +555,6 @@ struct ContactMapView: View {
                         .accessibilityIdentifier("fitAllButton")
                         // Projection state, exposed so UI tests can assert
                         // the globe <-> Mercator transitions.
-                        .accessibilityValue(projectionDebugValue)
                         #if os(macOS)
                         .help("Zoom to fit all contacts")
                         #endif
@@ -585,6 +578,7 @@ struct ContactMapView: View {
             .padding()
             // Keep clear of MapKit's bottom-left attribution.
             .padding(.bottom, 12)
+            }
         }
     }
 
@@ -647,7 +641,6 @@ struct ContactMapView: View {
             longitude: (minLon + maxLon) / 2
         )
         if lonSpan >= Self.globeFitSpanDegrees {
-            globeMode = true
             withAnimation(.easeInOut) {
                 cameraPosition = .camera(MapCamera(
                     centerCoordinate: center, distance: 42_000_000))
@@ -690,12 +683,22 @@ struct ContactMapView: View {
             .shadow(radius: 1)
             .frame(width: targetSize, height: targetSize)
             .contentShape(Circle())
+            // Selection is delivered by Map through the annotation's `.tag`,
+            // so the view itself never needs to capture touches. Leaving it
+            // hit-testable meant a 44pt target per pin swallowing the start of
+            // a pinch or a drag — on a dense globe almost every gesture begins
+            // on top of a pin, so zoom and rotate simply stopped working.
+            .allowsHitTesting(false)
     }
 
     private func clusterView(_ cluster: MapCluster) -> some View {
         let badgeSize: CGFloat = cluster.count >= 100 ? 34 : 28
         #if os(iOS)
-        let targetSize: CGFloat = 44
+        // Deliberately the badge's own size rather than the 44pt minimum.
+        // A cluster stays tappable (it is already large), and every extra
+        // point of target is map the operator cannot start a pinch or a
+        // rotation on — clusters bunch together, so the excess compounds.
+        let targetSize: CGFloat = badgeSize
         #else
         let targetSize: CGFloat = badgeSize + 6
         #endif
@@ -817,20 +820,15 @@ struct ContactMapView: View {
 
     // MARK: - Map Style
 
+    /// Always a globe. Only `.hybrid` differs, keeping its labels — the flat
+    /// `.standard` projection is gone, so the style choice is now "plain
+    /// imagery or imagery with labels".
     private var currentMapStyle: MapStyle {
-        // Far enough out, every style becomes the realistic globe; zooming
-        // back in restores the user's choice (standard = flat Mercator).
-        if globeMode {
-            switch appState.mapStyle {
-            case .standard, .satellite: return .imagery(elevation: .realistic)
-            case .hybrid:               return .hybrid(elevation: .realistic,
-                                                       pointsOfInterest: .excludingAll)
-            }
-        }
         switch appState.mapStyle {
-        case .standard:  return .standard(pointsOfInterest: .excludingAll)
-        case .satellite: return .imagery
-        case .hybrid:    return .hybrid(pointsOfInterest: .excludingAll)
+        case .standard, .satellite:
+            return .imagery(elevation: .realistic)
+        case .hybrid:
+            return .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll)
         }
     }
 

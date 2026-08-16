@@ -15,6 +15,9 @@ struct SettingsView: View {
                 .tabItem { Label("LoTW", systemImage: "checkmark.seal") }
             WSJTXSettingsView()
                 .tabItem { Label("WSJT-X", systemImage: "dot.radiowaves.left.and.right") }
+            Form { WavelogSettingsView() }
+                .padding()
+                .tabItem { Label("Wavelog", systemImage: "server.rack") }
             RigSettingsView()
                 .tabItem { Label("Rig Control", systemImage: "radio") }
             SpotsSettingsView()
@@ -32,6 +35,13 @@ struct SettingsView: View {
             }
             Section("Defaults") {
                 GeneralDefaultsView()
+            }
+            Section {
+                DisplaySettingsView()
+            } header: {
+                Text("Display")
+            } footer: {
+                Text("Stops the screen locking while Amateur Radio Log is open \u{2014} useful when the phone is propped up as a logging screen. Normal auto-lock resumes as soon as you switch apps, so this can't flatten the battery in your pocket.")
             }
             Section("QRZ.com") {
                 QRZSettingsView()
@@ -52,6 +62,13 @@ struct SettingsView: View {
                 Text("WSJT-X")
             } footer: {
                 Text("In WSJT-X, open Settings \u{2192} Reporting and set \u{201C}UDP Server\u{201D} to this device's IP address (both devices must be on the same network). Contacts you log in WSJT-X appear here automatically.")
+            }
+            Section {
+                WavelogSettingsView()
+            } header: {
+                Text("Wavelog")
+            } footer: {
+                Text("Uploads contacts to a self-hosted Wavelog instance. Upload-only \u{2014} Wavelog's API has no bulk download to pull back from. The URL and station profile are stored on this device, so a phone reaching the instance by one name won't overwrite the Mac's.")
             }
             Section {
                 RigSettingsView()
@@ -78,6 +95,142 @@ struct SettingsView: View {
         #endif
     }
 }
+
+// MARK: - Wavelog
+
+/// Wavelog (self-hosted logbook) settings: instance URL, API key and which
+/// station profile QSOs are filed against.
+///
+/// The URL and profile live in UserDefaults (per device — a self-hosted
+/// instance is reached by a different name from the phone than from the shack
+/// Mac) while the API key goes to the Keychain, like every other credential.
+struct WavelogSettingsView: View {
+    @Environment(AppState.self) private var appState
+    @AppStorage(WavelogPreferences.enabledKey) private var enabled = false
+    @AppStorage(WavelogPreferences.urlKey) private var urlString = ""
+    @AppStorage(WavelogPreferences.stationProfileKey) private var stationProfileId = ""
+
+    @State private var apiKey = ""
+    @State private var profiles: [WavelogStationProfile] = []
+    @State private var status = ""
+    @State private var statusIsError = false
+    @State private var isTesting = false
+
+    var body: some View {
+        Toggle("Enable Wavelog Sync", isOn: $enabled)
+            .onAppear { apiKey = WavelogPreferences.apiKey }
+
+        TextField("Instance URL", text: $urlString,
+                  prompt: Text(verbatim: "http://wavelog.local"))
+            .autocorrectionDisabled()
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            .keyboardType(.URL)
+            #endif
+
+        SecureField("API Key", text: $apiKey)
+            .autocorrectionDisabled()
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            #endif
+            .onSubmit { saveKey() }
+
+        if !profiles.isEmpty {
+            Picker("Station Profile", selection: $stationProfileId) {
+                Text("Not Set").tag("")
+                ForEach(profiles) { profile in
+                    Text(profile.displayName).tag(profile.id)
+                }
+            }
+        }
+
+        Button {
+            Task { await testConnection() }
+        } label: {
+            HStack {
+                Text(profiles.isEmpty ? "Connect" : "Refresh Profiles")
+                Spacer()
+                if isTesting { ProgressView().controlSize(.small) }
+            }
+        }
+        .disabled(isTesting)
+
+        if !status.isEmpty {
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(statusIsError ? .red : .green)
+        }
+    }
+
+    private func saveKey() {
+        try? WavelogPreferences.saveAPIKey(apiKey)
+    }
+
+    /// Validates the key and loads the station profiles in one pass — a key
+    /// that authenticates but has no profile to file into is still unusable,
+    /// so both are checked before reporting success.
+    private func testConnection() async {
+        isTesting = true
+        status = ""
+        saveKey()
+        defer { isTesting = false }
+
+        guard let config = WavelogService.Configuration(
+            urlString: urlString, apiKey: apiKey, stationProfileId: stationProfileId) else {
+            status = String(localized: "Enter your Wavelog URL and API key")
+            statusIsError = true
+            return
+        }
+
+        do {
+            let auth = try await appState.wavelogService.validate(config)
+            let loaded = try await appState.wavelogService.stationProfiles(config)
+            profiles = loaded
+            // Only one profile: pick it, since there is no meaningful choice.
+            if stationProfileId.isEmpty, loaded.count == 1 {
+                stationProfileId = loaded[0].id
+            }
+            if !auth.canWrite {
+                status = String(localized: "Key is valid but read-only — uploads will fail")
+                statusIsError = true
+            } else if loaded.isEmpty {
+                status = String(localized: "Connected, but this account has no station profiles")
+                statusIsError = true
+            } else {
+                status = String(localized: "Connected — \(loaded.count) station profile(s)")
+                statusIsError = false
+            }
+        } catch {
+            status = String(localized: "Failed: \(error.localizedDescription)")
+            statusIsError = true
+        }
+    }
+}
+
+// MARK: - Display
+
+/// Per-device display behaviour. UserDefaults rather than AppSettings for
+/// the same reason as the rig and WSJT-X preferences: whether a device is
+/// allowed to sleep is a property of that device — an iPhone propped up in
+/// the field and a Mac in the shack want different answers, and syncing the
+/// choice through CloudKit would have them fight.
+enum DisplayPreferences {
+    static let keepScreenAwakeKey = "keepScreenAwake"
+
+    static var keepScreenAwake: Bool {
+        UserDefaults.standard.bool(forKey: keepScreenAwakeKey)
+    }
+}
+
+#if os(iOS)
+struct DisplaySettingsView: View {
+    @AppStorage(DisplayPreferences.keepScreenAwakeKey) private var keepScreenAwake = false
+
+    var body: some View {
+        Toggle("Keep Screen Awake", isOn: $keepScreenAwake)
+    }
+}
+#endif
 
 // MARK: - Beta Features
 
@@ -856,9 +1009,17 @@ struct PocketCatSettingsSection: View {
                     HStack {
                         Text(bridge.name ?? String(localized: "Unnamed bridge"))
                         Spacer()
-                        Text("\(bridge.rssi) dBm")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        // An already-bonded bridge is retrieved rather than
+                        // scanned, so it has no advertisement to measure.
+                        if bridge.isAlreadyConnected {
+                            Text("Already connected")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if let rssi = bridge.rssi {
+                            Text("\(rssi) dBm")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 #if os(macOS)
@@ -902,7 +1063,12 @@ struct PocketCatSettingsSection: View {
             LabeledContent("Mode", value: mode)
         }
         if let power = service.reading.powerWatts {
-            LabeledContent("Power", value: "\(Int(power)) W")
+            // Fractional on radios that report tenths of a watt (QMX), whole
+            // watts on the Yaesus — don't render "5.0 W" for the latter.
+            let text = power == power.rounded()
+                ? String(format: "%.0f W", power)
+                : String(format: "%.1f W", power)
+            LabeledContent("Power", value: text)
         }
         if let error = service.lastError, !service.isConnected {
             Text(error)

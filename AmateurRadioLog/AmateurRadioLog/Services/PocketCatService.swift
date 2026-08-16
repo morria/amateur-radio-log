@@ -216,7 +216,11 @@ final class PocketCatService {
     struct BridgeInfo: Identifiable, Equatable {
         let id: UUID
         let name: String?
-        let rssi: Int
+        /// nil for a bridge iOS already has connected: the firmware stops
+        /// advertising once connected, so such a bridge is retrieved rather
+        /// than scanned and has no advertisement to measure.
+        let rssi: Int?
+        let isAlreadyConnected: Bool
     }
 
     private(set) var reading = Reading()
@@ -315,13 +319,22 @@ final class PocketCatService {
     }
 
     private func noteDiscovered(_ bridge: DiscoveredBridge) {
-        let info = BridgeInfo(id: bridge.id, name: bridge.name, rssi: bridge.rssi)
+        let info = BridgeInfo(id: bridge.id, name: bridge.name,
+                              rssi: bridge.rssi,
+                              isAlreadyConnected: bridge.isAlreadyConnected)
         if let index = discovered.firstIndex(where: { $0.id == info.id }) {
             discovered[index] = info
         } else {
             discovered.append(info)
         }
-        discovered.sort { $0.rssi > $1.rssi }
+        // Already-connected bridges first — they are the ones the operator is
+        // most likely reaching for, and they carry no RSSI to rank by.
+        discovered.sort {
+            if $0.isAlreadyConnected != $1.isAlreadyConnected {
+                return $0.isAlreadyConnected
+            }
+            return ($0.rssi ?? Int.min) > ($1.rssi ?? Int.min)
+        }
     }
 
     // MARK: Connection
@@ -401,7 +414,9 @@ final class PocketCatService {
         // The snapshot is the single source of truth for power: the library
         // fills it at connect and republishes on every `readPower`, so the
         // refresh task only has to ask — it never writes here itself.
-        next.powerWatts = snapshot.power.map(Double.init)
+        // Fractional since 2.0.0: the QMX reports measured output in tenths
+        // of a watt.
+        next.powerWatts = snapshot.power
         guard next != reading else { return }
         reading = next
     }
@@ -446,6 +461,14 @@ final class PocketCatService {
                 await self?.refreshPower()
             }
         }
+    }
+
+    /// Reads power now rather than waiting for the next slow refresh. Called
+    /// when a screen that displays power is about to be shown, so the value
+    /// on screen is current rather than up to `powerRefreshInterval` old.
+    func refreshPowerNow() {
+        guard isConnected else { return }
+        Task { await refreshPower() }
     }
 
     /// Asks the library to re-read RF power; the resulting snapshot carries

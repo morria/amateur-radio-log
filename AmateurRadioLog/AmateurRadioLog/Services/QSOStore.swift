@@ -13,6 +13,7 @@ enum SyncSource: Sendable {
 enum UploadService: Sendable {
     case qrz
     case hamqth
+    case wavelog
 }
 
 /// Outcome of merging a batch of remote records into the local log.
@@ -199,6 +200,7 @@ actor QSOStore {
             switch service {
             case .qrz: return !$0.qrzSynced
             case .hamqth: return !$0.hamqthSynced
+            case .wavelog: return !$0.wavelogSynced
             }
         }
         var minted = false
@@ -235,6 +237,8 @@ actor QSOStore {
                 if let logId = result.logIds[uuid] { qso.qrzLogId = logId }
             case .hamqth:
                 qso.hamqthSynced = true
+            case .wavelog:
+                qso.wavelogSynced = true
             }
         }
         if modelContext.hasChanges { try modelContext.save() }

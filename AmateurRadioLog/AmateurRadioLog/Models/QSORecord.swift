@@ -105,6 +105,7 @@ struct QSORecord: Sendable, Codable, Hashable {
     var qrzLogId: String?
     var qrzSynced: Bool = false
     var hamqthSynced: Bool = false
+    var wavelogSynced: Bool = false
     var lotwStatus: String = "none"
 
     // Overflow ADIF fields
@@ -212,6 +213,7 @@ struct QSORecord: Sendable, Codable, Hashable {
         qrzLogId = qso.qrzLogId
         qrzSynced = qso.qrzSynced
         hamqthSynced = qso.hamqthSynced
+        wavelogSynced = qso.wavelogSynced
         lotwStatus = qso.lotwStatus
         extraFields = qso.extraFields
         createdAt = qso.createdAt
@@ -289,6 +291,7 @@ struct QSORecord: Sendable, Codable, Hashable {
         qso.qrzLogId = qrzLogId
         qso.qrzSynced = qrzSynced
         qso.hamqthSynced = hamqthSynced
+        qso.wavelogSynced = wavelogSynced
         qso.lotwStatus = lotwStatus
         // Assigned once — the computed property JSON-encodes per write
         qso.extraFields = extraFields

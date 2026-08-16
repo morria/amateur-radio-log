@@ -5,19 +5,16 @@ import UniformTypeIdentifiers
 enum NavigationTab: String, CaseIterable, Identifiable {
     case log = "Log"
     case entry = "New QSO"
-    case map = "Map"
     case spots = "Spots"
     case stats = "Statistics"
 
     var id: String { rawValue }
 
-    /// Sidebar label ("List" reads better than "Log" under a log-centric
-    /// first section; rawValues stay stable).
+    /// Sidebar label. rawValues stay stable regardless of wording.
     var title: String {
         switch self {
-        case .log: return String(localized: "List")
+        case .log: return String(localized: "Log")
         case .entry: return String(localized: "New QSO")
-        case .map: return String(localized: "Map")
         case .spots: return String(localized: "Spots")
         case .stats: return String(localized: "Statistics")
         }
@@ -27,7 +24,6 @@ enum NavigationTab: String, CaseIterable, Identifiable {
         switch self {
         case .log: return "list.bullet.rectangle"
         case .entry: return "square.and.pencil"
-        case .map: return "map"
         case .spots: return "dot.radiowaves.left.and.right"
         case .stats: return "chart.bar"
         }
@@ -38,6 +34,11 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \QSO.qsoDate, order: .reverse) private var allQSOs: [QSO]
+
+    #if os(iOS)
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(DisplayPreferences.keepScreenAwakeKey) private var keepScreenAwake = false
+    #endif
 
     @State private var selectedQSO: QSO?
     @State private var editData: QSOEditData?
@@ -105,7 +106,6 @@ struct ContentView: View {
                 switch appState.selectedTab {
                 case .log: logView
                 case .entry: LogEntryView()
-                case .map: ContactMapView(qsos: allQSOs)
                 case .spots: SpotListView(allQSOs: allQSOs)
                 case .stats: StatsView(qsos: allQSOs)
                 }
@@ -217,7 +217,18 @@ struct ContentView: View {
             Text("The QSO is removed from the log on all your devices. You can undo this with Cmd-Z.")
         }
         #endif
+        #if os(iOS)
+        // `isIdleTimerDisabled` only has effect while the app is frontmost —
+        // iOS restores normal auto-lock on its own when we background — so
+        // simply keeping it in step with the preference gives exactly
+        // "awake while foregrounded".
+        .onChange(of: keepScreenAwake) { _, _ in applyIdleTimer() }
+        .onChange(of: scenePhase) { _, _ in applyIdleTimer() }
+        #endif
         .onAppear {
+            #if os(iOS)
+            applyIdleTimer()
+            #endif
             let settings = AppSettings.shared(context: modelContext)
             appState.settings = settings
             // Seed the milestone baseline (silent on first run) and catch any
@@ -231,11 +242,17 @@ struct ContentView: View {
                 switch args[idx + 1] {
                 case "log": appState.selectedTab = .log
                 case "entry": appState.selectedTab = .entry
-                case "map": appState.selectedTab = .map
                 case "spots": appState.selectedTab = .spots
                 case "stats": appState.selectedTab = .stats
                 default: break
                 }
+            }
+            // `-uiSeedADIF <path>` imports a log at launch. An empty
+            // simulator log hides anything that only goes wrong at scale —
+            // which is how a merged Log/Map screen that pegged the CPU on a
+            // real log passed simulator review twice.
+            if let idx = args.firstIndex(of: "-uiSeedADIF"), args.indices.contains(idx + 1) {
+                seedLog(from: args[idx + 1])
             }
             if args.contains("-uiSkipOnboarding") {
                 settings.hasCompletedOnboarding = true
@@ -307,7 +324,6 @@ struct ContentView: View {
 
     #if os(iOS)
     @State private var hasShownEntry = false
-    @State private var hasShownMap = false
     @State private var hasShownSpots = false
     @State private var hasShownStats = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -316,18 +332,16 @@ struct ContentView: View {
         ZStack(alignment: .topLeading) {
             VStack(spacing: 0) {
                 ZStack {
-                    logView
+                    LogGlobeView(allQSOs: allQSOs,
+                                 selectedQSO: $selectedQSO,
+                                 onEdit: { editData = QSOEditData(from: $0) },
+                                 onDelete: { requestDelete($0) })
                         .opacity(appState.selectedTab == .log ? 1 : 0)
                         .allowsHitTesting(appState.selectedTab == .log)
                     if hasShownEntry {
                         LogEntryView()
                             .opacity(appState.selectedTab == .entry ? 1 : 0)
                             .allowsHitTesting(appState.selectedTab == .entry)
-                    }
-                    if hasShownMap {
-                        ContactMapView(qsos: allQSOs)
-                            .opacity(appState.selectedTab == .map ? 1 : 0)
-                            .allowsHitTesting(appState.selectedTab == .map)
                     }
                     if hasShownSpots {
                         SpotListView(allQSOs: allQSOs)
@@ -360,10 +374,36 @@ struct ContentView: View {
         .overlay(alignment: .bottom) { undoSnackbar }
         .onChange(of: appState.selectedTab) { _, tab in
             if tab == .entry { hasShownEntry = true }
-            if tab == .map { hasShownMap = true }
             if tab == .spots { hasShownSpots = true }
             if tab == .stats { hasShownStats = true }
         }
+    }
+    #endif
+
+    #if os(iOS)
+    /// Only hold the screen awake while actually frontmost. Setting the flag
+    /// from a background scene phase is meaningless, and clearing it on the
+    /// way out keeps the state honest if the app is resumed with the
+    /// preference since turned off.
+    private func applyIdleTimer() {
+        UIApplication.shared.isIdleTimerDisabled = keepScreenAwake && scenePhase == .active
+    }
+    #endif
+
+    #if DEBUG
+    /// Imports a log at launch for `-uiSeedADIF`. Inserted directly rather
+    /// than through `beginImport`, whose preview sheet needs a tap to
+    /// confirm — seeding has to complete unattended.
+    private func seedLog(from path: String) {
+        let existing = (try? modelContext.fetchCount(FetchDescriptor<QSO>())) ?? 0
+        guard existing == 0 else { return }
+        let parser = ADIFParser()
+        guard let file = try? parser.parse(url: URL(fileURLWithPath: path)) else { return }
+        let records = parser.recordsToQSORecords(file.records)
+        for record in records {
+            modelContext.insert(record.makeQSO())
+        }
+        try? modelContext.save()
     }
     #endif
 

@@ -60,6 +60,28 @@ struct LogEntryView: View {
     @State private var confirmation: String?
     @State private var confirmationTask: Task<Void, Never>?
     @State private var didSeedDefaults = false
+
+    // MARK: Live rig tracking
+    //
+    // The frequency and power fields follow the radio while the New QSO tab
+    // is up, so turning the dial is reflected without reopening anything.
+    // Tracking yields to the operator: once a field is edited by hand (typed,
+    // or set via a band/mode chip) it stops following, and resumes on the
+    // next visit to the tab or after a contact is logged.
+
+    /// Last value written into each field *by the rig*. The fields' own
+    /// `onChange` handlers fire for programmatic writes too, so comparing
+    /// against these is what distinguishes a dial movement from typing.
+    @State private var rigWrittenFreq: Double?
+    @State private var rigWrittenPower: Double?
+    @State private var freqManuallyEdited = false
+    @State private var powerManuallyEdited = false
+    @State private var modeManuallyEdited = false
+
+    /// Only the standalone tab tracks the radio. A spot or edit sheet
+    /// carries deliberate values — a spot's frequency is the whole point of
+    /// tapping it — and must never be overwritten by the dial.
+    private var tracksRig: Bool { prefill == nil && !presentedAsSheet }
     @FocusState private var callFocused: Bool
 
     /// One-tap chips: the bands and modes people actually operate, in
@@ -117,9 +139,50 @@ struct LogEntryView: View {
         .sensoryFeedback(.success, trigger: confirmation) { _, new in new != nil }
         .onAppear {
             seedDefaults()
+            resumeRigTracking()
             #if os(macOS)
             callFocused = true
             #endif
+        }
+        // iOS keeps this view mounted across tab switches, so `onAppear`
+        // fires only once — watching the selected tab is what makes a return
+        // visit re-read the radio instead of showing the first reading
+        // forever.
+        .onChange(of: appState.selectedTab) { _, tab in
+            if tab == .entry { resumeRigTracking() }
+        }
+        // Follow the dial while the tab is up.
+        .onChange(of: appState.rigState) { _, _ in applyRigState() }
+    }
+
+    // MARK: - Live Rig Tracking
+
+    /// Re-reads the radio and re-enables tracking. Called on appear, on
+    /// returning to the tab, and after logging — each is a fresh contact, so
+    /// any earlier hand-editing no longer applies.
+    private func resumeRigTracking() {
+        guard tracksRig else { return }
+        freqManuallyEdited = false
+        powerManuallyEdited = false
+        modeManuallyEdited = false
+        // Power is read on a slow cadence (it changes rarely), so ask for a
+        // fresh value rather than showing one up to half a minute old.
+        appState.refreshRigPower()
+        applyRigState()
+    }
+
+    /// Copies the live rig reading into any field still tracking it.
+    private func applyRigState() {
+        guard tracksRig, let rig = appState.liveRigDefaults else { return }
+        if !freqManuallyEdited, let f = rig.freqMHz, f > 0 {
+            rigWrittenFreq = f
+            freq = f
+            if let b = rig.band { band = b }
+        }
+        if !modeManuallyEdited, let m = rig.mode { mode = m }
+        if !powerManuallyEdited, let p = rig.powerWatts, p > 0 {
+            rigWrittenPower = p
+            power = p
         }
     }
 
@@ -384,12 +447,16 @@ struct LogEntryView: View {
     private func selectBand(_ b: Band) {
         band = b
         freq = FrequencyBandMapper.defaultFrequency(for: b)
+        // An explicit band choice outranks the dial (the field's onChange
+        // also catches this; being explicit here keeps the intent readable).
+        freqManuallyEdited = true
     }
 
     /// The mode drives `rstPlaceholder`, so an untouched RST field follows
     /// the chip selection on its own — nothing to overwrite here.
     private func selectMode(_ m: Mode) {
         mode = m
+        modeManuallyEdited = true
     }
 
     // MARK: - Detail fields
@@ -404,6 +471,10 @@ struct LogEntryView: View {
                         #endif
                         .onChange(of: freq) { _, f in
                             if let f { band = Band.from(frequencyMHz: f) }
+                            // Anything that isn't the value the rig just
+                            // wrote is the operator typing — stop following
+                            // the dial so it can't overwrite them.
+                            if f != rigWrittenFreq { freqManuallyEdited = true }
                         }
                 }
                 labeledField("Power (W)") {
@@ -411,6 +482,9 @@ struct LogEntryView: View {
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
+                        .onChange(of: power) { _, p in
+                            if p != rigWrittenPower { powerManuallyEdited = true }
+                        }
                 }
             }
             HStack(spacing: 12) {
@@ -723,6 +797,9 @@ struct LogEntryView: View {
         comment = ""
         notes = ""
         callFocused = true
+        // A logged contact ends the run's hand-tuning: the next one should
+        // follow the radio again.
+        resumeRigTracking()
     }
 
     private func showConfirmation(_ message: String) {

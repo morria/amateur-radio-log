@@ -10,9 +10,11 @@ options:
 packages:
   CATBridgeKit:
     url: git@github.com:morria/pocket-cat.git
-    # 1.1.0 added the typed power API (readPower/snapshot.power) this app
-    # uses; 1.0.0 would resolve but not compile.
-    from: 1.1.0
+    # 3.0.0 is required, not just preferred: before it, a bridge iOS had
+    # already bonded could never be discovered (the firmware stops
+    # advertising while connected), so reconnecting appeared to need
+    # "Forget This Bridge". It also makes DiscoveredBridge.rssi optional.
+    from: 3.1.0
 
 settings:
   base:
@@ -42,6 +44,11 @@ targets:
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge."
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # Self-hosted Wavelog instances are routinely plain HTTP on a private
+        # network. This permits cleartext only to .local and unqualified
+        # hostnames — far narrower than NSAllowsArbitraryLoads, which would
+        # weaken every other request the app makes.
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         GENERATE_INFOPLIST_FILE: YES
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 1.0.0

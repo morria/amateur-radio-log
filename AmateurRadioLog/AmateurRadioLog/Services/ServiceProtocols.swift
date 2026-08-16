@@ -63,6 +63,15 @@ struct HamQTHRemoteAdapter: QSOUploader {
     }
 }
 
+struct WavelogRemoteAdapter: QSOUploader {
+    let service: WavelogService
+    let configuration: WavelogService.Configuration
+
+    func upload(_ qsos: [QSORecord], progress: SyncProgressHandler?) async throws -> UploadResult {
+        try await service.uploadQSOs(qsos, config: configuration, progress: progress)
+    }
+}
+
 struct LoTWRemoteAdapter: LoTWRemote {
     let service: LoTWService
     let username: String

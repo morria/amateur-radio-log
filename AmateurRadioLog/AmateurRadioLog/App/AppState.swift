@@ -123,6 +123,7 @@ enum SyncService: String, Identifiable, Sendable {
     case qrz = "QRZ"
     case lotw = "LoTW"
     case hamqth = "HamQTH"
+    case wavelog = "Wavelog"
     var id: String { rawValue }
 }
 
@@ -447,6 +448,7 @@ final class AppState {
     // MARK: - Services
     let qrzService = QRZService()
     let hamQTHService = HamQTHService()
+    let wavelogService = WavelogService()
     let lotwService = LoTWService()
 
     // MARK: - Spots
@@ -521,15 +523,45 @@ final class AppState {
         }
         let service = spotService
         let filter = spotFilter
-        Task {
+        enqueueSpotLifecycle {
             await service.setFilter(filter)
             await service.start()
         }
     }
 
-    func stopSpotPolling() {
+    /// Stops the spot feeds.
+    ///
+    /// Ignored while Spots is still the selected destination unless `force`
+    /// is set. Mounting the tab produces an appear *and* a stray
+    /// disappear/tab-change in the same update, and if that stop landed after
+    /// the start the feeds were left dead — the tab sat empty forever, and
+    /// only leaving and re-entering revived it. Ordering alone could not fix
+    /// that: the stop genuinely came second.
+    ///
+    /// Backgrounding passes `force`, because there the intent to stop is real.
+    func stopSpotPolling(force: Bool = false) {
         guard let service = _spotService else { return }
-        Task { await service.stop() }
+        if !force, selectedTab == .spots { return }
+        enqueueSpotLifecycle { await service.stop() }
+    }
+
+    /// Serializes start/stop so they apply in call order.
+    ///
+    /// Both used to fire independent `Task`s, which are unordered: a stop
+    /// raised in the same update cycle as a start could win and leave the
+    /// service stopped while the Spots screen was on-screen and showing its
+    /// loading state — no feeds running, nothing to wait for. Tab changes
+    /// routinely produce exactly that pairing, and the symptom is spots that
+    /// never arrive until the screen is left and re-entered.
+    @ObservationIgnored
+    private var spotLifecycleTask: Task<Void, Never>?
+
+    private func enqueueSpotLifecycle(_ work: @escaping @Sendable () async -> Void) {
+        let previous = spotLifecycleTask
+        spotLifecycleTask = Task {
+            await previous?.value
+            await work()
+        }
     }
 
     func applySpotFilter(_ filter: SpotFilter) {
@@ -577,6 +609,8 @@ final class AppState {
             syncTask = Task { await syncLoTW(context: context) }
         case .hamqth:
             syncTask = Task { await syncHamQTH(context: context) }
+        case .wavelog:
+            syncTask = Task { await syncWavelog(context: context) }
         }
     }
 
@@ -592,6 +626,7 @@ final class AppState {
         case .qrz: return settings?.lastQRZSync
         case .lotw: return settings?.lastLoTWSync
         case .hamqth: return settings?.lastHamQTHSync
+        case .wavelog: return settings?.lastWavelogSync
         }
     }
 
@@ -600,6 +635,7 @@ final class AppState {
         case .qrz: settings?.lastQRZSync = Date()
         case .lotw: settings?.lastLoTWSync = Date()
         case .hamqth: settings?.lastHamQTHSync = Date()
+        case .wavelog: settings?.lastWavelogSync = Date()
         }
         try? context.save()
     }
@@ -782,12 +818,12 @@ final class AppState {
 
     func showOnMap(qso: QSO) {
         mapHighlightQSOId = "\(qso.call)-\(qso.qsoDate)-\(qso.timeOn)"
-        navigate(to: .map)
+        navigate(to: .log)
         popDetailStack()
     }
 
     func showFilteredOnMap() {
-        navigate(to: .map)
+        navigate(to: .log)
         popDetailStack()
     }
 
@@ -1271,6 +1307,57 @@ final class AppState {
 
     // MARK: - HamQTH Sync
 
+    /// Uploads everything not yet sent to Wavelog. Upload-only: Wavelog is a
+    /// logbook you push into, and its API has no "give me everything since X"
+    /// counterpart to pull back.
+    func syncWavelog(context: ModelContext) async {
+        guard let config = WavelogPreferences.configuration else {
+            errorMessage = String(localized: "Wavelog URL or API key not configured")
+            return
+        }
+        guard !config.stationProfileId.isEmpty else {
+            errorMessage = String(localized: "Choose a Wavelog station profile in Settings")
+            return
+        }
+
+        let endSync = beginSyncState(.wavelog)
+        defer { endSync() }
+        statusMessage = String(localized: "Uploading to Wavelog...")
+
+        do {
+            let engine = SyncEngine(store: qsoStore(for: context))
+            let remote = WavelogRemoteAdapter(service: wavelogService, configuration: config)
+
+            let summary = try await engine.syncWavelog(
+                remote: remote,
+                onPhase: { [weak self] phase in
+                    self?.applySyncPhase(phase, provider: "Wavelog")
+                },
+                progress: { [weak self] done, total in
+                    self?.syncProgress = (done, total)
+                })
+
+            recordSyncSuccess(.wavelog, context: context)
+            refreshAfterBackgroundChanges(context)
+
+            if let result = summary.result {
+                lastSyncFailures = result.failures
+                var message = String(localized: "Uploaded \(result.succeeded.count) to Wavelog")
+                if !result.duplicates.isEmpty {
+                    message += ", " + String(localized: "\(result.duplicates.count) already in Wavelog")
+                }
+                if !result.failures.isEmpty {
+                    message += ", " + String(localized: "\(result.failures.count) failed")
+                }
+                statusMessage = message
+            } else {
+                statusMessage = String(localized: "Nothing new to upload")
+            }
+        } catch {
+            handleSyncError(error, provider: "Wavelog", context: context)
+        }
+    }
+
     func syncHamQTH(context: ModelContext) async {
         let creds = KeychainManager.loadCredentials(for: .hamqth)
         guard !creds.isEmpty else {
@@ -1589,6 +1676,15 @@ final class AppState {
         guard RigPreferences.enabled,
               RigPreferences.rigProtocol.supportsTuning else { return nil }
         return _pocketCat?.suggestedRSTReceived(for: mode)
+    }
+
+    /// Forces an immediate RF-power read. Power is otherwise refreshed on a
+    /// slow cadence, so screens that display it ask for a fresh value as they
+    /// appear. No-op unless a Pocket Cat rig is connected.
+    func refreshRigPower() {
+        guard RigPreferences.enabled,
+              RigPreferences.rigProtocol.supportsTuning else { return }
+        _pocketCat?.refreshPowerNow()
     }
 
     /// Tunes the radio to a spot's frequency and mode when a tuning-capable

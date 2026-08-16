@@ -35,15 +35,26 @@ final class ADIFWriter {
         writeRecord(QSORecord(from: q))
     }
 
-    /// Write a single record without ADIF file header (for API uploads)
-    func writeSingleRecord(_ r: QSORecord) -> String {
-        writeRecord(r)
+    /// Write a single record without ADIF file header (for API uploads).
+    ///
+    /// `omitting` drops named fields from the output. Wavelog uses it for the
+    /// station-location fields: it takes those from the station profile a QSO
+    /// is filed under, and *rejects* any record whose `MY_GRIDSQUARE`
+    /// disagrees with that profile ("Differing locator ... : SKIPPED").
+    func writeSingleRecord(_ r: QSORecord, omitting: Set<String> = []) -> String {
+        writeRecord(r, omitting: omitting)
     }
 
     // MARK: - Private
 
-    private func writeRecord(_ q: QSORecord) -> String {
+    private func writeRecord(_ q: QSORecord, omitting: Set<String> = []) -> String {
         var fields = ""
+        func adifField(_ name: String, _ value: String) -> String {
+            omitting.contains(name) ? "" : self.adifField(name, value)
+        }
+        func optField(_ name: String, _ value: String?) -> String {
+            omitting.contains(name) ? "" : self.optField(name, value)
+        }
 
         fields += adifField("CALL", q.call)
         fields += adifField("QSO_DATE", q.qsoDate)
