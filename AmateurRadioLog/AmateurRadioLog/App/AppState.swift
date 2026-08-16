@@ -119,12 +119,39 @@ enum SyncDirection: String, CaseIterable, Identifiable {
 
 /// The three sync providers, used to track which sync is currently running
 /// and to key last-synced timestamps.
-enum SyncService: String, Identifiable, Sendable {
+enum SyncService: String, Identifiable, Sendable, CaseIterable, Hashable {
     case qrz = "QRZ"
-    case lotw = "LoTW"
     case hamqth = "HamQTH"
     case wavelog = "Wavelog"
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .qrz: return "QRZ.com"
+        case .hamqth: return "HamQTH"
+        case .wavelog: return "Wavelog"
+        }
+    }
+
+    /// Whether the provider can be read back from.
+    ///
+    /// Only QRZ offers a logbook download. HamQTH has no download API at all,
+    /// and Wavelog's API can insert a QSO but cannot enumerate them — so for
+    /// those two a "sync" is an upload, and the UI says so rather than
+    /// offering a direction the provider cannot honour.
+    var supportsDownload: Bool { self == .qrz }
+
+    /// One line explaining what a sync will actually do.
+    var summary: String {
+        switch self {
+        case .qrz:
+            return String(localized: "Uploads new contacts and downloads any that are in your QRZ logbook but not here.")
+        case .hamqth:
+            return String(localized: "Uploads new contacts. HamQTH has no logbook download — to import, export ADIF from their site.")
+        case .wavelog:
+            return String(localized: "Uploads new contacts. Wavelog's API cannot list existing contacts, so there is nothing to download.")
+        }
+    }
 }
 
 // MARK: - Activation Session
@@ -450,7 +477,6 @@ final class AppState {
     let hamQTHService = HamQTHService()
     let wavelogService = WavelogService()
     let callsignDatabase = CallsignDatabase.shared
-    let lotwService = LoTWService()
 
     // MARK: - Spots
 
@@ -592,7 +618,19 @@ final class AppState {
     var syncProgress: (done: Int, total: Int)?
     /// Per-record failures from the last completed upload pass, shown in the
     /// post-run failure disclosure.
+    ///
+    /// Deprecated in favour of `syncReports`; kept only until every caller
+    /// reads the per-provider report.
     var lastSyncFailures: [SyncFailure] = []
+
+    /// The outcome of each provider's last sync, keyed by provider.
+    ///
+    /// Results used to live in shared `statusMessage`/`lastSyncFailures`
+    /// fields, so whichever sync sheet happened to be open rendered them —
+    /// which is how a Wavelog run reported its failures inside a sheet
+    /// titled "Sync QRZ.com". A report belongs to the provider that produced
+    /// it.
+    var syncReports: [SyncService: SyncReport] = [:]
     @ObservationIgnored
     private var syncTask: Task<Void, Never>?
 
@@ -606,8 +644,6 @@ final class AppState {
         switch service {
         case .qrz:
             syncTask = Task { await syncQRZ(context: context, direction: direction) }
-        case .lotw:
-            syncTask = Task { await syncLoTW(context: context) }
         case .hamqth:
             syncTask = Task { await syncHamQTH(context: context) }
         case .wavelog:
@@ -625,7 +661,6 @@ final class AppState {
     func lastSyncDate(for service: SyncService) -> Date? {
         switch service {
         case .qrz: return settings?.lastQRZSync
-        case .lotw: return settings?.lastLoTWSync
         case .hamqth: return settings?.lastHamQTHSync
         case .wavelog: return settings?.lastWavelogSync
         }
@@ -634,7 +669,6 @@ final class AppState {
     private func recordSyncSuccess(_ service: SyncService, context: ModelContext) {
         switch service {
         case .qrz: settings?.lastQRZSync = Date()
-        case .lotw: settings?.lastLoTWSync = Date()
         case .hamqth: settings?.lastHamQTHSync = Date()
         case .wavelog: settings?.lastWavelogSync = Date()
         }
@@ -660,6 +694,7 @@ final class AppState {
     private func beginSyncState(_ service: SyncService) -> () -> Void {
         activeSync = service
         lastSyncFailures = []
+        syncReports[service] = nil
         syncProgress = nil
         isLoading = true
         return { [weak self] in
@@ -1262,55 +1297,6 @@ final class AppState {
 
     // MARK: - LoTW Sync
 
-    func syncLoTW(context: ModelContext) async {
-        let creds = KeychainManager.loadCredentials(for: .lotw)
-        guard !creds.isEmpty else {
-            errorMessage = String(localized: "LoTW credentials not configured")
-            return
-        }
-
-        let endSync = beginSyncState(.lotw)
-        defer { endSync() }
-        statusMessage = String(localized: "Downloading from LoTW...")
-
-        let syncStart = Date()
-
-        do {
-            let engine = SyncEngine(store: qsoStore(for: context))
-            let remote = LoTWRemoteAdapter(
-                service: lotwService, username: creds.username, password: creds.password)
-
-            let summary = try await engine.syncLoTW(
-                remote: remote,
-                rxSince: settings?.lotwQSORxSince,
-                qslSince: settings?.lotwQSLSince,
-                onPhase: { [weak self] phase in
-                    self?.applySyncPhase(phase, provider: "LoTW")
-                })
-
-            // Advance the cursors to the sync start date minus a 1-day overlap
-            let nextCursor = LoTWService.cursorDate(from: syncStart)
-            settings?.lotwQSORxSince = nextCursor
-            settings?.lotwQSLSince = nextCursor
-            recordSyncSuccess(.lotw, context: context)
-            refreshAfterBackgroundChanges(context)
-
-            var messages: [String] = []
-            if summary.inserted > 0 { messages.append(String(localized: "\(summary.inserted) new QSOs from LoTW")) }
-            if summary.confirmed > 0 { messages.append(String(localized: "\(summary.confirmed) new confirmations")) }
-            if messages.isEmpty { messages.append(String(localized: "Already up to date")) }
-
-            statusMessage = messages.joined(separator: ", ")
-        } catch {
-            handleSyncError(error, provider: "LoTW", context: context)
-        }
-    }
-
-    // MARK: - LoTW Upload (TQSL)
-
-    /// The un-uploaded LoTW slice (`lotwQslSent != "Y"`) as export-ready
-    /// records, with the station callsign injected where missing so TQSL
-    /// can match the right station location.
     func lotwUploadRecords(context: ModelContext) async throws -> [QSORecord] {
         var records = try await qsoStore(for: context).fetchLoTWUnuploaded()
         let callsign = (settings?.stationCallsign ?? "")
@@ -1393,20 +1379,17 @@ final class AppState {
             recordSyncSuccess(.wavelog, context: context)
             refreshAfterBackgroundChanges(context)
 
+            var report = SyncReport(service: .wavelog)
             if let result = summary.result {
+                report.uploaded = result.succeeded.count
+                report.duplicates = result.duplicates.count
+                report.failures = result.failures
                 lastSyncFailures = result.failures
-                var message = String(localized: "Uploaded \(result.succeeded.count) to Wavelog")
-                if !result.duplicates.isEmpty {
-                    message += ", " + String(localized: "\(result.duplicates.count) already in Wavelog")
-                }
-                if !result.failures.isEmpty {
-                    message += ", " + String(localized: "\(result.failures.count) failed")
-                }
-                statusMessage = message
-            } else {
-                statusMessage = String(localized: "Nothing new to upload")
             }
+            syncReports[.wavelog] = report
+            statusMessage = report.summaryLine
         } catch {
+            recordSyncFailure(.wavelog, error)
             handleSyncError(error, provider: "Wavelog", context: context)
         }
     }
@@ -1439,20 +1422,17 @@ final class AppState {
             recordSyncSuccess(.hamqth, context: context)
             refreshAfterBackgroundChanges(context)
 
+            var report = SyncReport(service: .hamqth)
             if let result = summary.result {
+                report.uploaded = result.succeeded.count
+                report.duplicates = result.duplicates.count
+                report.failures = result.failures
                 lastSyncFailures = result.failures
-                var message = String(localized: "Uploaded \(result.succeeded.count) to HamQTH")
-                if !result.duplicates.isEmpty {
-                    message += ", " + String(localized: "\(result.duplicates.count) already on HamQTH")
-                }
-                if !result.failures.isEmpty {
-                    message += ", " + String(localized: "\(result.failures.count) failed")
-                }
-                statusMessage = message
-            } else {
-                statusMessage = String(localized: "Nothing new to upload")
             }
+            syncReports[.hamqth] = report
+            statusMessage = report.summaryLine
         } catch {
+            recordSyncFailure(.hamqth, error)
             handleSyncError(error, provider: "HamQTH", context: context)
         }
     }
@@ -1493,26 +1473,19 @@ final class AppState {
             recordSyncSuccess(.qrz, context: context)
             refreshAfterBackgroundChanges(context)
 
-            if let inserted = summary.downloadedInserted {
-                messages.append(String(localized: "\(inserted) new from QRZ"))
+            var report = SyncReport(service: .qrz)
+            report.downloaded = summary.downloadedInserted ?? 0
+            if let result = summary.upload?.result {
+                report.uploaded = result.succeeded.count
+                report.duplicates = result.duplicates.count
+                report.failures = result.failures
+                lastSyncFailures = result.failures
             }
-            if let upload = summary.upload {
-                if let result = upload.result {
-                    lastSyncFailures = result.failures
-                    messages.append(String(localized: "Uploaded \(result.succeeded.count) to QRZ"))
-                    if !result.duplicates.isEmpty {
-                        messages.append(String(localized: "\(result.duplicates.count) already on QRZ"))
-                    }
-                    if !result.failures.isEmpty {
-                        messages.append(String(localized: "\(result.failures.count) failed"))
-                    }
-                } else {
-                    messages.append(String(localized: "Nothing new to upload"))
-                }
-            }
-
-            statusMessage = messages.joined(separator: ", ")
+            syncReports[.qrz] = report
+            statusMessage = report.summaryLine
+            _ = messages
         } catch {
+            recordSyncFailure(.qrz, error)
             handleSyncError(error, provider: "QRZ", context: context)
         }
     }
@@ -1719,6 +1692,48 @@ final class AppState {
                     wsjtxRigState.loggableFrequencyMHz, nil)
         }
         return nil
+    }
+
+    // MARK: - Superfill (callsign completion from the log)
+
+    /// Distinct callsigns worked, with how often and how recently.
+    @ObservationIgnored
+    private var superfillIndex: [CallsignIndexEntry] = []
+    /// `dataRevision` the index was built from; -1 until first built.
+    @ObservationIgnored
+    private var superfillIndexRevision = -1
+
+    /// Completions for a partial callsign, drawn from the log.
+    ///
+    /// The index is rebuilt only when the log actually changes — it is a full
+    /// scan, and this is called on every keystroke of a callsign being copied
+    /// out of a difficult signal.
+    func callsignSuggestions(for fragment: String,
+                             context: ModelContext) -> [CallsignSuggestion] {
+        rebuildSuperfillIndexIfNeeded(context: context)
+        return CallsignSuperfill.suggestions(for: fragment, in: superfillIndex)
+    }
+
+    private func rebuildSuperfillIndexIfNeeded(context: ModelContext) {
+        guard superfillIndexRevision != dataRevision else { return }
+        superfillIndexRevision = dataRevision
+
+        var worked: [String: (count: Int, last: String)] = [:]
+        let descriptor = FetchDescriptor<QSO>()
+        for qso in (try? context.fetch(descriptor)) ?? [] where qso.deletedAt == nil {
+            let call = qso.call.uppercased()
+            guard !call.isEmpty else { continue }
+            let existing = worked[call]
+            worked[call] = (
+                count: (existing?.count ?? 0) + 1,
+                last: max(existing?.last ?? "", qso.qsoDate)
+            )
+        }
+        superfillIndex = worked.map {
+            CallsignIndexEntry(callsign: $0.key,
+                               timesWorked: $0.value.count,
+                               lastWorked: $0.value.last)
+        }
     }
 
     /// Suggested RST received from the radio's S-meter, or nil when no
@@ -2066,6 +2081,15 @@ final class AppState {
     /// Shared sync error handling: cancellation shows a neutral status;
     /// real failures surface in the error alert. Either way the main context
     /// is nudged, since a partial merge may already have saved.
+    /// Records an outright failure against the provider that produced it, so
+    /// its sheet shows the reason instead of a global banner appearing over
+    /// whichever screen is open.
+    private func recordSyncFailure(_ service: SyncService, _ error: Error) {
+        var report = SyncReport(service: service)
+        report.error = error.localizedDescription
+        syncReports[service] = report
+    }
+
     private func handleSyncError(_ error: Error, provider: String, context: ModelContext) {
         refreshAfterBackgroundChanges(context)
         if error is CancellationError || (error as? URLError)?.code == .cancelled {

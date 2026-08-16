@@ -60,6 +60,8 @@ struct LogEntryView: View {
     @State private var confirmation: String?
     @State private var confirmationTask: Task<Void, Never>?
     @State private var didSeedDefaults = false
+    /// Callsign completions drawn from the log — see `superfillChips`.
+    @State private var superfill: [CallsignSuggestion] = []
 
     // MARK: Live rig tracking
     //
@@ -119,6 +121,7 @@ struct LogEntryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     callsignField
+                    superfillChips
                     statusRow
                     lookupCard
                     bandChips
@@ -153,6 +156,57 @@ struct LogEntryView: View {
         }
         // Follow the dial while the tab is up.
         .onChange(of: appState.rigState) { _, _ in applyRigState() }
+    }
+
+    // MARK: - Superfill
+
+    /// Callsign completions from the log, offered while a call is being
+    /// copied out of a marginal signal.
+    ///
+    /// Deliberately quiet: nothing is shown until two characters are in, and
+    /// nothing at all when the fragment still matches a crowd (see
+    /// `CallsignSuperfill.ambiguityCeiling`). A long list of possibilities
+    /// during a difficult contact is worse than none — it invites picking a
+    /// plausible-looking callsign instead of asking for a repeat.
+    @ViewBuilder
+    private var superfillChips: some View {
+        if !superfill.isEmpty, !isEditing {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(superfill) { suggestion in
+                        Button {
+                            call = suggestion.callsign
+                            scheduleLookup()
+                            updateSuperfill()
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(suggestion.callsign)
+                                    .font(.system(.callout, design: .monospaced).weight(.medium))
+                                // Worked-before count: the strongest signal
+                                // that a guess is the right one.
+                                if suggestion.timesWorked > 1 {
+                                    Text("\(suggestion.timesWorked)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(.quaternary.opacity(0.6)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text("Use callsign \(suggestion.callsign)"))
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .accessibilityIdentifier("superfillChips")
+        }
+    }
+
+    private func updateSuperfill() {
+        guard !isEditing else { return }
+        superfill = appState.callsignSuggestions(for: call, context: modelContext)
     }
 
     // MARK: - Live Rig Tracking
@@ -277,6 +331,7 @@ struct LogEntryView: View {
                     let upper = v.uppercased()
                     if upper != v { call = upper }
                     scheduleLookup()
+                    updateSuperfill()
                 }
                 .numberKeyboardRow(text: $call, isActive: callFocused)
             if isLookingUp {
@@ -614,6 +669,7 @@ struct LogEntryView: View {
         call = ""
         lookupResult = nil
         priorQSOs = []
+        superfill = []
         isLookingUp = false
         callFocused = true
     }

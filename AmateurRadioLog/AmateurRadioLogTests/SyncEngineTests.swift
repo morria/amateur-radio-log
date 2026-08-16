@@ -48,15 +48,6 @@ private struct StubQRZRemote: QRZRemote {
     }
 }
 
-/// LoTW remote stub with scripted QSO and confirmation reports.
-private struct StubLoTWRemote: LoTWRemote {
-    var qsos: [QSORecord] = []
-    var confirmations: [QSORecord] = []
-
-    func downloadQSOs(since: String?) async throws -> [QSORecord] { qsos }
-    func downloadConfirmations(since: String?) async throws -> [QSORecord] { confirmations }
-}
-
 // MARK: - Harness
 
 private func makeInMemoryContainer() throws -> ModelContainer {
@@ -143,36 +134,6 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertTrue(batches.isEmpty, "No upload request should be made when nothing is unsynced")
     }
 
-    // LoTW confirmation merge through the engine.
-    func testLoTWConfirmationMerge() async throws {
-        let container = try makeInMemoryContainer()
-        try insertQSO(container, call: "W1AW")
-
-        var confirmation = QSORecord(call: "W1AW", qsoDate: "20260308", timeOn: "143059")
-        confirmation.bandRaw = "20m"
-        confirmation.lotwQslRcvd = "Y"
-
-        var newRemote = QSORecord(call: "JA1XYZ", qsoDate: "20260307", timeOn: "083000")
-        newRemote.bandRaw = "15m"
-
-        let engine = SyncEngine(store: QSOStore(modelContainer: container))
-        let remote = StubLoTWRemote(qsos: [newRemote], confirmations: [confirmation])
-
-        let summary = try await engine.syncLoTW(remote: remote, rxSince: nil, qslSince: nil)
-
-        XCTAssertEqual(summary.inserted, 1)
-        XCTAssertEqual(summary.confirmed, 1)
-
-        let byCall = Dictionary(uniqueKeysWithValues: try fetchAll(container).map { ($0.call, $0) })
-        XCTAssertEqual(byCall.count, 2, "Confirmation must not duplicate the local QSO")
-        XCTAssertEqual(byCall["W1AW"]?.lotwQslRcvd, "Y")
-        XCTAssertEqual(byCall["W1AW"]?.lotwStatus, "confirmed")
-        XCTAssertEqual(byCall["JA1XYZ"]?.lotwQslSent, "Y")
-    }
-
-    // QRZ download-then-upload flag reconciliation: a local record that the
-    // download proves is already on QRZ must be flagged synced and excluded
-    // from the subsequent upload.
     func testQRZDownloadReconcilesFlagsBeforeUpload() async throws {
         let container = try makeInMemoryContainer()
         try insertQSO(container, call: "W1AW")          // already on QRZ

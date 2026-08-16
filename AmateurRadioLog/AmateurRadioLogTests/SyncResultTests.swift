@@ -157,18 +157,4 @@ final class UploadResultTests: XCTestCase {
 // MARK: - LoTW Cursor Tests
 
 final class LoTWCursorTests: XCTestCase {
-    func testCursorDateAppliesOneDayOverlap() {
-        let date = ISO8601DateFormatter().date(from: "2026-07-04T12:00:00Z")!
-        XCTAssertEqual(LoTWService.cursorDate(from: date), "2026-07-03")
-    }
-
-    func testCursorDateCrossesMonthBoundary() {
-        let date = ISO8601DateFormatter().date(from: "2026-07-01T00:30:00Z")!
-        XCTAssertEqual(LoTWService.cursorDate(from: date), "2026-06-30")
-    }
-
-    func testCursorDateZeroOverlap() {
-        let date = ISO8601DateFormatter().date(from: "2026-07-04T12:00:00Z")!
-        XCTAssertEqual(LoTWService.cursorDate(from: date, overlapDays: 0), "2026-07-04")
-    }
 }

@@ -17,9 +17,22 @@ import SwiftUI
 ///   search field and filter chips; dragged up it becomes the full list.
 ///   Background interaction stays enabled through the medium detent so the
 ///   globe can still be spun.
-/// - **Regular (iPad):** an inline side panel. A `.sheet` with detents at
-///   regular width is presented as a *centred form sheet*, not a bottom
-///   sheet — a slab floating over the middle of the screen.
+/// - **Regular (iPad):** an `.inspector` — the platform's own trailing panel,
+///   as in Freeform and Numbers.
+///
+///   Two earlier attempts were wrong in the same way. A fixed column squeezed
+///   the globe between a sidebar that *overlays* and a panel that does not,
+///   leaving it neither whole nor wide; a floating card kept the globe entire
+///   but sat on top of it permanently. Both failed because the list could not
+///   be *put away*, and on a log screen the balance between map and list
+///   changes minute to minute. An inspector is resizable, remembers its
+///   width, and comes with a toolbar control for dismissing it — so the globe
+///   can be whole whenever it needs to be.
+///
+///   A three-column split view (Mail, Notes) is arguably the more canonical
+///   iPad shape for list-plus-detail, but the middle column belongs to the
+///   whole `NavigationSplitView` — Spots and Statistics would each have to
+///   grow one they have no use for.
 struct LogGlobeView: View {
     let allQSOs: [QSO]
     @Binding var selectedQSO: QSO?
@@ -43,6 +56,9 @@ struct LogGlobeView: View {
     /// `selectedTab` stays `.log` after backing out to the sidebar — so
     /// gating the sheet on the tab alone left it presented over the menu.
     @State private var isOnScreen = false
+    /// iPad only. Open by default — the list is why this screen exists — but
+    /// dismissable, which is the whole point of moving to an inspector.
+    @AppStorage("logInspectorPresented") private var inspectorPresented = true
 
     private var isCompact: Bool { horizontalSizeClass == .compact }
     /// The view stays mounted (at zero opacity) while other tabs are on
@@ -95,19 +111,30 @@ struct LogGlobeView: View {
         if sheetPresented != wanted { sheetPresented = wanted }
     }
 
-    /// iPad: globe and panel side by side, so neither hides the other.
+    /// iPad: the globe is the screen; the log is an inspector beside it.
     private var regularLayout: some View {
-        HStack(spacing: 0) {
-            ContactMapView(qsos: allQSOs, chromeless: true)
-            Divider()
-            LogSheetView(allQSOs: allQSOs,
-                         selectedQSO: $selectedQSO,
-                         onEdit: onEdit,
-                         onDelete: onDelete)
-                .frame(width: 380)
-                .background(.regularMaterial)
-        }
+        ContactMapView(qsos: allQSOs, chromeless: true)
+            .inspector(isPresented: $inspectorPresented) {
+                LogSheetView(allQSOs: allQSOs,
+                             selectedQSO: $selectedQSO,
+                             onEdit: onEdit,
+                             onDelete: onDelete)
+                    .inspectorColumnWidth(min: 320, ideal: Self.panelWidth, max: 560)
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                inspectorPresented.toggle()
+                            } label: {
+                                Label("Hide Log", systemImage: "sidebar.trailing")
+                            }
+                        }
+                    }
+            }
     }
+
+    /// Wide enough for a callsign, its date and the band/mode chips without
+    /// the search field truncating — 380 clipped its placeholder.
+    private static let panelWidth: CGFloat = 420
 }
 
 /// Detents shared by the globe screen and its sheet — the same instances

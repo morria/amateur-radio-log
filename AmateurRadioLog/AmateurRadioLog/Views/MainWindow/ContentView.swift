@@ -259,7 +259,7 @@ struct ContentView: View {
             }
             #endif
             #if os(macOS)
-            modelContext.undoManager = undoManager
+            modelContext.undoManager = Self.undoManagerForContext(undoManager)
             #endif
             if !settings.stationCallsign.isEmpty && !settings.hasCompletedOnboarding {
                 // Upgrader with a configured station: mark complete
@@ -277,7 +277,7 @@ struct ContentView: View {
         // The environment undo manager can arrive after onAppear (and change
         // per window); keep the model context pointed at the current one.
         .onChange(of: undoManager.map(ObjectIdentifier.init)) { _, _ in
-            modelContext.undoManager = undoManager
+            modelContext.undoManager = Self.undoManagerForContext(undoManager)
         }
         #endif
         .onChange(of: appState.pendingImportURL) { _, url in
@@ -404,6 +404,17 @@ struct ContentView: View {
             modelContext.insert(record.makeQSO())
         }
         try? modelContext.save()
+    }
+    #endif
+
+    #if os(macOS)
+    /// SwiftData's undo bookkeeping trips over an in-memory store under
+    /// XCTest ("A snapshot should exist before creating a new snapshot for
+    /// undo"), and nothing in the suite exercises the Edit menu — so the
+    /// window's undo manager is only attached outside tests.
+    static func undoManagerForContext(_ manager: UndoManager?) -> UndoManager? {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+            ? manager : nil
     }
     #endif
 

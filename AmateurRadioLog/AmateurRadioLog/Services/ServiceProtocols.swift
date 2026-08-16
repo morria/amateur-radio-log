@@ -31,13 +31,6 @@ protocol QRZRemote: QSOUploader {
     func download(afterLogId: Int?) async throws -> [QSORecord]
 }
 
-/// LoTW's remote surface (download-only): received QSOs and QSL
-/// confirmations, each with an independent yyyy-MM-dd cursor.
-protocol LoTWRemote: Sendable {
-    func downloadQSOs(since: String?) async throws -> [QSORecord]
-    func downloadConfirmations(since: String?) async throws -> [QSORecord]
-}
-
 // MARK: - Credential-bound adapters
 
 struct QRZRemoteAdapter: QRZRemote {
@@ -72,19 +65,6 @@ struct WavelogRemoteAdapter: QSOUploader {
     }
 }
 
-struct LoTWRemoteAdapter: LoTWRemote {
-    let service: LoTWService
-    let username: String
-    let password: String
-
-    func downloadQSOs(since: String?) async throws -> [QSORecord] {
-        try await service.downloadQSOs(username: username, password: password, since: since)
-    }
-
-    func downloadConfirmations(since: String?) async throws -> [QSORecord] {
-        try await service.downloadConfirmations(username: username, password: password, since: since)
-    }
-}
 
 // MARK: - Transport helper (retry-once on transient errors)
 

@@ -36,27 +36,62 @@ targets:
       base:
         DEVELOPMENT_TEAM: 7Q2SS8772K
         PRODUCT_BUNDLE_IDENTIFIER: com.w2asm.AmateurRadioLog
-        INFOPLIST_KEY_CFBundleDisplayName: "Amateur Radio Log"
-        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.utilities"
-        INFOPLIST_KEY_NSHumanReadableCopyright: ""
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0.0
+        SWIFT_EMIT_LOC_STRINGS: YES
+        PRODUCT_NAME: "QSO"
+        PRODUCT_MODULE_NAME: AmateurRadioLog
+        CODE_SIGN_ENTITLEMENTS: AmateurRadioLog/App/AmateurRadioLog.entitlements
+        SWIFT_STRICT_CONCURRENCY: targeted
+    info:
+      path: SupportingFiles/Info.plist
+      properties:
+        CFBundleDisplayName: QSO
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: ""
+        UILaunchScreen: {}
         # iOS terminates the app on first CBCentralManager use without this.
-        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge."
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        NSBluetoothAlwaysUsageDescription: "QSO connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge."
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         # Self-hosted Wavelog instances are routinely plain HTTP on a private
         # network. This permits cleartext only to .local and unqualified
         # hostnames — far narrower than NSAllowsArbitraryLoads, which would
         # weaken every other request the app makes.
-        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
-        GENERATE_INFOPLIST_FILE: YES
-        CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 1.0.0
-        SWIFT_EMIT_LOC_STRINGS: YES
-        PRODUCT_NAME: "Amateur Radio Log"
-        PRODUCT_MODULE_NAME: AmateurRadioLog
-        CODE_SIGN_ENTITLEMENTS: AmateurRadioLog/App/AmateurRadioLog.entitlements
-        SWIFT_STRICT_CONCURRENCY: targeted
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        # ADIF is not a system type and is not ours to define, so it is
+        # *imported*: we describe a format other logging software already
+        # produces. Declaring it is what puts QSO in other apps' share
+        # sheets and "Open With" menus — and what makes
+        # UTType("com.amateurradiolog.adif") resolve at all.
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.amateurradiolog.adif
+            UTTypeDescription: ADIF Log
+            UTTypeConformsTo:
+              - public.plain-text
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension: [adi, adif]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: ADIF Log
+            LSItemContentTypes: [com.amateurradiolog.adif]
+            # Editor, not Viewer: an imported log is merged into this app's
+            # own log, not merely displayed. Alternate rank because ADIF
+            # belongs to the hobby — other logging software has an equal
+            # claim on the extension.
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+        # Open a log from Files or iCloud without copying it in first.
+        LSSupportsOpeningDocumentsInPlace: true
+
     entitlements:
       path: AmateurRadioLog/App/AmateurRadioLog.entitlements
       properties:
@@ -88,7 +123,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.w2asm.AmateurRadioLogTests
         GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Amateur Radio Log.app/Contents/MacOS/Amateur Radio Log"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/QSO.app/Contents/MacOS/QSO"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
   AmateurRadioLogUITests:

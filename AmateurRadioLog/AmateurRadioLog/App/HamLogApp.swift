@@ -7,11 +7,19 @@ struct AmateurRadioLogApp: App {
 
     let container: ModelContainer = {
         let schema = Schema([QSO.self, AppSettings.self, Operation.self, ReplicationEntry.self])
-        let config = ModelConfiguration(
-            "AmateurRadioLog",
-            schema: schema,
-            cloudKitDatabase: .automatic
-        )
+
+        // The unit-test bundle runs with this app as its TEST_HOST, so
+        // launching it opened the operator's real log — and the whole suite
+        // died on `fatalError` whenever that store's model was a version
+        // behind the code under test. Tests got no isolation from real data
+        // either way, so under XCTest the container is in-memory and
+        // CloudKit-free.
+        let underTest = ProcessInfo.processInfo
+            .environment["XCTestConfigurationFilePath"] != nil
+        let config = underTest
+            ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            : ModelConfiguration("AmateurRadioLog", schema: schema,
+                                 cloudKitDatabase: .automatic)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {

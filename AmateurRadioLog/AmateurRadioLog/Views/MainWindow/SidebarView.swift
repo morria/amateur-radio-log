@@ -4,9 +4,8 @@ import SwiftData
 struct SidebarView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @State private var showQRZSync = false
-    @State private var showLoTWSync = false
-    @State private var showHamQTHSync = false
+    /// Which provider's sync sheet is open, if any.
+    @State private var syncSheetService: SyncService?
     @AppStorage(WavelogPreferences.enabledKey) private var wavelogEnabled = false
     @State private var showSettings = false
     @State private var showFieldDay = false
@@ -91,28 +90,19 @@ struct SidebarView: View {
             }
 
             Section("Sync") {
-                SidebarSyncRow(service: .qrz, title: "Sync QRZ",
-                               icon: "arrow.triangle.2.circlepath") {
-                    showQRZSync = true
-                }
-                SidebarSyncRow(service: .lotw, title: "Sync LoTW",
-                               icon: "arrow.up.arrow.down.circle") {
-                    showLoTWSync = true
-                }
-                SidebarSyncRow(service: .hamqth, title: "Upload to HamQTH",
-                               icon: "arrow.up.circle") {
-                    showHamQTHSync = true
-                }
-                // Shown as soon as Wavelog is switched on. Read through
-                // @AppStorage rather than WavelogPreferences: a direct
-                // UserDefaults read inside the body creates no SwiftUI
-                // dependency, so the row would not appear until something
-                // else happened to invalidate the sidebar. If the URL, key
-                // or profile is still missing, the sync itself says which.
-                if wavelogEnabled {
-                    SidebarSyncRow(service: .wavelog, title: "Sync Wavelog",
-                                   icon: "arrow.up.circle") {
-                        appState.startSync(.wavelog, context: modelContext)
+                // Every provider opens the same sheet, so each one's result
+                // is shown under its own name. Wavelog used to sync straight
+                // from here with no sheet at all, which is why its failures
+                // appeared inside the QRZ screen.
+                ForEach(SyncService.allCases) { service in
+                    if service != .wavelog || wavelogEnabled {
+                        SidebarSyncRow(service: service,
+                                       title: "Sync \(service.displayName)",
+                                       icon: service.supportsDownload
+                                             ? "arrow.triangle.2.circlepath"
+                                             : "arrow.up.circle") {
+                            syncSheetService = service
+                        }
                     }
                 }
                 Button(action: { appState.requestLogExport() }) {
@@ -131,7 +121,7 @@ struct SidebarView: View {
             #endif
         }
         .listStyle(.sidebar)
-        .navigationTitle("Amateur Radio Log")
+        .navigationTitle("QSO")
         .onAppear {
             if listSelection == nil { listSelection = appState.selectedTab }
         }
@@ -154,20 +144,8 @@ struct SidebarView: View {
         .sheet(isPresented: $showOperationList) {
             OperationListView()
         }
-        .sheet(isPresented: $showQRZSync) {
-            SyncConfigSheet(provider: "QRZ.com") { direction in
-                appState.startSync(.qrz, context: modelContext, direction: direction)
-            }
-        }
-        .sheet(isPresented: $showLoTWSync) {
-            LoTWDownloadSheet {
-                appState.startSync(.lotw, context: modelContext)
-            }
-        }
-        .sheet(isPresented: $showHamQTHSync) {
-            HamQTHUploadSheet {
-                appState.startSync(.hamqth, context: modelContext)
-            }
+        .sheet(item: $syncSheetService) { service in
+            SyncSheet(service: service)
         }
         #if os(iOS)
         .sheet(isPresented: $showSettings) {
@@ -283,194 +261,3 @@ private struct SidebarSyncRow: View {
     }
 }
 
-// MARK: - Sync Progress Section
-
-/// Shared sheet section: determinate progress + Cancel while syncing, the
-/// final status once done, and a disclosure listing per-QSO upload failures.
-struct SyncProgressSection: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        Section {
-            if appState.isSyncing {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let progress = appState.syncProgress {
-                        ProgressView(value: Double(progress.done),
-                                     total: Double(max(progress.total, 1)))
-                        Text("\(progress.done) of \(progress.total) uploaded")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    } else {
-                        ProgressView()
-                            .progressViewStyle(.linear)
-                    }
-                    Text(appState.statusMessage ?? String(localized: "Syncing..."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Button(role: .cancel) {
-                    appState.cancelSync()
-                } label: {
-                    Text("Cancel Sync")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else if let status = appState.statusMessage, !status.isEmpty {
-                Text(status)
-                    .font(.caption)
-                    .foregroundStyle(.green)
-            }
-        }
-
-        if !appState.isSyncing && !appState.lastSyncFailures.isEmpty {
-            Section {
-                DisclosureGroup {
-                    ForEach(appState.lastSyncFailures) { failure in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(failure.call)
-                                .font(.caption.bold())
-                            Text(failure.reason)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } label: {
-                    Label("\(appState.lastSyncFailures.count) QSOs failed to upload",
-                          systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Sync Config Sheet
-
-struct SyncConfigSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
-    let provider: String
-    let onSync: (SyncDirection) -> Void
-
-    @State private var direction: SyncDirection = .both
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Provider") {
-                    Text(provider).font(.headline)
-                }
-
-                Section("Direction") {
-                    Picker("Sync Direction", selection: $direction) {
-                        ForEach(SyncDirection.allCases) { dir in
-                            Text(dir.localizedName).tag(dir)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    switch direction {
-                    case .upload:
-                        Text("Upload local QSOs to \(provider).")
-                            .font(.caption).foregroundStyle(.secondary)
-                    case .download:
-                        Text("Download QSOs from \(provider). Duplicates will be skipped.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    case .both:
-                        Text("Upload local QSOs and download new QSOs from \(provider). Duplicates will be skipped.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-
-                SyncProgressSection()
-            }
-            .navigationTitle("Sync \(provider)")
-            #if os(macOS)
-            .frame(width: 400, height: 340)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Sync") {
-                        onSync(direction)
-                    }
-                    .disabled(appState.isSyncing)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - LoTW Sheet (download sync)
-
-struct LoTWDownloadSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
-    let onDownload: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("Download QSL confirmations from LoTW. New QSOs and confirmations will be added to your log.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } footer: {
-                    Text("To upload, use Export and choose the LoTW format: LoTW only accepts logs signed with TQSL.")
-                }
-
-                SyncProgressSection()
-            }
-            .navigationTitle("Sync LoTW")
-            #if os(macOS)
-            .frame(width: 420, height: 300)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Download") { onDownload() }
-                        .disabled(appState.isSyncing)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - HamQTH Upload Sheet
-
-struct HamQTHUploadSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
-    let onUpload: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("Upload new QSOs to your HamQTH logbook.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("HamQTH does not support logbook download. To import QSOs from HamQTH, export an ADIF file from their website and import it here.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                SyncProgressSection()
-            }
-            .navigationTitle("Upload to HamQTH")
-            #if os(macOS)
-            .frame(width: 400, height: 300)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Upload") { onUpload() }
-                        .disabled(appState.isSyncing)
-                }
-            }
-        }
-    }
-}

@@ -12,12 +12,6 @@ enum SyncPhase: Sendable {
 
 typealias SyncPhaseHandler = @MainActor @Sendable (SyncPhase) -> Void
 
-/// Outcome of a LoTW download sync.
-struct LoTWSyncSummary: Sendable {
-    var inserted = 0
-    var confirmed = 0
-}
-
 /// Outcome of an upload pass to one provider.
 struct UploadSyncSummary: Sendable {
     /// Number of unsynced records that were candidates for upload.
@@ -96,26 +90,6 @@ struct SyncEngine: Sendable {
                      onPhase: SyncPhaseHandler? = nil,
                      progress: SyncProgressHandler? = nil) async throws -> UploadSyncSummary {
         try await uploadUnsynced(to: remote, service: .wavelog, onPhase: onPhase, progress: progress)
-    }
-
-    // MARK: LoTW (download-only)
-
-    func syncLoTW(remote: some LoTWRemote,
-                  rxSince: String?,
-                  qslSince: String?,
-                  onPhase: SyncPhaseHandler? = nil) async throws -> LoTWSyncSummary {
-        // Query A: QSO records LoTW has received from us since the rx cursor.
-        await onPhase?(.downloading)
-        let remoteQSOs = try await remote.downloadQSOs(since: rxSince)
-
-        // Query B: QSL confirmations issued since the QSL cursor.
-        await onPhase?(.downloadingConfirmations)
-        let confirmations = try await remote.downloadConfirmations(since: qslSince)
-
-        // Dictionary merge off the main actor (confirmation flags come
-        // from each record's LOTW_QSL_RCVD).
-        let merge = try await store.merge(remoteQSOs + confirmations, source: .lotw)
-        return LoTWSyncSummary(inserted: merge.inserted, confirmed: merge.confirmed)
     }
 
     // MARK: Shared upload pass

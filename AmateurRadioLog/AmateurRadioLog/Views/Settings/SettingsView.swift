@@ -11,8 +11,6 @@ struct SettingsView: View {
                 .tabItem { Label("QRZ.com", systemImage: "antenna.radiowaves.left.and.right") }
             HamQTHSettingsView()
                 .tabItem { Label("HamQTH", systemImage: "globe") }
-            LoTWSettingsView()
-                .tabItem { Label("LoTW", systemImage: "checkmark.seal") }
             WSJTXSettingsView()
                 .tabItem { Label("WSJT-X", systemImage: "dot.radiowaves.left.and.right") }
             Form { WavelogSettingsView() }
@@ -48,13 +46,6 @@ struct SettingsView: View {
             }
             Section("HamQTH") {
                 HamQTHSettingsView()
-            }
-            Section {
-                LoTWSettingsView()
-            } header: {
-                Text("LoTW")
-            } footer: {
-                Text("LoTW upload requires digitally signed ADIF files via TQSL. Download of QSL confirmations works with these credentials.")
             }
             Section {
                 WSJTXSettingsView()
@@ -577,146 +568,6 @@ struct HamQTHSettingsView: View {
             try await service.authenticate(username: username, password: password)
             status = String(localized: "Success! Connected to HamQTH.com")
             statusIsError = false
-        } catch {
-            status = String(localized: "Failed: \(error.localizedDescription)")
-            statusIsError = true
-        }
-        isTesting = false
-    }
-}
-
-// MARK: - LoTW Settings
-
-struct LoTWSettingsView: View {
-    @Query private var allSettings: [AppSettings]
-    @State private var username = ""
-    @State private var password = ""
-    @State private var status = ""
-    @State private var statusIsError = false
-    @State private var isTesting = false
-
-    var body: some View {
-        #if os(macOS)
-        Form {
-            Section("ARRL LoTW Credentials") {
-                TextField("Username (Callsign)", text: $username)
-                SecureField("Password", text: $password)
-            }
-            Section {
-                HStack {
-                    Button("Test Connection") {
-                        Task { await testConnection() }
-                    }
-                    .disabled(username.isEmpty || password.isEmpty || isTesting)
-
-                    if isTesting {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
-                    Spacer()
-
-                    Button("Save") { save() }
-                }
-
-                Button("Full LoTW Resync") { resetSyncCursors() }
-                    .help("Clears the incremental sync cursors so the next LoTW sync downloads your full log")
-
-                if !status.isEmpty {
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(statusIsError ? .red : .green)
-                }
-
-                Text("Note: LoTW upload requires digitally signed ADIF files via TQSL. Download of QSL confirmations works with these credentials.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-        .onAppear { load() }
-        #else
-        TextField("Username (Callsign)", text: $username)
-            .textContentType(.username)
-            .autocorrectionDisabled()
-            .textInputAutocapitalization(.characters)
-        SecureField("Password", text: $password)
-            .textContentType(.password)
-
-        credentialActions
-            .onAppear { load() }
-        #endif
-    }
-
-    #if os(iOS)
-    private var credentialActions: some View {
-        Group {
-            Button {
-                Task { await testConnection() }
-            } label: {
-                HStack {
-                    Text("Test Connection")
-                    Spacer()
-                    if isTesting {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-            }
-            .disabled(username.isEmpty || password.isEmpty || isTesting)
-
-            Button("Save Credentials") { save() }
-
-            Button("Full LoTW Resync") { resetSyncCursors() }
-
-            if !status.isEmpty {
-                Text(status)
-                    .font(.caption)
-                    .foregroundStyle(statusIsError ? .red : .green)
-            }
-        }
-    }
-    #endif
-
-    /// Clears the incremental-sync cursors so the next LoTW sync fetches the full log.
-    private func resetSyncCursors() {
-        guard let settings = allSettings.first else { return }
-        settings.lotwQSORxSince = nil
-        settings.lotwQSLSince = nil
-        status = String(localized: "Next LoTW sync will download the full log")
-        statusIsError = false
-    }
-
-    private func load() {
-        let creds = KeychainManager.loadCredentials(for: .lotw)
-        username = creds.username
-        password = creds.password
-    }
-
-    private func save() {
-        do {
-            try KeychainManager.saveCredentials(ServiceCredentials(username: username, password: password), for: .lotw)
-            status = String(localized: "Saved")
-            statusIsError = false
-        } catch {
-            status = String(localized: "Save failed: \(error.localizedDescription)")
-            statusIsError = true
-        }
-    }
-
-    private func testConnection() async {
-        isTesting = true
-        save()
-        let service = LoTWService()
-        do {
-            let valid = try await service.verifyCredentials(username: username, password: password)
-            if valid {
-                status = String(localized: "Success! Connected to LoTW")
-                statusIsError = false
-            } else {
-                status = String(localized: "Failed: Invalid credentials")
-                statusIsError = true
-            }
         } catch {
             status = String(localized: "Failed: \(error.localizedDescription)")
             statusIsError = true

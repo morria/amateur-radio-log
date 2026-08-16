@@ -10,5 +10,4 @@ struct ServiceCredentials: Sendable, Equatable {
 enum ServiceType: String, CaseIterable, Sendable {
     case qrz = "QRZ.com"
     case hamqth = "HamQTH.com"
-    case lotw = "LoTW"
 }

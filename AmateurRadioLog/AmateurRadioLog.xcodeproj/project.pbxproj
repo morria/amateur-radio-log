@@ -36,6 +36,7 @@
 		28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */; };
 		2A025DF68A820CA19D11B48E /* FrequencyBandMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */; };
 		2EB19A941D3A4E010078716D /* CallsignSuperfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA3C42BF55EC7DD7F3B81C1 /* CallsignSuperfill.swift */; };
+		2EF9188877E0508C38A4CC9B /* SyncReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3281A4EC59DA6D07A77DB4AF /* SyncReport.swift */; };
 		2F8B14644735D6CF62043A55 /* StationInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364515BC2452FE33C5C76C20 /* StationInfoCard.swift */; };
 		32AF577147893E10F915E91A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */; };
 		342459C52D5EC9B9F81D0030 /* SyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9E4AA9657B3AFA4559E47E /* SyncTests.swift */; };
@@ -76,7 +77,6 @@
 		9788B752C9A09395D697C64E /* QSOMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A437A6C9C6E52A8CD52B0F3 /* QSOMatcher.swift */; };
 		98B3DD97D0B5DFD98DA7683A /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 834B46C3E471F216FB58CCE9 /* ShareSheet.swift */; };
 		99C619B13EBF85303B7DE910 /* StatsSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFE5FFD47E8907B7828CD79 /* StatsSummary.swift */; };
-		9CC7306B7E7DDB9D5E51A514 /* LoTWService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93A962F6080E90AEB5E8199B /* LoTWService.swift */; };
 		9D856B119E29B5562B2BF928 /* ServiceError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA8C2116BF90D70986F30FA /* ServiceError.swift */; };
 		9F0F3F636745D746F680608A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6FFF828976FE434255D0276 /* AppState.swift */; };
 		9FFAF59B4F7465E565A97F48 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B533A3F90ACF8E596A7C622 /* OnboardingView.swift */; };
@@ -87,9 +87,11 @@
 		B34998BF85699C26C7DA09AA /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751E4D19CC969EC2263A7F5E /* KeychainManager.swift */; };
 		B63C02EC4C5B1D841CCEB3B5 /* ADIFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EBCDAD1FEEA1D174C9F87C /* ADIFParser.swift */; };
 		B6DCE35147163EBFD91F0269 /* AwardEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0755D1B36432788FB86E9B30 /* AwardEngine.swift */; };
+		B85B06055E50FFAC898EB3A7 /* SyncSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F0141D2866E0FF01F47D98 /* SyncSheet.swift */; };
 		BECEB011F784065020BCCD6E /* ClusterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */; };
 		BF84C71FB3F043313B4829C8 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC69A3DA9ED827733908D386 /* SidebarView.swift */; };
 		BF9953C0718F0E1FA326C3B6 /* SpotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0510701E4652985EC2569789 /* SpotProvider.swift */; };
+		C04FF737B211E09D3218D7DC /* CallsignSuperfillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 367CFC445221013281527876 /* CallsignSuperfillTests.swift */; };
 		C3A3EFF6854AD48B77E895EF /* SpotSubmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1606C15DE6AFF14E21D041DB /* SpotSubmitter.swift */; };
 		C775845EEB2D4BDCBA864C4E /* LogEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D602CAA8FEA9D6503701EF /* LogEntryView.swift */; };
 		C7F65F634CD8A87180F05398 /* ParkDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */; };
@@ -153,7 +155,6 @@
 		0E49C26E41522EC357E3A52D /* FieldDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldDayView.swift; sourceTree = "<group>"; };
 		0F92A9393C186928D96B2C35 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClusterParserTests.swift; sourceTree = "<group>"; };
-		143FDB332171E9BFB0D89DDC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1606C15DE6AFF14E21D041DB /* SpotSubmitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotSubmitter.swift; sourceTree = "<group>"; };
 		192D4A21004CED7D40145A8E /* QRZService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRZService.swift; sourceTree = "<group>"; };
 		19D84EB4665CEBBF11DB3FD1 /* PreviewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
@@ -166,8 +167,10 @@
 		2F44254B1312E8C10FAECED7 /* Mode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mode.swift; sourceTree = "<group>"; };
 		2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParkDatabase.swift; sourceTree = "<group>"; };
 		32508686DD4BFB82BA10DCA5 /* ContactMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactMapView.swift; sourceTree = "<group>"; };
+		3281A4EC59DA6D07A77DB4AF /* SyncReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncReport.swift; sourceTree = "<group>"; };
 		33FF7077DF7629746C2915FC /* OnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTests.swift; sourceTree = "<group>"; };
 		364515BC2452FE33C5C76C20 /* StationInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StationInfoCard.swift; sourceTree = "<group>"; };
+		367CFC445221013281527876 /* CallsignSuperfillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignSuperfillTests.swift; sourceTree = "<group>"; };
 		3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TQSLLauncher.swift; sourceTree = "<group>"; };
 		3A8F38DFF854D4CA16439B17 /* WSJTXListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSJTXListener.swift; sourceTree = "<group>"; };
 		3D76E301651BC205642DEDC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -209,12 +212,12 @@
 		8BA8C2116BF90D70986F30FA /* ServiceError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceError.swift; sourceTree = "<group>"; };
 		908896B782E1C73A0E87D9C6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		91385BDA835FED00C748E4DD /* PocketCatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketCatTests.swift; sourceTree = "<group>"; };
-		93A962F6080E90AEB5E8199B /* LoTWService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoTWService.swift; sourceTree = "<group>"; };
 		9608DE44244D28AC40650023 /* SignalReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalReportTests.swift; sourceTree = "<group>"; };
 		9641694D5C217DD93F6D8BF0 /* CallsignDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignDatabaseTests.swift; sourceTree = "<group>"; };
 		99BDB2EDCBB5C0426D5F7FC9 /* QSOStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOStoreTests.swift; sourceTree = "<group>"; };
 		9BE906F1F502447279BDF9C8 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		9D1CC7D81F61D1D8E2B1476E /* AmateurRadioLog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AmateurRadioLog.entitlements; sourceTree = "<group>"; };
+		A9F0141D2866E0FF01F47D98 /* SyncSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSheet.swift; sourceTree = "<group>"; };
 		ADB96D32A2C761676B98BBD9 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		AEF5670E0813F619BAE3EA51 /* QSOEditData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOEditData.swift; sourceTree = "<group>"; };
 		B46FD8BBA8F7F9A3576C3069 /* SpotListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotListView.swift; sourceTree = "<group>"; };
@@ -308,7 +311,6 @@
 				D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */,
 				751E4D19CC969EC2263A7F5E /* KeychainManager.swift */,
 				C9913A69C231F9A5283608B6 /* LocationManager.swift */,
-				93A962F6080E90AEB5E8199B /* LoTWService.swift */,
 				3E9AE7A788B8CEA526FE36C5 /* OperationIdentityBackfill.swift */,
 				2F543D88B1CC2A8386791CDA /* ParkDatabase.swift */,
 				EC266241ECB2A70B1C2E3A88 /* PocketCatService.swift */,
@@ -377,7 +379,6 @@
 		6803286BF695C3F0F92EB2F3 /* AmateurRadioLog */ = {
 			isa = PBXGroup;
 			children = (
-				143FDB332171E9BFB0D89DDC /* Info.plist */,
 				36C640A88FFF6958D2A4D703 /* ADIF */,
 				1371E593FE18FD934DBAD2D9 /* App */,
 				6E99847B5872FBE13455185D /* Models */,
@@ -404,6 +405,7 @@
 				AEF5670E0813F619BAE3EA51 /* QSOEditData.swift */,
 				64ED0ED70560B9F519AAFA10 /* QSORecord.swift */,
 				6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */,
+				3281A4EC59DA6D07A77DB4AF /* SyncReport.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -430,6 +432,7 @@
 				C5E0FAE0EB2E4F8A07483995 /* ActivationTests.swift */,
 				0BAB794A26A0412CE3C70471 /* AwardEngineTests.swift */,
 				9641694D5C217DD93F6D8BF0 /* CallsignDatabaseTests.swift */,
+				367CFC445221013281527876 /* CallsignSuperfillTests.swift */,
 				1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */,
 				87F2547788F423DBE3731308 /* FieldDayReplicationTests.swift */,
 				F106C61338C6F99B136BB883 /* FilterPerfTests.swift */,
@@ -519,6 +522,7 @@
 				2CD8C3278680F85D50E624F2 /* QuickEntryBar.swift */,
 				4E81E8F81A3699300D8265B9 /* SearchBarView.swift */,
 				DC69A3DA9ED827733908D386 /* SidebarView.swift */,
+				A9F0141D2866E0FF01F47D98 /* SyncSheet.swift */,
 			);
 			path = MainWindow;
 			sourceTree = "<group>";
@@ -708,6 +712,7 @@
 				831C8721E5310907EE3247C6 /* ActivationTests.swift in Sources */,
 				715AFD07BDA920635300BEB5 /* AwardEngineTests.swift in Sources */,
 				25F1F41E6470A9171CAEC993 /* CallsignDatabaseTests.swift in Sources */,
+				C04FF737B211E09D3218D7DC /* CallsignSuperfillTests.swift in Sources */,
 				BECEB011F784065020BCCD6E /* ClusterParserTests.swift in Sources */,
 				767BED956B3CD1CE8D2FD2E2 /* FieldDayReplicationTests.swift in Sources */,
 				E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */,
@@ -764,7 +769,6 @@
 				FBD3A6B24B5CE855CA3F8070 /* HamQTHService.swift in Sources */,
 				781F084552AF6A96AB822E88 /* ImportPreviewSheet.swift in Sources */,
 				B34998BF85699C26C7DA09AA /* KeychainManager.swift in Sources */,
-				9CC7306B7E7DDB9D5E51A514 /* LoTWService.swift in Sources */,
 				A0B09F303E4E3B501249FB64 /* LocationManager.swift in Sources */,
 				C775845EEB2D4BDCBA864C4E /* LogEntryView.swift in Sources */,
 				0A3768A20108615692DD495F /* LogGlobeView.swift in Sources */,
@@ -810,6 +814,8 @@
 				99C619B13EBF85303B7DE910 /* StatsSummary.swift in Sources */,
 				0744B0373BDD960A17D15078 /* StatsView.swift in Sources */,
 				27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */,
+				2EF9188877E0508C38A4CC9B /* SyncReport.swift in Sources */,
+				B85B06055E50FFAC898EB3A7 /* SyncSheet.swift in Sources */,
 				E3B147A925E44A654DF7598F /* TQSLLauncher.swift in Sources */,
 				18276D484E7860B588CB07B8 /* TelnetSpotProvider.swift in Sources */,
 				F7E9894D5A35485B4FA7FF77 /* UploadResult.swift in Sources */,
@@ -906,7 +912,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLogTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Amateur Radio Log.app/Contents/MacOS/Amateur Radio Log";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QSO.app/Contents/MacOS/QSO";
 			};
 			name = Debug;
 		};
@@ -1026,16 +1032,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7Q2SS8772K;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = AmateurRadioLog/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Amateur Radio Log";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = SupportingFiles/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1043,7 +1040,7 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLog;
 				PRODUCT_MODULE_NAME = AmateurRadioLog;
-				PRODUCT_NAME = "Amateur Radio Log";
+				PRODUCT_NAME = QSO;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -1063,16 +1060,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7Q2SS8772K;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = AmateurRadioLog/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Amateur Radio Log";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Amateur Radio Log connects to your transceiver's CAT interface over a Pocket Cat Bluetooth bridge.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = SupportingFiles/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1080,7 +1068,7 @@
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLog;
 				PRODUCT_MODULE_NAME = AmateurRadioLog;
-				PRODUCT_NAME = "Amateur Radio Log";
+				PRODUCT_NAME = QSO;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -1105,7 +1093,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.w2asm.AmateurRadioLogTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Amateur Radio Log.app/Contents/MacOS/Amateur Radio Log";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QSO.app/Contents/MacOS/QSO";
 			};
 			name = Release;
 		};

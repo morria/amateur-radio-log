@@ -147,7 +147,7 @@ struct OnboardingView: View {
             Text("Already have a log?")
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)
-            Text("Import an ADIF (.adi) file exported from another logging app or LoTW. You'll see a preview before anything is added.")
+            Text("Import an ADIF (.adi) file exported from another logging app. You'll see a preview before anything is added.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -182,7 +182,7 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 Text("Connect Services")
                     .font(.title2.bold())
-                Text("Optional: link QRZ.com, HamQTH, or LoTW for callsign lookups and QSL sync. You can set these up later in Settings.")
+                Text("Optional: link QRZ.com or HamQTH for callsign lookups and log sync. You can set these up later in Settings.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -194,7 +194,6 @@ struct OnboardingView: View {
             Picker("Service", selection: $selectedService) {
                 Text("QRZ.com").tag(0)
                 Text("HamQTH").tag(1)
-                Text("LoTW").tag(2)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -204,7 +203,7 @@ struct OnboardingView: View {
                 switch selectedService {
                 case 0: QRZSettingsView()
                 case 1: HamQTHSettingsView()
-                default: LoTWSettingsView()
+                default: HamQTHSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -212,7 +211,6 @@ struct OnboardingView: View {
             Form {
                 Section("QRZ.com") { QRZSettingsView() }
                 Section("HamQTH") { HamQTHSettingsView() }
-                Section("LoTW") { LoTWSettingsView() }
             }
             #endif
         }

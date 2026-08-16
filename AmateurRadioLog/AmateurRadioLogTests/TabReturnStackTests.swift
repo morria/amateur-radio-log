@@ -17,35 +17,47 @@ final class TabReturnStackTests: XCTestCase {
         XCTAssertEqual(state.tabReturnStack, [.stats])
     }
 
-    func testDrillInFromMapRecordsMap() {
+    func testDrillInFromSpotsRecordsSpots() {
         let state = AppState()
-        state.selectedTab = .map
+        state.selectedTab = .spots
         state.showLogFiltered(mode: .cw)
-        XCTAssertEqual(state.tabReturnStack, [.map])
+        XCTAssertEqual(state.tabReturnStack, [.spots])
     }
 
-    func testShowOnMapFromLogRecordsLog() {
+    /// The map is no longer a separate destination — the Log *is* the globe.
+    /// "Show on Map" from the log therefore stays put, and a same-tab
+    /// navigation records no history to go back through.
+    func testShowOnMapFromLogStaysOnLogAndRecordsNothing() {
         let state = AppState()
         state.selectedTab = .log
         state.showOnMap(qso: QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000"))
-        XCTAssertEqual(state.selectedTab, .map)
-        XCTAssertEqual(state.tabReturnStack, [.log])
+        XCTAssertEqual(state.selectedTab, .log)
+        XCTAssertTrue(state.tabReturnStack.isEmpty)
     }
 
-    func testShowFilteredOnMapRecordsLog() {
+    /// From elsewhere it is still a real move, so the origin is recorded.
+    func testShowOnMapFromStatsRecordsStats() {
+        let state = AppState()
+        state.selectedTab = .stats
+        state.showOnMap(qso: QSO(call: "W1AW", qsoDate: "20260308", timeOn: "143000"))
+        XCTAssertEqual(state.selectedTab, .log)
+        XCTAssertEqual(state.tabReturnStack, [.stats])
+    }
+
+    func testShowFilteredOnMapFromLogRecordsNothing() {
         let state = AppState()
         state.selectedTab = .log
         state.showFilteredOnMap()
-        XCTAssertEqual(state.tabReturnStack, [.log])
+        XCTAssertTrue(state.tabReturnStack.isEmpty)
     }
 
-    func testShowLogSearchFromMapRecordsMapAndSetsSearch() {
+    func testShowLogSearchFromStatsRecordsStatsAndSetsSearch() {
         let state = AppState()
-        state.selectedTab = .map
+        state.selectedTab = .stats
         state.showLogSearch("20260308")
         XCTAssertEqual(state.selectedTab, .log)
         XCTAssertEqual(state.searchText, "20260308")
-        XCTAssertEqual(state.tabReturnStack, [.map])
+        XCTAssertEqual(state.tabReturnStack, [.stats])
     }
 
     func testSameTabDrillInKeepsExistingHistory() {
@@ -70,19 +82,24 @@ final class TabReturnStackTests: XCTestCase {
         XCTAssertFalse(state.popReturnTab(), "no history left — back should dismiss")
     }
 
-    func testChainRetracesEachHop() {
+    /// Since the map merged into the Log, every drill-in lands on `.log` —
+    /// so successive drill-ins from the Log are same-tab moves that record
+    /// nothing, and the history is at most one hop deep. (The stack is still
+    /// an array, and `selectedTab`'s didSet still clears it on a direct
+    /// write; this pins the reachable behaviour, not the machinery.)
+    func testDrillInsIntoTheLogNeverStackDeeperThanOneHop() {
         let state = AppState()
-        state.selectedTab = .stats
-        state.showLogFiltered(band: .band20m)                       // stats -> log
-        state.showOnMap(qso: QSO(call: "W1AW", qsoDate: "20260308",
-                                 timeOn: "143000"))                 // log -> map
-        XCTAssertEqual(state.tabReturnStack, [.stats, .log])
+        state.selectedTab = .spots
+        state.showLogFiltered(band: .band20m)   // spots -> log
+        XCTAssertEqual(state.tabReturnStack, [.spots])
+
+        state.showLogSearch("20260308")         // log -> log: no hop
+        state.showFilteredOnMap()               // log -> log: no hop
+        XCTAssertEqual(state.tabReturnStack, [.spots])
 
         XCTAssertTrue(state.popReturnTab())
-        XCTAssertEqual(state.selectedTab, .log)
-        XCTAssertTrue(state.popReturnTab())
-        XCTAssertEqual(state.selectedTab, .stats)
-        XCTAssertFalse(state.popReturnTab())
+        XCTAssertEqual(state.selectedTab, .spots)
+        XCTAssertFalse(state.popReturnTab(), "no history left — back should dismiss")
     }
 
     func testHistoryIsBounded() {

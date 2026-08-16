@@ -166,6 +166,11 @@ struct ContactMapView: View {
     @State private var displayPins: [QSOMapPin] = []
     @State private var clusters: [MapCluster] = []
     @State private var currentSpan: MKCoordinateSpan?
+    /// Whether the opening camera has been placed. `settings` is assigned by
+    /// the parent's `onAppear`, which SwiftUI runs *after* this view's, so on
+    /// a cold launch the station grid is not yet readable here — the camera
+    /// has to be placed again when it arrives.
+    @State private var didPlaceInitialCamera = false
 
     /// Above this many pins the map switches to grid-bucketed clustering.
     private static let clusteringThreshold = 500
@@ -187,8 +192,12 @@ struct ContactMapView: View {
 
     /// Far enough out that MapKit renders the Earth as a globe, but close
     /// enough that the globe fills the frame rather than sitting as a small
-    /// disc in a field of black.
+    /// disc in a field of black. Used before the station's grid is known.
     static let globeCameraDistance: CLLocationDistance = 26_000_000
+    /// Opening altitude over the operator's own QTH: the globe still reads as
+    /// a globe (its limb is visible) while the home continent is large enough
+    /// to pick individual clusters out of.
+    static let homeCameraDistance: CLLocationDistance = 12_000_000
 
     /// Composite key describing every input that affects which pins exist.
     /// Color-by is included so legend/pin styling inputs stay in sync, and the
@@ -326,7 +335,24 @@ struct ContactMapView: View {
         #endif
         if let camera = appState.lastMapCamera {
             cameraPosition = .camera(camera)
+            return
         }
+        // First run: open over the operator's own station rather than an
+        // arbitrary point in the Atlantic. Their own QTH is where their log
+        // radiates from, so it is the one centre that makes the opening view
+        // legible.
+        placeHomeCamera()
+    }
+
+    /// Centres on the operator's own station. No-op once placed, once the
+    /// operator has moved the camera themselves, or while the grid is unknown.
+    private func placeHomeCamera() {
+        guard !didPlaceInitialCamera, appState.lastMapCamera == nil,
+              let grid = appState.settings?.myGridsquare, !grid.isEmpty,
+              let home = MaidenheadConverter.toCoordinate(grid: grid) else { return }
+        didPlaceInitialCamera = true
+        cameraPosition = .camera(MapCamera(centerCoordinate: home,
+                                           distance: Self.homeCameraDistance))
     }
 
     private func handleHighlight(_ id: String?) {
@@ -477,6 +503,9 @@ struct ContactMapView: View {
                 appState.lastMapCamera = context.camera
                 currentSpan = context.region.span
                 recomputeClusters()
+            }
+            .onChange(of: appState.settings?.myGridsquare) { _, _ in
+                placeHomeCamera()
             }
             .onChange(of: pinRebuildKey) { _, _ in
                 updatePins()
