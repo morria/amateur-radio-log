@@ -60,8 +60,8 @@ final class ADIFWriter {
         fields += adifField("QSO_DATE", q.qsoDate)
         fields += adifField("TIME_ON", q.timeOn)
         fields += optField("TIME_OFF", q.timeOff)
-        fields += optField("FREQ", q.freq.map { String($0) })
-        fields += optField("FREQ_RX", q.freqRx.map { String($0) })
+        fields += freqField("FREQ", q.freq)
+        fields += freqField("FREQ_RX", q.freqRx)
         fields += optField("BAND", q.bandRaw)
         fields += optField("BAND_RX", q.bandRxRaw)
         fields += optField("MODE", q.modeRaw)
@@ -79,10 +79,10 @@ final class ADIFWriter {
         fields += optField("ITUZ", q.ituZone.map { String($0) })
         fields += optField("CONT", q.continent)
         fields += optField("IOTA", q.iota)
-        fields += optField("TX_PWR", q.txPower.map { String($0) })
-        fields += optField("RX_PWR", q.rxPower.map { String($0) })
-        fields += optField("ANT_AZ", q.antAz.map { String($0) })
-        fields += optField("ANT_EL", q.antEl.map { String($0) })
+        fields += optField("TX_PWR", numberString(q.txPower))
+        fields += optField("RX_PWR", numberString(q.rxPower))
+        fields += optField("ANT_AZ", numberString(q.antAz))
+        fields += optField("ANT_EL", numberString(q.antEl))
         fields += optField("QSL_SENT", q.qslSent)
         fields += optField("QSL_SENT_VIA", q.qslSentVia)
         fields += optField("QSL_RCVD", q.qslRcvd)
@@ -137,5 +137,32 @@ final class ADIFWriter {
     private func optField(_ name: String, _ value: String?) -> String {
         guard let value = value, !value.isEmpty else { return "" }
         return adifField(name, value)
+    }
+
+    /// FREQ/FREQ_RX in MHz. Six decimals is 1 Hz — finer than any radio
+    /// reports — and a non-positive frequency is never a real dial reading,
+    /// so it is dropped rather than exported: BAND still carries the QSO,
+    /// where a bogus FREQ would cost the whole record at upload time.
+    private func freqField(_ name: String, _ mhz: Double?) -> String {
+        guard let mhz, mhz > 0, let text = numberString(mhz, decimals: 6) else { return "" }
+        return adifField(name, text)
+    }
+
+    /// ADIF numbers must be plain decimals. `String(Double)` is a debug
+    /// description rather than a formatter: it prints the binary artifacts a
+    /// value picks up from unit conversion or another logger's export
+    /// ("21.073999999999998"), falls back to scientific notation at the
+    /// extremes ("1e-05"), and renders "nan"/"inf" verbatim. Strict
+    /// consumers — QRZ's logbook API among them — reject the whole record
+    /// over any of the three. Fixed decimals with the trailing zeros trimmed
+    /// keep every digit a QSO can legitimately carry.
+    private func numberString(_ value: Double?, decimals: Int = 3) -> String? {
+        guard let value, value.isFinite else { return nil }
+        var text = String(format: "%.\(decimals)f", value)
+        if text.contains(".") {
+            while text.hasSuffix("0") { text.removeLast() }
+            if text.hasSuffix(".") { text.removeLast() }
+        }
+        return text == "-0" ? "0" : text
     }
 }

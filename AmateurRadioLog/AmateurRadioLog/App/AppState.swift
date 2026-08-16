@@ -449,6 +449,7 @@ final class AppState {
     let qrzService = QRZService()
     let hamQTHService = HamQTHService()
     let wavelogService = WavelogService()
+    let callsignDatabase = CallsignDatabase.shared
     let lotwService = LoTWService()
 
     // MARK: - Spots
@@ -859,7 +860,7 @@ final class AppState {
     }
 
     func saveLastUsed(from data: QSOEditData) {
-        if let b = data.band { lastBand = b }
+        if let b = data.resolvedBand { lastBand = b }
         if let m = data.mode { lastMode = m }
         if let f = data.freq { lastFreq = f }
         if let p = data.txPower { lastPower = p }
@@ -867,7 +868,32 @@ final class AppState {
 
     // MARK: - Callsign Lookup
 
+    /// The bundled FCC database first, then the callbook layered on top of it.
+    ///
+    /// The offline hit answers instantly and offline; the callbook then fills
+    /// in everything the FCC doesn't publish — county, DXCC, zones, LoTW/eQSL
+    /// participation, precise coordinates — and wins wherever the two
+    /// disagree. With no callbook configured, or when one fails, the offline
+    /// answer stands on its own.
+    ///
+    /// Callers that want the answer on screen before the network returns
+    /// should use `localCallsignLookup` and `remoteCallsignLookup` directly
+    /// and merge with `enriched(with:)`, as the entry screen does.
     func lookupCallsign(_ callsign: String) async -> CallsignLookupResult? {
+        let local = await localCallsignLookup(callsign)
+        guard let remote = await remoteCallsignLookup(callsign) else { return local }
+        return local?.enriched(with: remote) ?? remote
+    }
+
+    /// Offline lookup against the bundled FCC license snapshot: first name and
+    /// 4-character grid for any active US callsign. Returns nil for anything
+    /// it doesn't carry — non-US calls, and calls licensed since the snapshot.
+    func localCallsignLookup(_ callsign: String) async -> CallsignLookupResult? {
+        await callsignDatabase.lookupResult(callsign: callsign)
+    }
+
+    /// Callbook lookup: QRZ if configured, otherwise (or on failure) HamQTH.
+    func remoteCallsignLookup(_ callsign: String) async -> CallsignLookupResult? {
         let qrzCreds = KeychainManager.loadCredentials(for: .qrz)
         if !qrzCreds.isEmpty {
             do {
@@ -891,9 +917,18 @@ final class AppState {
         return nil
     }
 
-    /// Whether a callbook (QRZ or HamQTH) is configured, so callsign lookups
-    /// can succeed. Drives whether the location backfill is worth running.
+    /// Whether any callsign source is available — the bundled FCC database, or
+    /// a configured callbook. Drives whether the location backfill is worth
+    /// running.
     var canLookupCallsigns: Bool {
+        CallsignDatabase.isBundled
+            || !KeychainManager.loadCredentials(for: .qrz).isEmpty
+            || !KeychainManager.loadCredentials(for: .hamqth).isEmpty
+    }
+
+    /// True once a callbook is configured, so the backfill knows whether a
+    /// local miss is worth a network round trip at all.
+    private var hasCallbook: Bool {
         !KeychainManager.loadCredentials(for: .qrz).isEmpty
             || !KeychainManager.loadCredentials(for: .hamqth).isEmpty
     }
@@ -966,10 +1001,30 @@ final class AppState {
 
         var pendingSave = localChanges
         var sinceSave = 0
-        for call in pending.prefix(Self.locationBackfillLimit) {
+        var callbookLookups = 0
+        // The cap counts callbook requests only — the bundled FCC database is
+        // free to query, so an offline pass can place the whole log at once
+        // and only the calls it misses are rationed.
+        //
+        // Deliberately not `lookupCallsign`: this pass only needs a
+        // coordinate, and enriching every offline hit from the callbook would
+        // put the whole log back on the network for no gain here.
+        for call in pending {
             if Task.isCancelled { break }
-            guard let result = await lookupCallsign(call),
-                  let coord = Self.coordinate(from: result) else {
+
+            var result = await localCallsignLookup(call)
+            let usedCallbook = result == nil && hasCallbook
+                && callbookLookups < Self.locationBackfillLimit
+            if usedCallbook {
+                callbookLookups += 1
+                result = await remoteCallsignLookup(call)
+                // Be polite to the callbook between requests. A local hit
+                // never earned a wait, which is what makes an offline pass
+                // over a large log finish in one go.
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+
+            guard let result, let coord = Self.coordinate(from: result) else {
                 continue
             }
             // Apply to every contact with this callsign still missing a location.
@@ -993,8 +1048,6 @@ final class AppState {
                 sinceSave = 0
                 pendingSave = false
             }
-            // Be polite to the callbook between lookups.
-            try? await Task.sleep(for: .milliseconds(200))
         }
 
         if pendingSave {
@@ -1558,9 +1611,9 @@ final class AppState {
 
         // Feed the last-used editor defaults so a manually opened editor is
         // pre-filled with live rig state.
-        if freqMHz > 0 {
-            lastFreq = freqMHz
-            if let band = Band.from(frequencyMHz: freqMHz) { lastBand = band }
+        if let freq = state.loggableFrequencyMHz {
+            lastFreq = freq
+            if let band = state.band { lastBand = band }
         }
         if let mode = state.mode { lastMode = mode }
 
@@ -1658,12 +1711,12 @@ final class AppState {
     /// for frequency and mode alone, and WSJT-X Status frames carry no power.
     var liveRigDefaults: (band: Band?, mode: Mode?, freqMHz: Double?, powerWatts: Double?)? {
         if rigState.connected {
-            return (rigState.band, rigState.mode, rigState.frequencyMHz,
+            return (rigState.band, rigState.mode, rigState.loggableFrequencyMHz,
                     rigState.powerWatts)
         }
         if wsjtxRigState.connected {
             return (wsjtxRigState.band, wsjtxRigState.mode,
-                    wsjtxRigState.dialFrequencyMHz, nil)
+                    wsjtxRigState.loggableFrequencyMHz, nil)
         }
         return nil
     }
@@ -1770,7 +1823,7 @@ final class AppState {
         guard state != rigState else { return }
         rigState = state
         guard state.connected else { return }
-        if let freq = state.frequencyMHz, freq > 0 {
+        if let freq = state.loggableFrequencyMHz {
             lastFreq = freq
             if let band = state.band { lastBand = band }
         }
@@ -1820,7 +1873,7 @@ final class AppState {
             rigState = state
             // Feed the last-used editor defaults so a manually opened
             // editor is pre-filled with live rig state (same as WSJT-X).
-            if let freq = state.frequencyMHz, freq > 0 {
+            if let freq = state.loggableFrequencyMHz {
                 lastFreq = freq
                 if let band = state.band { lastBand = band }
             }

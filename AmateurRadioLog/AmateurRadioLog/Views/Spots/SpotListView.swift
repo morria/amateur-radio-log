@@ -424,16 +424,10 @@ struct SpotListView: View {
         operationWorkedCalls = operationCalls
     }
 
-    /// "EA8/W1AW/P" → "W1AW": the slash-separated segment that looks most
-    /// like a callsign (has a digit and a letter; longest wins). Lets a
-    /// logged "AB4PP" match a spotted "AB4PP/P".
+    /// "EA8/W1AW/P" → "W1AW". Lets a logged "AB4PP" match a spotted
+    /// "AB4PP/P"; shared with the offline callsign database.
     static func baseCallsign(_ call: String) -> String {
-        let parts = call.split(separator: "/").map(String.init)
-        guard parts.count > 1 else { return call }
-        let plausible = parts.filter { part in
-            part.contains(where: \.isNumber) && part.contains(where: \.isLetter)
-        }
-        return plausible.max { $0.count < $1.count } ?? call
+        CallsignFormat.base(call)
     }
 
     // MARK: - Logging Actions

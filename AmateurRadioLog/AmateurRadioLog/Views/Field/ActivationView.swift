@@ -497,6 +497,7 @@ private struct ActivationLoggingView: View {
     @State private var showExport = false
 
     @FocusState private var callFocused: Bool
+    @FocusState private var theirParkFocused: Bool
 
     private enum SpotStatus: Equatable {
         case idle
@@ -694,33 +695,45 @@ private struct ActivationLoggingView: View {
                                 placeholder: QuickEntryParser.defaultRST(for: mode) ?? "")
                 LabeledRSTField(title: "Rcvd", text: $rstRcvd,
                                 placeholder: QuickEntryParser.defaultRST(for: mode) ?? "")
-                if session.kind == .general { Spacer(minLength: 0) }
-                if session.kind != .general {
-                HStack(spacing: 4) {
-                    Text(session.kind == .sota ? "S2S" : "P2P")
-                        .font(.caption.bold())
-                        .foregroundStyle(.secondary)
-                    TextField(session.kind == .sota ? "Their summit" : "Their park",
-                              text: $theirPark)
-                        .autocorrectionDisabled()
-                        .font(.body.monospaced())
-                        #if os(iOS)
-                        .textInputAutocapitalization(.characters)
-                        #endif
-                        #if os(macOS)
-                        .textFieldStyle(.roundedBorder)
-                        #endif
-                        .onChange(of: theirPark) { _, v in
-                            let upper = v.uppercased()
-                            if upper != v { theirPark = upper }
-                        }
-                }
-                }
+                Spacer(minLength: 0)
+            }
+
+            // Their reference gets its own row: sharing one with the RST
+            // fields squeezed all three below a comfortable tap size.
+            if session.kind != .general {
+                theirReferenceField
             }
         }
     }
 
+    private var theirReferenceField: some View {
+        HStack(spacing: 6) {
+            Text(session.kind == .sota ? "S2S" : "P2P")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+            TextField(session.kind == .sota ? "Their summit" : "Their park",
+                      text: $theirPark)
+                .autocorrectionDisabled()
+                .font(.body.monospaced())
+                .focused($theirParkFocused)
+                #if os(iOS)
+                .textInputAutocapitalization(.characters)
+                #endif
+                #if os(macOS)
+                .textFieldStyle(.roundedBorder)
+                #endif
+                .onChange(of: theirPark) { _, v in
+                    let upper = v.uppercased()
+                    if upper != v { theirPark = upper }
+                }
+        }
+        .entryChip(focus: $theirParkFocused)
+    }
+
     private var logButton: some View {
+        // Extra headroom above the entry fields: a mistap here logs the QSO
+        // rather than moving the cursor, so it gets a wider guard band than
+        // the stack's default spacing.
         Button(action: logQSO) {
             Group {
                 if let confirmation {
@@ -735,6 +748,7 @@ private struct ActivationLoggingView: View {
         .buttonStyle(.borderedProminent)
         .tint(confirmation == nil ? Color.accentColor : Color.green)
         .disabled(!QuickEntryParser.isPlausibleCallsign(call.trimmingCharacters(in: .whitespaces)))
+        .padding(.top, 16)
     }
 
     private var recentStrip: some View {
@@ -901,10 +915,9 @@ private struct ActivationLoggingView: View {
         data.call = trimmedCall
         data.band = band
         data.mode = mode
+        // A missing band follows from the frequency — `QSOEditData` owns
+        // that rule now, for every entry path.
         data.freq = currentFrequency()
-        if data.band == nil, let f = data.freq {
-            data.band = Band.from(frequencyMHz: f)
-        }
         // Empty RST = the usual report for this mode (what the ghost
         // text promised); nil for modes without RST-style reports.
         let rstDefault = QuickEntryParser.defaultRST(for: data.mode)
@@ -1028,14 +1041,17 @@ private struct LabeledRSTField: View {
     @Binding var text: String
     var placeholder: String = "59"
 
+    @FocusState private var focused: Bool
+
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Text(title)
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
             TextField(placeholder, text: $text)
                 .frame(maxWidth: 64)
                 .font(.body.monospacedDigit())
+                .focused($focused)
                 #if os(iOS)
                 .keyboardType(.numberPad)
                 #endif
@@ -1043,5 +1059,45 @@ private struct LabeledRSTField: View {
                 .textFieldStyle(.roundedBorder)
                 #endif
         }
+        .entryChip(focus: $focused)
+    }
+}
+
+// MARK: - Entry Chip
+
+/// Bordered 44pt target for the small entry fields under the callsign box.
+/// Bare text fields there are only as tall as their text, which puts a ~20pt
+/// target directly above the full-width Log QSO button — a near miss logs
+/// the QSO instead of moving the cursor. macOS keeps the plain layout; the
+/// pointer is precise and the fields already draw a bezel there.
+private struct EntryChip: ViewModifier {
+    var focus: FocusState<Bool>.Binding
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content
+            .padding(.horizontal, 10)
+            .frame(minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.gray.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(focus.wrappedValue ? Color.accentColor
+                                                     : Color.gray.opacity(0.4),
+                                  lineWidth: 1.5)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .onTapGesture { focus.wrappedValue = true }
+        #else
+        content
+        #endif
+    }
+}
+
+private extension View {
+    func entryChip(focus: FocusState<Bool>.Binding) -> some View {
+        modifier(EntryChip(focus: focus))
     }
 }

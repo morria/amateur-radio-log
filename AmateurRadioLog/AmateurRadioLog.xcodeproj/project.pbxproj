@@ -30,6 +30,7 @@
 		1FEE73AA367F2CDA4E7DC43A /* LogNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F5FB14589E176DFB269369 /* LogNavigationUITests.swift */; };
 		20B883B9A60C53E8C1D9C0B1 /* AchievementBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62474014EC027A3A905A871 /* AchievementBanner.swift */; };
 		255AB7169165FD58A31175FF /* AwardMilestone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77DF41C9E83FA0027CB01630 /* AwardMilestone.swift */; };
+		25F1F41E6470A9171CAEC993 /* CallsignDatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9641694D5C217DD93F6D8BF0 /* CallsignDatabaseTests.swift */; };
 		26EF4116A34E2852176E8B59 /* Mode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F44254B1312E8C10FAECED7 /* Mode.swift */; };
 		27C7EAB75C140351117D84E7 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FD889A4B81B4BF6623F368E /* SyncEngine.swift */; };
 		28BC6F0EEA136706998F1D2C /* SyncResultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69F9B007955CB3D145C03C1 /* SyncResultTests.swift */; };
@@ -41,6 +42,7 @@
 		385945CEFE756082FF4AD316 /* StatsFilterScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6B5E7E0570C1C35282E94A /* StatsFilterScopeTests.swift */; };
 		3E21A60E4FA3F089CC9385CA /* ADIFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B723A65B2A6BC7EB72E990 /* ADIFWriter.swift */; };
 		3E2D570DF678103C64D88A1D /* XMLResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5E74769E2B699BCAA597B7 /* XMLResponseParser.swift */; };
+		3E63CFC9B4B96F2413D0FF9E /* CallsignDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF616DCD34CBC3DBD3B65229 /* CallsignDatabase.swift */; };
 		44C3929CF740FC630BAC36A3 /* SpotStreamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82E1A51721ED40A8BCC7FD4 /* SpotStreamingTests.swift */; };
 		4682B3123A5EA6C94DA8F2A3 /* POTAExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D4499C8AB92E0F9E923487E /* POTAExportSheet.swift */; };
 		48C8760B6FAB8E247FA7A80B /* SpotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733F41AD731BAB10F094E805 /* SpotTests.swift */; };
@@ -98,11 +100,13 @@
 		D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E3BA1BA315779F6F1BFDBE /* Band.swift */; };
 		DA46E8E6E05A5D244D025427 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3D76E301651BC205642DEDC3 /* Assets.xcassets */; };
 		DD735F7AD1D575328D88CAEE /* WavelogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22199A504E8F988C5FDFDC85 /* WavelogService.swift */; };
+		DEC95AA261494F3FDD1C447B /* CallsignFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B920EF96A0B5190F09D3AD /* CallsignFormat.swift */; };
 		E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F106C61338C6F99B136BB883 /* FilterPerfTests.swift */; };
 		E3B147A925E44A654DF7598F /* TQSLLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A29F7024366B6DEB1E6C15B /* TQSLLauncher.swift */; };
 		E3D2944619CAF7D427C8A578 /* ServiceCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBDAF361698C60B2E6D71D3 /* ServiceCredentials.swift */; };
 		E8C00D5640295A3BE4864E1E /* OnboardingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FF7077DF7629746C2915FC /* OnboardingTests.swift */; };
 		ECB12A39E0A4DC0D3FB91C5B /* SpotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5065C428C2F4027D8B9B9DD /* SpotService.swift */; };
+		ECC0E1BF8AE5B351C789696E /* callsigns.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = FC1E68F462012EC9EE33BDE9 /* callsigns.sqlite */; };
 		ED8ED051C1F1D437A49F02D5 /* QSOStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445FF6EA45ED93E04E697D9C /* QSOStore.swift */; };
 		EF2FA64B2211A14B1AB2E74C /* RigServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D624CDF6C32DEA8171C8203 /* RigServiceTests.swift */; };
 		EF89B45C549AF43365AA91D8 /* ActivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7DF4847F085D3453F05951F /* ActivationView.swift */; };
@@ -134,6 +138,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		03B920EF96A0B5190F09D3AD /* CallsignFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignFormat.swift; sourceTree = "<group>"; };
 		0510701E4652985EC2569789 /* SpotProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotProvider.swift; sourceTree = "<group>"; };
 		05AC67E2F8C6B10E1F72DDBD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		0755D1B36432788FB86E9B30 /* AwardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwardEngine.swift; sourceTree = "<group>"; };
@@ -206,6 +211,7 @@
 		91385BDA835FED00C748E4DD /* PocketCatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketCatTests.swift; sourceTree = "<group>"; };
 		93A962F6080E90AEB5E8199B /* LoTWService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoTWService.swift; sourceTree = "<group>"; };
 		9608DE44244D28AC40650023 /* SignalReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalReportTests.swift; sourceTree = "<group>"; };
+		9641694D5C217DD93F6D8BF0 /* CallsignDatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignDatabaseTests.swift; sourceTree = "<group>"; };
 		99BDB2EDCBB5C0426D5F7FC9 /* QSOStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QSOStoreTests.swift; sourceTree = "<group>"; };
 		9BE906F1F502447279BDF9C8 /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		9D1CC7D81F61D1D8E2B1476E /* AmateurRadioLog.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AmateurRadioLog.entitlements; sourceTree = "<group>"; };
@@ -241,10 +247,12 @@
 		E4F9667B78E543487D4805B4 /* QuickEntryParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryParserTests.swift; sourceTree = "<group>"; };
 		E7DF4847F085D3453F05951F /* ActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationView.swift; sourceTree = "<group>"; };
 		EC266241ECB2A70B1C2E3A88 /* PocketCatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketCatService.swift; sourceTree = "<group>"; };
+		EF616DCD34CBC3DBD3B65229 /* CallsignDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignDatabase.swift; sourceTree = "<group>"; };
 		F106C61338C6F99B136BB883 /* FilterPerfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPerfTests.swift; sourceTree = "<group>"; };
 		F5C478245B150F8B0B49552D /* CallsignLookupResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsignLookupResult.swift; sourceTree = "<group>"; };
 		F7C1963EF5268CDE6655022B /* AmateurRadioLogUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AmateurRadioLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAB8287FE642D71BCB719D0C /* TabReturnStackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabReturnStackTests.swift; sourceTree = "<group>"; };
+		FC1E68F462012EC9EE33BDE9 /* callsigns.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = callsigns.sqlite; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -283,6 +291,7 @@
 			isa = PBXGroup;
 			children = (
 				3D76E301651BC205642DEDC3 /* Assets.xcassets */,
+				FC1E68F462012EC9EE33BDE9 /* callsigns.sqlite */,
 				4358E0583762C64EA1F32B3A /* Localizable.xcstrings */,
 				08F0A30ECCE28BF637EFD2ED /* pota_parks.csv.z */,
 			);
@@ -293,6 +302,7 @@
 			isa = PBXGroup;
 			children = (
 				0755D1B36432788FB86E9B30 /* AwardEngine.swift */,
+				EF616DCD34CBC3DBD3B65229 /* CallsignDatabase.swift */,
 				7FA3C42BF55EC7DD7F3B81C1 /* CallsignSuperfill.swift */,
 				8AF37FB1C38AF284AB4F6933 /* FieldDaySession.swift */,
 				D7FADD384575DA34F0F2DDA5 /* HamQTHService.swift */,
@@ -419,6 +429,7 @@
 			children = (
 				C5E0FAE0EB2E4F8A07483995 /* ActivationTests.swift */,
 				0BAB794A26A0412CE3C70471 /* AwardEngineTests.swift */,
+				9641694D5C217DD93F6D8BF0 /* CallsignDatabaseTests.swift */,
 				1394CCA3F15A4CEDC4EF0C88 /* ClusterParserTests.swift */,
 				87F2547788F423DBE3731308 /* FieldDayReplicationTests.swift */,
 				F106C61338C6F99B136BB883 /* FilterPerfTests.swift */,
@@ -481,6 +492,7 @@
 		C4739EA8448913FCADC7F9D0 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				03B920EF96A0B5190F09D3AD /* CallsignFormat.swift */,
 				9BE906F1F502447279BDF9C8 /* DateFormatters.swift */,
 				6CE80E7234CF976F31E0F178 /* FrequencyBandMapper.swift */,
 				3FD5D37600BB476F93E0BEAA /* GeoMath.swift */,
@@ -673,6 +685,7 @@
 			files = (
 				DA46E8E6E05A5D244D025427 /* Assets.xcassets in Resources */,
 				CC84B2F8FBAB6BC81293AEDB /* Localizable.xcstrings in Resources */,
+				ECC0E1BF8AE5B351C789696E /* callsigns.sqlite in Resources */,
 				8B466B1D9B0866DDCD38561D /* pota_parks.csv.z in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -694,6 +707,7 @@
 			files = (
 				831C8721E5310907EE3247C6 /* ActivationTests.swift in Sources */,
 				715AFD07BDA920635300BEB5 /* AwardEngineTests.swift in Sources */,
+				25F1F41E6470A9171CAEC993 /* CallsignDatabaseTests.swift in Sources */,
 				BECEB011F784065020BCCD6E /* ClusterParserTests.swift in Sources */,
 				767BED956B3CD1CE8D2FD2E2 /* FieldDayReplicationTests.swift in Sources */,
 				E12238EA4BAD0B373E6AAE01 /* FilterPerfTests.swift in Sources */,
@@ -733,6 +747,8 @@
 				255AB7169165FD58A31175FF /* AwardMilestone.swift in Sources */,
 				D8E7A25459D88B3902EC4C28 /* Band.swift in Sources */,
 				895570C7A86594308C5F071C /* BandPlan.swift in Sources */,
+				3E63CFC9B4B96F2413D0FF9E /* CallsignDatabase.swift in Sources */,
+				DEC95AA261494F3FDD1C447B /* CallsignFormat.swift in Sources */,
 				4FA5F74488EB9AEB08AF6CAA /* CallsignLookupResult.swift in Sources */,
 				2EB19A941D3A4E010078716D /* CallsignSuperfill.swift in Sources */,
 				FFBAABCF5903E4496B9F3A4B /* ClusterLineParser.swift in Sources */,

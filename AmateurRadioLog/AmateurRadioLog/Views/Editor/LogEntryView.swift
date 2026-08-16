@@ -469,8 +469,13 @@ struct LogEntryView: View {
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
+                        // Only *follow* the frequency into a band. A value
+                        // that lands in no band (mid-typing "14", a rig
+                        // reporting in the wrong unit) used to clear the
+                        // band outright, exporting FREQ with no BAND at all
+                        // — a record QRZ and LoTW both refuse.
                         .onChange(of: freq) { _, f in
-                            if let f { band = Band.from(frequencyMHz: f) }
+                            if let f, let b = Band.from(frequencyMHz: f) { band = b }
                             // Anything that isn't the value the rig just
                             // wrote is the operator typing — stop following
                             // the dial so it can't overwrite them.
@@ -849,17 +854,33 @@ struct LogEntryView: View {
                                                       excluding: prefill?.id,
                                                       in: modelContext)
                 .filter { $0.deletedAt == nil }
-            // Short extra pause before hitting the network.
+
+            // The bundled FCC database answers most US calls right here, with
+            // no network and no second pause — show it at once. On a miss,
+            // leave whatever is on screen for now: the callbook may still know
+            // the call, and clearing here would flicker the card away and back.
+            let local = await appState.localCallsignLookup(callsign)
+            guard !Task.isCancelled else { return }
+            if let local { withAnimation { lookupResult = local } }
+
+            // Then enrich from the callbook in the background. The spinner is
+            // only for an empty card: once the offline answer is up, the
+            // upgrade happens quietly, and a callbook that is unconfigured,
+            // unreachable or simply doesn't know the call leaves it standing.
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            isLookingUp = true
-            let result = await appState.lookupCallsign(callsign)
+            isLookingUp = local == nil
+            let remote = await appState.remoteCallsignLookup(callsign)
             guard !Task.isCancelled else {
                 isLookingUp = false
                 return
             }
             isLookingUp = false
-            withAnimation { lookupResult = result }
+            // The callbook's answer layered over the offline one, or whichever
+            // single source had it. Assigning even when both came back empty
+            // is what clears a card left over from the previous callsign.
+            let merged = remote.map { local?.enriched(with: $0) ?? $0 } ?? local
+            withAnimation { lookupResult = merged }
         }
     }
 }

@@ -115,6 +115,16 @@ struct RigState: Equatable {
         explicitMode ?? rigModeRaw.flatMap(RigModeMapper.mode(fromRigModeName:))
     }
     var band: Band? { frequencyMHz.flatMap { Band.from(frequencyMHz: $0) } }
+
+    /// The dial reading, but only when it lands in an amateur band — i.e.
+    /// only when it is fit to become a QSO's FREQ. A transport reporting in
+    /// the wrong unit still yields a positive, plausible-looking Double
+    /// (14.266 MHz read from 100 Hz steps as if they were Hz comes through
+    /// as 0.14266), and a `> 0` check waves it past onto every QSO of the
+    /// run — where it derives no band and costs the whole batch at upload
+    /// time. The raw reading stays in `frequencyMHz`, so the toolbar chip
+    /// still shows what the rig actually said.
+    var loggableFrequencyMHz: Double? { band == nil ? nil : frequencyMHz }
 }
 
 // MARK: - Mode Mapping
